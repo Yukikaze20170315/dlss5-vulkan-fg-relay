@@ -1,0 +1,191 @@
+INFO real loader APIs; unavailable branch is not fault-injected; failures are fail-fast.
+PASS null, unreadable, interior and unloaded HMODULE
+PASS non-candidate: 20 unload/reload cycles, including stale handles
+PASS D11 create only: 20 unload/reload cycles, including stale handles
+PASS D11 evaluate only: 20 unload/reload cycles, including stale handles
+PASS D11 evaluate_C only: 20 unload/reload cycles, including stale handles
+PASS Vulkan create only: 20 unload/reload cycles, including stale handles
+PASS Vulkan create1 only: 20 unload/reload cycles, including stale handles
+PASS Vulkan evaluate only: 20 unload/reload cycles, including stale handles
+PASS Vulkan evaluate_C only: 20 unload/reload cycles, including stale handles
+PASS D11 create + Vulkan evaluate: 20 unload/reload cycles, including stale handles
+PASS Vulkan create + D11 evaluate: 20 unload/reload cycles, including stale handles
+PASS export near matches: 20 unload/reload cycles, including stale handles
+PASS D11: 20 unload/reload cycles, including stale handles
+PASS D11_C: 20 unload/reload cycles, including stale handles
+PASS D11 with Vulkan scanning: 20 unload/reload cycles, including stale handles
+PASS D11_C with Vulkan scanning: 20 unload/reload cycles, including stale handles
+PASS Vulkan create/evaluate: 20 unload/reload cycles, including stale handles
+PASS Vulkan create/evaluate_C: 20 unload/reload cycles, including stale handles
+PASS Vulkan create1/evaluate: 20 unload/reload cycles, including stale handles
+PASS Vulkan create1/evaluate_C: 20 unload/reload cycles, including stale handles
+PASS Vulkan rejected without flag: 20 unload/reload cycles, including stale handles
+PASS Vulkan_C rejected without flag: 20 unload/reload cycles, including stale handles
+PASS Vulkan1 rejected without flag: 20 unload/reload cycles, including stale handles
+PASS Vulkan1_C rejected without flag: 20 unload/reload cycles, including stale handles
+PASS real loader-lock contention: 20 cycles, maximum retry 0.000 ms
+OBSERVE forward preload=0 vulkan=0 cycle=1: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=2: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=3: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=4: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=5: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=6: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=7: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=8: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=9: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=10: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=11: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=12: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=13: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=14: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=15: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=16: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=17: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=18: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=19: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=0 cycle=20: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+PASS forwarding / lazy target vulkan=0: 20 cycles; all seven forwarded names
+OBSERVE forward preload=1 vulkan=0 cycle=1: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=2: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=3: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=4: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=5: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=6: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=7: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=8: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=9: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=10: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=11: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=12: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=13: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=14: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=15: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=16: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=17: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=18: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=19: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=0 cycle=20: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+PASS forwarding / preloaded target vulkan=0: 20 cycles; all seven forwarded names
+OBSERVE forward preload=0 vulkan=1 cycle=1: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=2: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=3: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=4: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=5: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=6: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=7: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=8: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=9: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=10: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=11: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=12: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=13: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=14: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=15: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=16: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=17: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=18: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=19: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=0 vulkan=1 cycle=20: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+PASS forwarding / lazy target vulkan=1: 20 cycles; all seven forwarded names
+OBSERVE forward preload=1 vulkan=1 cycle=1: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=2: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=3: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=4: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=5: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=6: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=7: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=8: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=9: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=10: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=11: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=12: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=13: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=14: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=15: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=16: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=17: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=18: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=19: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+OBSERVE forward preload=1 vulkan=1 cycle=20: source-owned=1 target-alive=1
+OBSERVE final source release: source-detach=1 target-detach=1 target-unloaded=1
+PASS forwarding / preloaded target vulkan=1: 20 cycles; all seven forwarded names
+PASS scan-test: 20705 assertions; no game, NGX runtime or module API mocks

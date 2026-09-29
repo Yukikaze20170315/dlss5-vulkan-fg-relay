@@ -1,0 +1,48 @@
+GENERIC registered module=00007FF92CDC0000 thread=56144 count=1
+INSTANCE created=0000000000523480 result=0 registered=1
+BEFORE destroy registered=1 acquisitions=0 gated=0
+GENERIC unregister module=00007FF92CDC0000 thread=56144
+  stack[0] host.exe+0x1376
+  stack[1] host.exe+0x161c
+  stack[2] renodx-dlss5.addon64+0x11af1e
+  stack[3] renodx-dlss5.addon64+0x12474a
+  stack[4] ntdll.dll+0x15f73a
+  stack[5] ntdll.dll+0xbc33
+  stack[6] ntdll.dll+0x97998
+  stack[7] ntdll.dll+0x966ee
+  stack[8] ntdll.dll+0x96534
+  stack[9] ntdll.dll+0x147b0
+  stack[10] KERNELBASE.dll+0x40679
+  stack[11] ReShade64.dll+0x3f892
+  stack[12] ReShade64.dll+0x201cd3
+  stack[13] nvoglv64.dll+0xd9d437
+  stack[14] vulkan-1.dll+0x69d7e
+  stack[15] host.exe+0x1a2f
+  stack[16] host.exe+0x3f80
+  stack[17] KERNEL32.DLL+0x2e8d7
+  stack[18] ntdll.dll+0x8c48c
+AFTER destroy registered=0 module=0000000000000000
+GENERIC registered module=00007FF92CDC0000 thread=56144 count=2
+INSTANCE created=0000000000523480 result=0 registered=1
+VERDICT stable=1 registrations=2 acquisitions=0 registered=1 control=1
+GENERIC unregister module=00007FF92CDC0000 thread=56144
+  stack[0] host.exe+0x1376
+  stack[1] host.exe+0x161c
+  stack[2] renodx-dlss5.addon64+0x11af1e
+  stack[3] renodx-dlss5.addon64+0x12474a
+  stack[4] ntdll.dll+0x15f73a
+  stack[5] ntdll.dll+0xbc33
+  stack[6] ntdll.dll+0x97998
+  stack[7] ntdll.dll+0x966ee
+  stack[8] ntdll.dll+0x96534
+  stack[9] ntdll.dll+0x147b0
+  stack[10] KERNELBASE.dll+0x40679
+  stack[11] ReShade64.dll+0x3f892
+  stack[12] ReShade64.dll+0x201cd3
+  stack[13] nvoglv64.dll+0xd9d437
+  stack[14] vulkan-1.dll+0x69d7e
+  stack[15] host.exe+0x1c55
+  stack[16] host.exe+0x3f80
+  stack[17] KERNEL32.DLL+0x2e8d7
+  stack[18] ntdll.dll+0x8c48c
+FINAL cleanup=1 acquisitions=0

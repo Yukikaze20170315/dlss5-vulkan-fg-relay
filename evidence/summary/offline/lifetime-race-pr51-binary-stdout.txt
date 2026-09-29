@@ -1,0 +1,30 @@
+GENERIC registered module=00007FF92CDC0000 thread=72872 count=1
+SCAN holds Generic reference thread=50596 caller=00007FF9D7261241
+  stack[0] host.exe+0x1376
+  stack[1] host.exe+0x1210
+  stack[2] dlss5-bridge.addon64+0x11241
+  stack[3] dlss5-bridge.addon64+0x28925
+  stack[4] dlss5-bridge.addon64+0x11fe1
+  stack[5] KERNEL32.DLL+0x2e8d7
+  stack[6] ntdll.dll+0x8c48c
+INSTANCE created=0000000000547250 result=0 registered=1
+BEFORE destroy registered=1 acquisitions=1 gated=1
+AFTER destroy registered=1 module=00007FF92CDC0000
+INSTANCE created=0000000000547250 result=0 registered=1
+GENERIC unregister module=00007FF92CDC0000 thread=50596
+  stack[0] host.exe+0x1376
+  stack[1] host.exe+0x161c
+  stack[2] renodx-dlss5.addon64+0x11af1e
+  stack[3] renodx-dlss5.addon64+0x12474a
+  stack[4] ntdll.dll+0x15f73a
+  stack[5] ntdll.dll+0xbc33
+  stack[6] ntdll.dll+0x97998
+  stack[7] ntdll.dll+0x966ee
+  stack[8] ntdll.dll+0x96534
+  stack[9] ntdll.dll+0x147b0
+  stack[10] KERNELBASE.dll+0x40679
+  stack[11] dlss5-bridge.addon64+0x28999
+  stack[12] dlss5-bridge.addon64+0x11fe1
+  stack[13] KERNEL32.DLL+0x2e8d7
+  stack[14] ntdll.dll+0x8c48c
+VERDICT race=1 registrations=1 acquisitions=1 registered=0

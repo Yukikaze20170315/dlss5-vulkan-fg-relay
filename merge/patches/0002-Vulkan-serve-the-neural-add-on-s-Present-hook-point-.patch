@@ -1,0 +1,2976 @@
+From a22ecb65916793362cc4b794038fb0fb8cedefc4 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E7=9B=97=E7=89=88=E3=81=AE=E9=9B=AA=E9=A2=A8=E9=85=B1?=
+ <50561019+Yukikaze20170315@users.noreply.github.com>
+Date: Mon, 28 Sep 2026 21:01:20 +0800
+Subject: [PATCH 2/3] Vulkan: serve the neural add-on's Present hook point at
+ the Frame Generation input
+
+RenoDX's DLSS 5 Generic does not serve NRHookPoint=Present on Vulkan; it falls
+back to the Upscaled point. Processing the present stream instead is correct but
+bounded by NR throughput: every FG-generated frame pays a full evaluate, which
+measured 29 presents/s at 5120x2160 with two NR passes against ~300 idle.
+
+This change hooks the game's own DLSS-G evaluate (feature 11, already forwarded
+by the Vulkan mirror) and processes the real frame once before forwarding it:
+HUD-less -> sRGB decode -> Generic NR through an identity SR carrier -> encode ->
+UI-preserving composite into the back buffer, with the game's output-resolution
+depth and motion vectors as guides. FG then interpolates from the processed
+frames, so the presented multiplier is kept (109 presents/s, 4.9x in the same
+scene). Generic 8.5.0-rc10 is used unmodified; the carrier hook is on the SR
+runtime's public export, thread-scoped, and tail-forwards every other caller.
+
+Follow=1 maps Generic's own hook-point setting onto the two Vulkan paths:
+Present runs this feed continuously, Upscaled/Render keep the native mirror,
+with the private D3D12 session handed over on the render thread. The FG thread
+never blocks on the bridge lock or waits the device idle (a device-wide wait
+there deadlocked the game once during development), and frames without an NR
+entry are not counted as failures (that made Generic's toggle key unusable).
+
+Also included: fence completion proofs and resource retention when GPU
+completion cannot be proven, the sRGB branch of the colour pass with FP32
+intermediates for the HDR10 pass, a swapchain contract check on the present
+path, and offline tests (asm thunk, composite shader, isolated Vulkan
+round-trip host). Details, measurements and a minimal-integration guide are in
+VULKAN-FG-INPUT-NR.md. Builds on the two fixes from #49.
+---
+ README.md                                   |   5 +
+ VULKAN-FG-INPUT-NR.md                       | 183 ++++++++
+ src/AdapterEvents.fx                        |  20 +
+ src/bridge.h                                |   1 +
+ src/bridge.inc                              |  74 +--
+ src/build.cmd                               |   7 +-
+ src/dlss5-bridge.cpp                        |   3 +-
+ src/fg-composite-shader.h                   |  24 +
+ src/fg-input.inc                            | 487 ++++++++++++++++++++
+ src/present-adapter-config.h                |  85 ++++
+ src/present-adapter.inc                     | 445 ++++++++++++++++++
+ src/present-nr-witness.asm                  |  44 ++
+ src/synth.inc                               |  92 +++-
+ src/version.rc                              |   8 +-
+ src/vk-present-adapter.ini.example          |  26 ++
+ src/vkmirror.inc                            |  66 ++-
+ tests/vulkan-fg-input/build-roundtrip.cmd   |   9 +
+ tests/vulkan-fg-input/roundtrip-host.cpp    | 326 +++++++++++++
+ tests/vulkan-fg-input/run-roundtrip.py      | 133 ++++++
+ tests/vulkan-fg-input/test-composite.cmd    |  10 +
+ tests/vulkan-fg-input/test-composite.cpp    | 165 +++++++
+ tests/vulkan-fg-input/test-witness.cmd      |  12 +
+ tests/vulkan-fg-input/test-witness.cpp      |  69 +++
+ tests/vulkan-fg-input/validate-roundtrip.py | 148 ++++++
+ tests/vulkan-fg-input/vcvars.cmd            |   9 +
+ 25 files changed, 2390 insertions(+), 61 deletions(-)
+ create mode 100644 VULKAN-FG-INPUT-NR.md
+ create mode 100644 src/AdapterEvents.fx
+ create mode 100644 src/fg-composite-shader.h
+ create mode 100644 src/fg-input.inc
+ create mode 100644 src/present-adapter-config.h
+ create mode 100644 src/present-adapter.inc
+ create mode 100644 src/present-nr-witness.asm
+ create mode 100644 src/vk-present-adapter.ini.example
+ create mode 100644 tests/vulkan-fg-input/build-roundtrip.cmd
+ create mode 100644 tests/vulkan-fg-input/roundtrip-host.cpp
+ create mode 100644 tests/vulkan-fg-input/run-roundtrip.py
+ create mode 100644 tests/vulkan-fg-input/test-composite.cmd
+ create mode 100644 tests/vulkan-fg-input/test-composite.cpp
+ create mode 100644 tests/vulkan-fg-input/test-witness.cmd
+ create mode 100644 tests/vulkan-fg-input/test-witness.cpp
+ create mode 100644 tests/vulkan-fg-input/validate-roundtrip.py
+ create mode 100644 tests/vulkan-fg-input/vcvars.cmd
+
+diff --git a/README.md b/README.md
+index 84b7bec..9f4302e 100644
+--- a/README.md
++++ b/README.md
+@@ -70,6 +70,7 @@ Three routes; the substitute is off by default:
+ | --- | --- | --- |
+ | **D3D11 bridge** | DirectX 11 with DLSS | The game's Color, Depth and MotionVectors are copied into shared textures, evaluated on D3D12 and copied back. The bridge follows the supplied dimensions, regions and parameters, with defaults for missing values. |
+ | **Vulkan mirror** | Vulkan with DLSS | The game's own, mirrored the same way through imported D3D12 textures. `vk_mirror=1`, the default. |
++| **Vulkan final-frame feed** | Vulkan with DLSS Frame Generation | The neural add-on's "Present" hook point, which it does not serve on Vulkan itself: the real frame is processed once at the game's Frame Generation input (HUD-less in, UI preserved), so FG interpolates the enhanced image and the presented multiplier stays. Opt-in through `vk-present-adapter.ini`; see [VULKAN-FG-INPUT-NR.md](VULKAN-FG-INPUT-NR.md). |
+ | **Substitute contract** | Games without DLSS that expose usable depth and motion inputs through ReShade | DLAA at back-buffer size, using NVIDIA Optical Flow or a ReShade motion-vector shader. Requires `synth=1`; availability depends on the API, driver and inputs. |
+ 
+ With `source=auto`, the game's own DLSS takes priority. Prefer that route when
+@@ -174,6 +175,10 @@ not re-read until the game's DLSS goes quiet.
+ | `probe` | 0 | `1` runs a standalone NGX D3D12 probe at attach and logs the result. Diagnostic. |
+ | `hash_out` | 1 | Once per feature build, 60 frames in, read the input and the output back and log a hash of the output, the mean of each channel of both, and the brightness ratio out/in. One readback per build; `0` disables. D3D11 bridge only. |
+ 
++A second, optional file beside the add-on, `vk-present-adapter.ini`, enables the
++Vulkan final-frame feed (`Enabled=1`, `Source=fg-input`, `Follow=1`); it is read
++once at start-up and documented in `src/vk-present-adapter.ini.example`.
++
+ ## Status panel
+ 
+ ReShade's overlay has a **DLSS 5 Bridge** window. It shows which route holds
+diff --git a/VULKAN-FG-INPUT-NR.md b/VULKAN-FG-INPUT-NR.md
+new file mode 100644
+index 0000000..775cda0
+--- /dev/null
++++ b/VULKAN-FG-INPUT-NR.md
+@@ -0,0 +1,183 @@
++# Vulkan: neural rendering of the final frame at the Frame Generation input
++
++Status: verified in one title (Arknights: Endfield, Vulkan, 5120x2160, RTX 5090,
++Generic 8.5.0-rc10 with two NR passes, native DLSS-G fixed 6x). Not yet tested
++with other Vulkan games, HDR swapchains, or without native Frame Generation.
++
++## Problem
++
++RenoDX's DLSS 5 Generic offers three hook points: Upscaled, Render and Present.
++On Vulkan the add-on itself falls back: `NRHookPoint=Present is not served on
++Vulkan; NR runs at the Upscaled hook point`. The Present point is what users
++want when they need the neural pass to see the finished frame (post-processing,
++colour grading, HUD) rather than the DLSS output.
++
++Two facts constrain any Vulkan implementation of that point:
++
++1. **Where the frame is read decides how many times NR runs.** A game with
++   native Frame Generation presents 6 frames per real frame at 6x. Anything that
++   processes the present stream (ReShade `begin_effects`, a swapchain hook)
++   pays one full NR evaluate per presented frame. At 5120x2160 with two NR
++   passes one evaluate costs ~20-40 ms, so a post-FG feed collapses to ~29
++   presents/s and drags the game's simulation rate down with it. This was
++   measured with PresentMon before this design was adopted (see "Measurements").
++2. **The private D3D12 session is only usable from a thread that may block.**
++   Generic's NR runs inside `NVSDK_NGX_D3D12_EvaluateFeature` on the bridge's
++   private device; the Vulkan side has to wait for that work before it can copy
++   the result back. Doing that inside the FG evaluate (Streamline's present
++   thread) with a device-wide wait deadlocked the game once during development,
++   because the render thread's queue was waiting on present progress.
++
++## Design
++
++The feed hooks the game's own Frame Generation evaluate (NGX feature 11, which
++the bridge already forwards) and processes **only the real frame, once**, before
++the evaluate is forwarded:
++
++```
++FG evaluate (feature 11, MultiFrameIndex == 1)
++  copy DLSSG.HUDLess   -> private COLOR   (shared D3D12 texture, imported VkImage)
++  copy DLSSG.Backbuffer-> private OUT_B
++  copy DLSSG.Depth     -> private DEPTH   (R32_SFLOAT, output resolution)
++  copy DLSSG.MVecs     -> private MV      (R16G16_SFLOAT, DLSSG.MvecScaleX/Y)
++  vkCmdSetEvent(in) ; vkCmdWaitEvents(out)         <- the mirror's existing park
++  copy private OUTPUT  -> DLSSG.HUDLess
++  copy private OUT_B   -> DLSSG.Backbuffer
++forward the FG evaluate
++```
++
++The worker thread, woken by the `in` event:
++
++```
++sRGB decode COLOR -> linear FP16 working textures
++NVSDK_NGX_D3D12_EvaluateFeature on the bridge's own 1:1 SR feature
++   |- the SR runtime's public export is hooked for this thread only and answers
++   |  with a same-size copy instead of running DLAA (identity carrier)
++   |- Generic's after-upscale detour runs its NR passes on that call as usual
++sRGB encode -> OUTPUT
++composite: OUT_B = Backbuffer + (NR - HUDLess) * w,  w = saturate(1 - |Backbuffer - HUDLess| / 0.25)
++set the out event
++```
++
++Consequences:
++
++* NR cost is paid per **real** frame (22 evaluates/s at 5120x2160 for a 22 fps
++  game), and FG still generates its frames from the processed image. Presented
++  rate stayed at ~109/s (4.9x) in the game test versus 29/s for the post-FG feed.
++* The UI is preserved: FG receives both the processed HUD-less image and a
++  back buffer whose UI pixels are untouched, so real and interpolated frames
++  agree. Translucent panels keep a faded part of the enhancement instead of a
++  hard cut-out.
++* Generic is used **unmodified** (8.5.0-rc10, SHA-256
++  `DCD93881E976AD033D83C2BB01F4BC3E4DDC59C15FE0DD4CA165BC5FC7D1AC68`). Nothing
++  reads its private layout; the identity-carrier hook is on the SR runtime's
++  public `NVSDK_NGX_D3D12_EvaluateFeature`, scoped by thread and by resource
++  identity, and tail-forwards every other caller unchanged.
++* Depth and motion vectors at output resolution come from the FG parameter
++  block, so the neural pass has real guides rather than the neutral zeros the
++  present-stream feed had to use.
++
++## Threading rules (the hard-won part)
++
++* The FG evaluate runs on Streamline's present thread, not the render thread.
++  **Never** call `vkDeviceWaitIdle`, `vkQueueWaitIdle` or any unbounded wait
++  from `FgInputFrame`. The first build is allowed only when nothing has been
++  imported yet; a shape change is refused (or, with `Follow=1`, deferred to the
++  render thread).
++* `FgInputFrame` takes `g_bridge_cs` with `TryEnterCriticalSection`; a missed
++  frame keeps the game's own image, a blocked present thread can deadlock.
++* Session hand-over between the native mirror and this feed (`Follow=1`) happens
++  only inside the game's SR evaluate on the render thread, where the mirror
++  already does its own device-idle rebuilds.
++* A frame whose NR entry was not observed (Generic switched off, warming up) is
++  **not** a failure: the carriers hold the game's own image and the recorded
++  copy back is a no-op. Counting it as a failure retired the mirror after five
++  frames and made Generic's toggle key unusable until restart.
++
++## Colour
++
++* UNORM8 swapchains (sRGB, the only ones handled by this build): decode to
++  normalized linear FP16 for the carrier, encode back after NR. Generic then
++  sees `encoding=linear units=relative`. `NRSourceEncoding`, `NRSourcePrimaries`
++  and `NRLinearUnitNits` must stay at Auto (0); the adapter refuses otherwise,
++  because a forced "SDR encoded" declaration over an already-linear input made
++  Generic rebuild its workset every frame.
++* HDR10 (PQ) swapchains use the existing PQ decode/encode pass with FP32
++  intermediates and exact BT.2020/BT.709 matrices; the previous FP16/rounded
++  constants lost dark channels (measured 54/255 error on a colour-block
++  fixture, 0 after the change). HDR is verified only in the offline host.
++
++## Files
++
++| File | Role |
++| --- | --- |
++| `src/fg-input.inc` | FG-evaluate hook: parameter validation, copies, park, worker half, session hand-over. |
++| `src/fg-composite-shader.h` | UI-preserving composite (cs_5_0), shared with `tests/vulkan-fg-input/test-composite.cpp`. |
++| `src/present-adapter.inc` | Identity-carrier hook on the SR runtime, NR entry witness, configuration checks, the reference present-stream feed. |
++| `src/present-adapter-config.h` | `vk-present-adapter.ini` keys: `Enabled`, `Source`, `Follow`, `AutoRun`; session ownership. |
++| `src/present-nr-witness.asm` | Tail-forwarding thunks that preserve the four arguments and the caller's return address. |
++| `src/vkmirror.inc` | Worker dispatch (`fg_arm`), FG handle tracking, mirror/feed arbitration in the evaluate detour. |
++| `src/synth.inc`, `src/bridge.inc`, `src/bridge.h` | sRGB path in the colour pass, fence-completion proofs, resource retention when completion is unproven, swapchain contract capture. |
++| `src/AdapterEvents.fx` | Empty technique so ReShade 6.8 emits `begin_effects` (present-stream feed only). |
++| `src/vk-present-adapter.ini.example` | Documented configuration. |
++| `tests/vulkan-fg-input/` | Offline tests (below). |
++
++## Tests
++
++All require MSVC (`tests/vulkan-fg-input/vcvars.cmd` finds it) and, for the
++round-trip host, `VULKAN_SDK` plus ReShade 6.8 installed as `VK_LAYER_reshade`.
++
++| Command | Checks |
++| --- | --- |
++| `test-witness.cmd` | The asm thunks preserve arguments, return address and result; the identity gate is thread-local. |
++| `test-composite.cmd` | Composite on a D3D12 device: 2868 scene pixels take the NR result, 192 opaque UI pixels are untouched, 12 translucent pixels blend. |
++| `build-roundtrip.cmd` + `run-roundtrip.py <dir> --assets <dir> [--hdr] [--with-rr-module] [--hook-point 2]` | Off-screen Vulkan host through the present-stream feed: copy, colour round-trip and two NR requests with a pause; validates zero ROI error, single Generic workset, history reset and two NR passes after the host exits. Needs the third-party binaries in `--assets` (not shipped). |
++
++The fg-input path has no offline host because it needs a real DLSS-G evaluate;
++it was validated in the game with the request file (copy -> colour round-trip
++-> NR) before being switched on continuously.
++
++## Measurements (Arknights: Endfield, 5120x2160, two NR passes, fixed 6x)
++
++PresentMon 2.5.1, same scene, same session:
++
++| | idle (no NR) | present-stream feed | **fg-input feed** |
++| --- | --- | --- | --- |
++| presents / s | 299-320 | 29 | **109** |
++| simulation marks / s | 49-53 | 14.5 | **22** |
++| presents per simulation | 6.1 | 2.0 | **4.9** |
++| MsBetweenPresents p50 / p95 | 3.3 / 4.0 | 32 / 44 | **7.3 / 28** |
++
++The remaining gap to 6x is the ~28 ms the real frame spends parked while NR
++runs; generated frames cannot present during that window, so the cadence is
++bimodal. Pipelining (interpolate frame N-1 while NR processes frame N) would
++remove it at the cost of one frame of latency and is not part of this change.
++
++## Known limits
++
++* UNORM8 sRGB FG inputs only; other formats and non-full-image subrects are
++  refused with a log line and the game keeps its own image.
++* Requires the game to supply `DLSSG.HUDLess` (Endfield does).
++* One effect runtime / one swapchain; a resolution or format change while the
++  feed owns the session is refused unless `Follow=1` can hand it over on the
++  render thread.
++* Generic's layer count and per-layer parameters are global, so the two
++  sources (mirror at Upscaled, feed at Present) cannot run different layer
++  configurations; only the source differs.
++
++## Minimal integration for maintainers
++
++If you prefer not to take the whole change, the essential pieces are, in order:
++
++1. `fg-input.inc` + the two-line hook in `ForwardVkEvaluate` for handles noted
++   as feature 11, and the `fg_arm` branch in `VkmWorkerProc`.
++2. The identity-carrier hook (`PresentAdapterCarrier`, `PresentAdapterSrEnter`,
++   `present-nr-witness.asm`) so Generic's after-upscale NR can be driven without
++   an extra DLAA pass.
++3. `Synth12Build(..., srgb=true)` and the sRGB branch in the colour pass.
++4. The "no NR entry is not a failure" rule and the no-device-wait rule on the
++   FG thread; both were found in the game, not offline.
++
++The present-stream feed (`Source=present`) can be dropped entirely; it is kept
++because its offline host is the only way to regression-test the colour path
++without a game.
+diff --git a/src/AdapterEvents.fx b/src/AdapterEvents.fx
+new file mode 100644
+index 0000000..8331809
+--- /dev/null
++++ b/src/AdapterEvents.fx
+@@ -0,0 +1,20 @@
++// ReShade skips begin/finish-effects events when it has no techniques.
++// This technique exists only to make the documented callback available.
++// ColorWriteMask=0 preserves the application's colour, including alpha.
++float4 AdapterVS(uint id : SV_VertexID) : SV_Position
++{
++    return float4(id == 2 ? 3.0 : -1.0, id == 1 ? 3.0 : -1.0, 0.0, 1.0);
++}
++float4 AdapterPS(float4 position : SV_Position) : SV_Target
++{
++    return 0.0;
++}
++technique AdapterEvents
++{
++    pass
++    {
++        VertexShader = AdapterVS;
++        PixelShader = AdapterPS;
++        ColorWriteMask = 0;
++    }
++}
+diff --git a/src/bridge.h b/src/bridge.h
+index 307a5cb..0798a21 100644
+--- a/src/bridge.h
++++ b/src/bridge.h
+@@ -95,6 +95,7 @@ struct PqPass
+     ID3D12RootSignature  *rs;
+     ID3D12PipelineState  *pso;
+     ID3D12DescriptorHeap *heap;
++    bool                  srgb;
+     UINT                  cw, ch, ow, oh;
+     // Not owned: the session's colour and output textures the passes convert.
+     // output_b is the substitute's second Output, and it is null on every other
+diff --git a/src/bridge.inc b/src/bridge.inc
+index 0096073..98aa65f 100644
+--- a/src/bridge.inc
++++ b/src/bridge.inc
+@@ -1866,34 +1866,44 @@ static bool PqBackBuffer(DXGI_FORMAT f)
+ // is parked behind those.
+ static bool PqPassWait(PqPass *p, UINT64 value, DWORD wait_ms = 4000)
+ {
+-    if (p->fence == nullptr || p->fence->GetCompletedValue() >= value) return true;
++    if (p->fence == nullptr) return true;
++    const UINT64 completed = p->fence->GetCompletedValue();
++    if (completed == UINT64_MAX) return false;
++    if (completed >= value) return true;
+     if (FAILED(p->fence->SetEventOnCompletion(value, p->ev))) return false;
+-    return WaitForSingleObject(p->ev, wait_ms) == WAIT_OBJECT_0;
++    if (WaitForSingleObject(p->ev, wait_ms) != WAIT_OBJECT_0) return false;
++    const UINT64 after = p->fence->GetCompletedValue();
++    return after != UINT64_MAX && after >= value;
+ }
+ 
+-static void PqPassRelease(PqPass *p)
++static bool PqPassRelease(PqPass *p)
+ {
+-    // The lists may still name the textures: let them finish first.
+-    if (p->fence != nullptr) PqPassWait(p, p->fv);
++    if (!PqPassWait(p, p->fv)) {
++        Log("[bridge] colour-pass completion unproven; retaining its resources.");
++        return false;
++    }
+     if (p->in  != nullptr) { p->in->Release();  p->in  = nullptr; }
+     if (p->out != nullptr) { p->out->Release(); p->out = nullptr; }
+     p->colour = p->output = p->output_b = nullptr;
++    return true;
+ }
+ 
+ // One shader, one root constant choosing the direction: 0 decodes colour into
+ // in, 1 encodes out into output. The BT.2020 matrices are the ones an HDR10
+ // surface implies; the model side is BT.709.
+ static bool PqPassMake(PqPass *p, ID3D12Device *dev, ID3D12Resource *colour, ID3D12Resource *output,
+-                       ID3D12Resource *output_b = nullptr)
++                       ID3D12Resource *output_b = nullptr, bool srgb = false)
+ {
+-    PqPassRelease(p);
++    if (!PqPassRelease(p)) return false;
+     p->dev      = dev;
++    p->srgb     = srgb;
+     p->colour   = colour;
+     p->output   = output;
+     p->output_b = output_b;
+     const D3D12_RESOURCE_DESC cd = colour->GetDesc(), od = output->GetDesc();
+     p->cw = static_cast<UINT>(cd.Width); p->ch = cd.Height;
+     p->ow = static_cast<UINT>(od.Width); p->oh = od.Height;
++    const DXGI_FORMAT linear_format = srgb ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R32G32B32A32_FLOAT;
+ 
+     D3D12_HEAP_PROPERTIES hp = {};
+     hp.Type = D3D12_HEAP_TYPE_DEFAULT;
+@@ -1901,7 +1911,8 @@ static bool PqPassMake(PqPass *p, ID3D12Device *dev, ID3D12Resource *colour, ID3
+     rd.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+     rd.DepthOrArraySize = 1;
+     rd.MipLevels        = 1;
+-    rd.Format           = DXGI_FORMAT_R16G16B16A16_FLOAT;
++    // Wide-gamut cancellation can destroy dark HDR channels in FP16 intermediates.
++    rd.Format           = linear_format;
+     rd.SampleDesc.Count = 1;
+     rd.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+     rd.Flags            = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+@@ -1915,8 +1926,8 @@ static bool PqPassMake(PqPass *p, ID3D12Device *dev, ID3D12Resource *colour, ID3
+             reinterpret_cast<void **>(pair[i]));
+         if (FAILED(hr))
+         {
+-            Log("[bridge] the %llux%u R16G16B16A16_FLOAT texture for the HDR10 %s could not be "
+-                "created: 0x%08X", rd.Width, rd.Height, i == 0 ? "decode" : "encode", hr);
++            Log("[bridge] the %llux%u %s texture for colour %s could not be created: 0x%08X",
++                rd.Width, rd.Height, FormatName(linear_format), i == 0 ? "decode" : "encode", hr);
+             PqPassRelease(p);
+             return false;
+         }
+@@ -1945,12 +1956,12 @@ static bool PqPassMake(PqPass *p, ID3D12Device *dev, ID3D12Resource *colour, ID3
+             "cbuffer C : register(b0) { uint mode; };\n"
+             "static const float m1 = 0.1593017578125, m2 = 78.84375;\n"
+             "static const float c1 = 0.8359375, c2 = 18.8515625, c3 = 18.6875;\n"
+-            "static const float3x3 k2020to709 = { 1.6605, -0.5876, -0.0728,\n"
+-            "                                    -0.1246,  1.1329, -0.0083,\n"
+-            "                                    -0.0182, -0.1006,  1.1187 };\n"
+-            "static const float3x3 k709to2020 = { 0.6274, 0.3293, 0.0433,\n"
+-            "                                     0.0691, 0.9195, 0.0114,\n"
+-            "                                     0.0164, 0.0880, 0.8956 };\n"
++            "static const float3x3 k2020to709 = { 1.6604910021, -0.5876411388, -0.0728498633,\n"
++            "                                    -0.1245504745, 1.1328998971, -0.0083494226,\n"
++            "                                    -0.0181507634, -0.1005788980, 1.1187296614 };\n"
++            "static const float3x3 k709to2020 = { 0.6274038959, 0.3292830384, 0.0433130657,\n"
++            "                                     0.0690972894, 0.9195403951, 0.0113623156,\n"
++            "                                     0.0163914389, 0.0880133079, 0.8955952532 };\n"
+             "float3 pq_to_nits(float3 e)\n"
+             "{\n"
+             "    float3 p = pow(max(e, 0.0), 1.0 / m2);\n"
+@@ -1961,13 +1972,19 @@ static bool PqPassMake(PqPass *p, ID3D12Device *dev, ID3D12Resource *colour, ID3
+             "    float3 y = pow(saturate(n / 10000.0), m1);\n"
+             "    return pow((c1 + c2 * y) / (1.0 + c3 * y), m2);\n"
+             "}\n"
++            "float3 srgb_decode(float3 v) { return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4); }\n"
++            "float3 srgb_encode(float3 v) { v = saturate(v); return v <= 0.0031308 ? v * 12.92 : 1.055 * pow(v, 1.0 / 2.4) - 0.055; }\n"
+             "[numthreads(8,8,1)]\n"
+             "void main(uint3 id : SV_DispatchThreadID)\n"
+             "{\n"
+             "    uint w, h; dst.GetDimensions(w, h);\n"
+             "    if (id.x >= w || id.y >= h) return;\n"
+             "    float4 v = src[id.xy];\n"
+-            "    if (mode == 0)\n"
++            "    if (mode == 2)\n"
++            "        dst[id.xy] = float4(srgb_decode(v.rgb), v.a);\n"
++            "    else if (mode == 3)\n"
++            "        dst[id.xy] = float4(srgb_encode(v.rgb), v.a);\n"
++            "    else if (mode == 0)\n"
+             "        dst[id.xy] = float4(mul(k2020to709, pq_to_nits(v.rgb)) / 80.0, v.a);\n"
+             "    else\n"
+             "        dst[id.xy] = float4(nits_to_pq(mul(k709to2020, v.rgb * 80.0)), v.a);\n"
+@@ -2064,10 +2081,10 @@ static bool PqPassMake(PqPass *p, ID3D12Device *dev, ID3D12Resource *colour, ID3
+     cpu.ptr += inc;
+     D3D12_UNORDERED_ACCESS_VIEW_DESC ud = {};
+     ud.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+-    ud.Format        = DXGI_FORMAT_R16G16B16A16_FLOAT;
++    ud.Format        = linear_format;
+     dev->CreateUnorderedAccessView(p->in, nullptr, &ud, cpu);
+     cpu.ptr += inc;
+-    sd.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
++    sd.Format = linear_format;
+     dev->CreateShaderResourceView(p->out, &sd, cpu);
+     cpu.ptr += inc;
+     ud.Format = od.Format;
+@@ -2080,16 +2097,16 @@ static bool PqPassMake(PqPass *p, ID3D12Device *dev, ID3D12Resource *colour, ID3
+     {
+         const D3D12_RESOURCE_DESC bd = output_b->GetDesc();
+         cpu.ptr += inc;
+-        sd.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
++        sd.Format = linear_format;
+         dev->CreateShaderResourceView(p->out, &sd, cpu);
+         cpu.ptr += inc;
+         ud.Format = bd.Format;
+         dev->CreateUnorderedAccessView(output_b, nullptr, &ud, cpu);
+     }
+ 
+-    Log("[bridge] HDR10 PQ conversion ready: the %s back buffer is decoded to linear BT.709 "
+-        "(1.0 = 80 nits) before the evaluate and the result encoded again after, so the "
+-        "contract can say IsHDR and mean it.", FormatName(cd.Format));
++    Log("[bridge] %s conversion ready: %s -> linear BT.709 %s -> original encoding.",
++        srgb ? "sRGB" : "HDR10 PQ", FormatName(cd.Format),
++        srgb ? "(normalized SDR)" : "(1.0 = 80 nits)");
+     return true;
+ }
+ 
+@@ -2108,7 +2125,7 @@ static void PqPassDispatch(PqPass *p, ID3D12GraphicsCommandList *list, int mode,
+     // pipeline does not double colour.
+     gpu.ptr += static_cast<UINT64>(mode == 0 ? 0 : 2 + 2 * set) * inc;
+     list->SetComputeRootDescriptorTable(0, gpu);
+-    list->SetComputeRoot32BitConstant(1, static_cast<UINT>(mode), 0);
++    list->SetComputeRoot32BitConstant(1, static_cast<UINT>(mode + (p->srgb ? 2 : 0)), 0);
+     const UINT w = mode == 0 ? p->cw : p->ow, h = mode == 0 ? p->ch : p->oh;
+     list->Dispatch((w + 7) / 8, (h + 7) / 8, 1);
+ }
+@@ -2151,11 +2168,12 @@ static bool PqPassRun(PqPass *p, ID3D12CommandQueue *queue, int mode, int set,
+         Barrier(list, p->out, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON);
+         Barrier(list, p->in, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON);
+     }
+-    list->Close();
++    if (FAILED(list->Close())) return false;
+     ID3D12CommandList *lists[] = { list };
+     queue->ExecuteCommandLists(1, lists);
+-    queue->Signal(p->fence, ++p->fv);
+-    p->done[mode] = p->fv;
++    const UINT64 value = ++p->fv;
++    if (FAILED(queue->Signal(p->fence, value))) return false;
++    p->done[mode] = value;
+     return true;
+ }
+ 
+@@ -2174,7 +2192,7 @@ static UINT64 PqPassAfter(PqPass *p, ID3D12CommandQueue *queue, ID3D12Fence *ses
+ {
+     if (!PqPassRun(p, queue, 1, set, wait_ms)) return fallback;
+     const UINT64 v = ++*session_value;
+-    queue->Signal(session_fence, v);
++    if (FAILED(queue->Signal(session_fence, v))) return fallback;
+     return v;
+ }
+ 
+diff --git a/src/build.cmd b/src/build.cmd
+index fa16c59..3b52788 100644
+--- a/src/build.cmd
++++ b/src/build.cmd
+@@ -25,8 +25,11 @@ cd /d "%~dp0"
+ rc /nologo version.rc
+ if errorlevel 1 exit /b 1
+ 
+-cl /nologo /W4 /O2 /MT /EHsc /std:c++17 /Ireshade /Iminhook\include /Iminhook\src /LD ^
+-   dlss5-bridge.cpp minhook.c version.res ^
++ml64 /nologo /c present-nr-witness.asm
++if errorlevel 1 exit /b 1
++
++cl /nologo /W4 /WX /O2 /MT /EHsc /std:c++17 /Ireshade /Iminhook\include /Iminhook\src /LD ^
++   dlss5-bridge.cpp minhook.c version.res present-nr-witness.obj ^
+    /Fe:dlss5-bridge.addon64 ^
+    /link /DLL user32.lib advapi32.lib bcrypt.lib
+ if errorlevel 1 exit /b 1
+diff --git a/src/dlss5-bridge.cpp b/src/dlss5-bridge.cpp
+index 595ad6c..4c48331 100644
+--- a/src/dlss5-bridge.cpp
++++ b/src/dlss5-bridge.cpp
+@@ -65,7 +65,7 @@
+ #pragma comment(lib, "version.lib")
+ 
+ // Kept in step with version.rc, which is where ReShade's overlay reads it from.
+-#define BRIDGE_VERSION "1.4.13-pre8"
++#define BRIDGE_VERSION "1.4.13-pre8-vk-fginput"
+ 
+ extern "C" __declspec(dllexport) const char *NAME =
+     "DLSS 5 Bridge " BRIDGE_VERSION;
+@@ -128,6 +128,7 @@ typedef NVSDK_NGX_Result (*PFN_Create)(ID3D11DeviceContext *, int,
+ static CRITICAL_SECTION g_log_cs;
+ static char             g_log_path[MAX_PATH];
+ static HMODULE          g_self;
++#include "present-adapter-config.h"
+ 
+ // Anything that means "your setup is wrong" also goes into ReShade's own log,
+ // where its overlay shows it. People reliably post ReShade.log instead of this
+diff --git a/src/fg-composite-shader.h b/src/fg-composite-shader.h
+new file mode 100644
+index 0000000..4aa4d5b
+--- /dev/null
++++ b/src/fg-composite-shader.h
+@@ -0,0 +1,24 @@
++#pragma once
++
++// UI-preserving recomposition of a neural-rendered HUD-less frame.
++//   t0 = original HUD-less, t1 = NR(HUD-less), u0 = backbuffer in / composite out.
++// The NR delta is applied fully where the UI did not touch the pixel and fades
++// out with the UI's contribution, so translucent panels keep a soft, continuous
++// scene under them instead of an un-enhanced cut-out; opaque UI stays untouched.
++static const char kFgCompositeShader[] =
++    "Texture2D<float4>   hudless : register(t0);\n"
++    "Texture2D<float4>   nr      : register(t1);\n"
++    "RWTexture2D<float4> back    : register(u0);\n"
++    "static const float kUiFade = 0.25;\n"
++    "[numthreads(8,8,1)]\n"
++    "void main(uint3 id : SV_DispatchThreadID)\n"
++    "{\n"
++    "    uint w, h; back.GetDimensions(w, h);\n"
++    "    if (id.x >= w || id.y >= h) return;\n"
++    "    float4 b = back[id.xy];\n"
++    "    float3 s = hudless[id.xy].rgb;\n"
++    "    float3 d = abs(b.rgb - s);\n"
++    "    float ui = max(d.r, max(d.g, d.b));\n"
++    "    float weight = saturate(1.0 - ui / kUiFade);\n"
++    "    back[id.xy] = float4(saturate(b.rgb + (nr[id.xy].rgb - s) * weight), b.a);\n"
++    "}\n";
+diff --git a/src/fg-input.inc b/src/fg-input.inc
+new file mode 100644
+index 0000000..b4ff50e
+--- /dev/null
++++ b/src/fg-input.inc
+@@ -0,0 +1,487 @@
++// Native frame-generation input feed for Vulkan: the real, fully composited frame
++// that DLSS-G interpolates from is neural-rendered once per real frame, before the
++// FG evaluate is forwarded. FG then interpolates from processed frames, so the
++// presented multiplier is preserved. Generic still runs through the identity SR
++// carrier on the private D3D12 session; nothing here reads Generic's layout.
++#include "fg-composite-shader.h"
++
++static NVSDK_NGX_Handle *g_fg_handles[8];
++static LONG g_fg_handle_count;
++
++static void FgInputNoteCreated(int feature_id, NVSDK_NGX_Result r, NVSDK_NGX_Handle **out)
++{
++    if (r != NGX_SUCCESS || out == nullptr || *out == nullptr) return;
++    for (LONG i = 0; i < g_fg_handle_count; ++i)
++        if (g_fg_handles[i] == *out) { g_fg_handles[i] = g_fg_handles[--g_fg_handle_count]; break; }
++    if (feature_id == 11 && g_fg_handle_count < static_cast<LONG>(_countof(g_fg_handles)))
++        g_fg_handles[g_fg_handle_count++] = *out;
++}
++
++static bool FgInputIsFgHandle(const NVSDK_NGX_Handle *handle)
++{
++    for (LONG i = 0; i < g_fg_handle_count; ++i)
++        if (g_fg_handles[i] == handle) return true;
++    return false;
++}
++
++struct FgComposite {
++    ID3D12RootSignature *rs;
++    ID3D12PipelineState *pso;
++    ID3D12DescriptorHeap *heap;
++    ID3D12CommandAllocator *alloc;
++    ID3D12GraphicsCommandList *list;
++    ID3D12Fence *fence;
++    HANDLE ev;
++    UINT64 fv;
++    ID3D12Resource *hudless, *nr, *back;
++};
++static FgComposite g_fg_composite;
++
++struct FgInputState {
++    bool refused, armed, worker_ok, want_release;
++    uint32_t vk_fmt;
++    UINT w, h;
++    VkmRes hudless, back;
++    unsigned frames, writes, skipped_nr;
++    unsigned long long token;
++};
++static FgInputState g_fg_input;
++
++static bool FgCompositeWait(DWORD ms)
++{
++    FgComposite &c = g_fg_composite;
++    if (c.fence == nullptr) return true;
++    const UINT64 done = c.fence->GetCompletedValue();
++    if (done == UINT64_MAX) return false;
++    if (done >= c.fv) return true;
++    if (FAILED(c.fence->SetEventOnCompletion(c.fv, c.ev))) return false;
++    if (WaitForSingleObject(c.ev, ms) != WAIT_OBJECT_0) return false;
++    const UINT64 after = c.fence->GetCompletedValue();
++    return after != UINT64_MAX && after >= c.fv;
++}
++
++static bool FgCompositeMake(ID3D12Device *dev, ID3D12Resource *hudless, ID3D12Resource *nr,
++                            ID3D12Resource *back)
++{
++    FgComposite &c = g_fg_composite;
++    if (c.pso == nullptr) {
++        PFN_D3DCompile_ compile = LoadSystemD3DCompiler();
++        if (compile == nullptr) { Log("[fg-input] d3dcompiler_47.dll unavailable for the composite pass"); return false; }
++        ID3DBlob *code = nullptr, *err = nullptr;
++        HRESULT hr = compile(kFgCompositeShader, sizeof(kFgCompositeShader) - 1, "fgc", nullptr, nullptr,
++                             "main", "cs_5_0", 0, 0, &code, &err);
++        if (FAILED(hr) || code == nullptr) {
++            Log("[fg-input] composite shader failed to compile: %s",
++                err != nullptr ? static_cast<const char *>(err->GetBufferPointer()) : "");
++            if (err != nullptr) err->Release();
++            return false;
++        }
++        if (err != nullptr) err->Release();
++        D3D12_DESCRIPTOR_RANGE ranges[2] = {};
++        ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
++        ranges[0].NumDescriptors = 2;
++        ranges[0].OffsetInDescriptorsFromTableStart = 0;
++        ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
++        ranges[1].NumDescriptors = 1;
++        ranges[1].OffsetInDescriptorsFromTableStart = 2;
++        D3D12_ROOT_PARAMETER param = {};
++        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
++        param.DescriptorTable.NumDescriptorRanges = 2;
++        param.DescriptorTable.pDescriptorRanges = ranges;
++        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
++        D3D12_ROOT_SIGNATURE_DESC rsd = {};
++        rsd.NumParameters = 1;
++        rsd.pParameters = &param;
++        HMODULE d3d12 = GetModuleHandleW(L"d3d12.dll");
++        auto serialize = d3d12 != nullptr
++            ? reinterpret_cast<PFN_D3D12_SERIALIZE_ROOT_SIGNATURE>(GetProcAddress(d3d12, "D3D12SerializeRootSignature")) : nullptr;
++        ID3DBlob *rsblob = nullptr, *rserr = nullptr;
++        hr = serialize != nullptr ? serialize(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &rsblob, &rserr) : E_FAIL;
++        if (FAILED(hr) || rsblob == nullptr) {
++            Log("[fg-input] composite root signature would not serialize 0x%08X", hr);
++            if (rserr != nullptr) rserr->Release();
++            code->Release();
++            return false;
++        }
++        if (rserr != nullptr) rserr->Release();
++        hr = dev->CreateRootSignature(0, rsblob->GetBufferPointer(), rsblob->GetBufferSize(),
++                                      __uuidof(ID3D12RootSignature), reinterpret_cast<void **>(&c.rs));
++        rsblob->Release();
++        if (FAILED(hr)) { code->Release(); Log("[fg-input] composite root signature failed 0x%08X", hr); return false; }
++        D3D12_COMPUTE_PIPELINE_STATE_DESC pd = {};
++        pd.pRootSignature = c.rs;
++        pd.CS.pShaderBytecode = code->GetBufferPointer();
++        pd.CS.BytecodeLength = code->GetBufferSize();
++        hr = dev->CreateComputePipelineState(&pd, __uuidof(ID3D12PipelineState), reinterpret_cast<void **>(&c.pso));
++        code->Release();
++        if (FAILED(hr)) { Log("[fg-input] composite pipeline failed 0x%08X", hr); return false; }
++        D3D12_DESCRIPTOR_HEAP_DESC hd = {};
++        hd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
++        hd.NumDescriptors = 3;
++        hd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
++        if (FAILED(dev->CreateDescriptorHeap(&hd, __uuidof(ID3D12DescriptorHeap), reinterpret_cast<void **>(&c.heap))) ||
++            FAILED(dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandAllocator), reinterpret_cast<void **>(&c.alloc))) ||
++            FAILED(dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, c.alloc, nullptr, __uuidof(ID3D12GraphicsCommandList), reinterpret_cast<void **>(&c.list))) ||
++            FAILED(dev->CreateFence(0, D3D12_FENCE_FLAG_NONE, __uuidof(ID3D12Fence), reinterpret_cast<void **>(&c.fence)))) {
++            Log("[fg-input] composite heap/list/fence creation failed");
++            return false;
++        }
++        c.list->Close();
++        c.ev = CreateEventW(nullptr, FALSE, FALSE, nullptr);
++        if (c.ev == nullptr) return false;
++    }
++    if (!FgCompositeWait(4000)) return false;
++    c.hudless = hudless; c.nr = nr; c.back = back;
++    const UINT inc = dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
++    D3D12_CPU_DESCRIPTOR_HANDLE cpu = c.heap->GetCPUDescriptorHandleForHeapStart();
++    D3D12_SHADER_RESOURCE_VIEW_DESC sd = {};
++    sd.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
++    sd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
++    sd.Texture2D.MipLevels = 1;
++    sd.Format = hudless->GetDesc().Format;
++    dev->CreateShaderResourceView(hudless, &sd, cpu);
++    cpu.ptr += inc;
++    sd.Format = nr->GetDesc().Format;
++    dev->CreateShaderResourceView(nr, &sd, cpu);
++    cpu.ptr += inc;
++    D3D12_UNORDERED_ACCESS_VIEW_DESC ud = {};
++    ud.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
++    ud.Format = back->GetDesc().Format;
++    dev->CreateUnorderedAccessView(back, nullptr, &ud, cpu);
++    return true;
++}
++
++// Runs on the private queue after the NR submission; the caller fences on it.
++static bool FgCompositeRun(ID3D12CommandQueue *queue, DWORD wait_ms)
++{
++    FgComposite &c = g_fg_composite;
++    if (c.pso == nullptr || c.back == nullptr) return false;
++    if (!FgCompositeWait(wait_ms)) return false;
++    if (FAILED(c.alloc->Reset()) || FAILED(c.list->Reset(c.alloc, nullptr))) return false;
++    Barrier(c.list, c.hudless, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++    Barrier(c.list, c.nr, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++    Barrier(c.list, c.back, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++    ID3D12DescriptorHeap *heaps[] = { c.heap };
++    c.list->SetDescriptorHeaps(1, heaps);
++    c.list->SetComputeRootSignature(c.rs);
++    c.list->SetPipelineState(c.pso);
++    c.list->SetComputeRootDescriptorTable(0, c.heap->GetGPUDescriptorHandleForHeapStart());
++    const D3D12_RESOURCE_DESC bd = c.back->GetDesc();
++    c.list->Dispatch((static_cast<UINT>(bd.Width) + 7) / 8, (bd.Height + 7) / 8, 1);
++    Barrier(c.list, c.back, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
++    Barrier(c.list, c.nr, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON);
++    Barrier(c.list, c.hudless, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON);
++    if (FAILED(c.list->Close())) return false;
++    ID3D12CommandList *lists[] = { c.list };
++    queue->ExecuteCommandLists(1, lists);
++    if (FAILED(queue->Signal(c.fence, ++c.fv))) return false;
++    return FgCompositeWait(wait_ms);
++}
++
++// Identity on the private side so an unconditional Vulkan copy back is harmless.
++static bool FgIdentityCopy(DWORD wait_ms)
++{
++    if (!Synth12Begin(wait_ms)) return false;
++    Barrier(g_s12.list, g_s12.tex[SLOT_COLOR], D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
++    Barrier(g_s12.list, g_s12.tex[SLOT_OUTPUT], D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
++    g_s12.list->CopyResource(g_s12.tex[SLOT_OUTPUT], g_s12.tex[SLOT_COLOR]);
++    Barrier(g_s12.list, g_s12.tex[SLOT_COLOR], D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON);
++    Barrier(g_s12.list, g_s12.tex[SLOT_OUTPUT], D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
++    return Synth12WaitFence(Synth12End(), wait_ms);
++}
++
++// Worker-thread half of one FG-input frame. The game's queue is parked while this
++// runs, so every wait is bounded by the mirror's evaluate budget.
++static bool FgInputWorker()
++{
++    bool ok = false, nr_absent = false;
++    unsigned nr_entries = 0, sr_entries = 0, sr_copies = 0;
++    if (g_present_adapter.run_nr) {
++        g_present_nr_entries = g_present_sr_entries = g_present_sr_copies = 0;
++        g_present_nr_scope = true;
++        if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
++        ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs);
++        if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
++        g_present_nr_scope = false;
++        nr_entries = g_present_nr_entries; sr_entries = g_present_sr_entries; sr_copies = g_present_sr_copies;
++        if (ok && (sr_entries != 1 || sr_copies != 1)) {
++            Log("[fg-input] carrier contract mismatch: sr_entries=%u sr_copies=%u; frame not written.", sr_entries, sr_copies);
++            ok = false;
++        }
++        // Generic switched off or warming up: the carrier round-trip is the game's own
++        // image, so the recorded copy back is harmless and this is not a failure.
++        if (ok && nr_entries == 0) { nr_absent = true; ++g_fg_input.skipped_nr; }
++        if (ok && !nr_absent) ok = FgCompositeRun(g_s12.queue, kVkmEvaluateMs);
++    } else {
++        ok = PresentAdapterCopy12();
++    }
++    ok = ok && g_s12.dev->GetDeviceRemovedReason() == S_OK;
++    if (!ok) {
++        // Keep the carriers equal to their inputs so the recorded copy back is a no-op.
++        FgIdentityCopy(kVkmEvaluateMs);
++    }
++    g_fg_input.worker_ok = ok;
++    ++g_fg_input.frames;
++    if (ok && !nr_absent) ++g_fg_input.writes;
++    const unsigned cadence = g_present_adapter.continuous ? 1800u : 120u;
++    if (g_fg_input.frames <= 3 || g_fg_input.frames % cadence == 0 || !ok || g_present_adapter.remaining == 0)
++        Log("[fg-input] frame=%u %ux%u vkfmt=%u mode=%s nr_entries=%u sr_entries=%u sr_copies=%u ok=%d token=%llu.",
++            g_fg_input.frames, g_fg_input.w, g_fg_input.h, g_fg_input.vk_fmt,
++            g_present_adapter.run_nr ? "NR" : g_present_adapter.colour_roundtrip ? "carrier" : "copy",
++            nr_entries, sr_entries, sr_copies, ok ? 1 : 0, g_present_adapter.token);
++    if (g_present_adapter.remaining == 0)
++        Log("[fg-input] request complete: frames=%u writes=%u no_nr=%u. token=%llu",
++            g_fg_input.frames, g_fg_input.writes, g_fg_input.skipped_nr, g_present_adapter.token);
++    return ok;
++}
++
++static void FgInputRefuse(const char *why)
++{
++    if (g_fg_input.refused) return;
++    g_fg_input.refused = true;
++    g_present_adapter.remaining = 0;
++    Log("[fg-input] refused: %s. Frame generation continues on the game's own frames.", why);
++}
++
++static bool FgInputReadU(const NVSDK_NGX_Parameter *p, const char *key, unsigned *out)
++{
++    unsigned u = 0; int i = 0;
++    if (p->Get(key, &u) == NGX_SUCCESS) { *out = u; return true; }
++    if (p->Get(key, &i) == NGX_SUCCESS) { *out = static_cast<unsigned>(i); return true; }
++    return false;
++}
++
++// Render-thread only (inside the game's SR evaluate, where the mirror already waits
++// the device idle for its own rebuilds). Hands the private session back so the
++// other path can build. Returns false and keeps everything when completion is unproven.
++static bool FgInputRelease()
++{
++    if (g_vkm.idle != nullptr && WaitForSingleObject(g_vkm.idle, kVkmIdleMs) != WAIT_OBJECT_0) return false;
++    if (!FgCompositeWait(4000)) return false;
++    if (!Synth12Drain(4000)) return false;
++    if (g_svk.dev != nullptr && g_svk.DeviceWaitIdle != nullptr && g_svk.DeviceWaitIdle(g_svk.dev) != 0) return false;
++    SynthVkReleaseImages();
++    if (!Synth12ReleaseTextures()) return false;
++    g_fg_composite.hudless = g_fg_composite.nr = g_fg_composite.back = nullptr;
++    g_fg_input.vk_fmt = 0;
++    g_fg_input.want_release = false;
++    g_s12.w = 0;
++    g_s12.need_reset = true;
++    InterlockedExchange(&g_adapter_owner, OWNER_NONE);
++    Log("[fg-input] released the private session; the native mirror may take it.");
++    return true;
++}
++
++// Render-thread only: the mirror's session is torn down so the FG-input feed can build.
++static bool MirrorReleaseForFgInput()
++{
++    if (g_vkm.idle != nullptr && WaitForSingleObject(g_vkm.idle, kVkmIdleMs) != WAIT_OBJECT_0) return false;
++    if (!SynthVkDrainWorker()) return false;
++    if (!Synth12Drain(4000)) return false;
++    if (g_svk.dev != nullptr && g_svk.DeviceWaitIdle != nullptr && g_svk.DeviceWaitIdle(g_svk.dev) != 0) return false;
++    SynthVkReleaseImages();
++    SynthOfaVkRebuild();
++    SynthDepthCsRelease();
++    if (!Synth12ReleaseTextures()) return false;
++    g_s12.w = 0;
++    g_s12.need_reset = true;
++    InterlockedExchange(&g_adapter_owner, OWNER_NONE);
++    Log("[fg-input] the native mirror released the private session; Present is served at the frame-generation input.");
++    return true;
++}
++
++// Render-thread half: records copies of the FG inputs into the FG evaluate's own
++// command buffer, parks it, and records the copy back before the evaluate is
++// forwarded -- so FG and the real-frame present both see the processed image.
++static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
++{
++    if (g_fg_input.refused || g_vkm.stopping || g_cfg.stage < 2) return;
++    if (!FgInputActive()) return;
++    if (InterlockedCompareExchange(&g_adapter_owner, 0, 0) == OWNER_MIRROR) return;
++    PresentAdapterRequest();
++    if (g_present_adapter.remaining == 0 && (PresentAdapterAutoRun() || PresentAdapterFollow()) &&
++        g_present_adapter.request_seen && !g_present_adapter.refused && !g_present_adapter.stopped) {
++        if (!PresentAdapterConsumer()) { g_present_adapter.refused = true; return; }
++        g_present_adapter.remaining = UINT_MAX;
++        g_present_adapter.continuous = true;
++        g_present_adapter.run_nr = true;
++        g_present_adapter.colour_roundtrip = false;
++        g_present_adapter.deadline = ULLONG_MAX;
++        g_present_adapter.token = 1;
++        g_s12.need_reset = true;
++        Log("[fg-input] AutoRun: continuous NR at the frame-generation input; a request with frames=0 stops it.");
++    }
++    if (g_present_adapter.remaining == 0 || g_present_adapter.refused) return;
++    if (GetTickCount64() >= g_present_adapter.deadline) {
++        Log("[fg-input] request complete: frames=%u writes=%u no_nr=%u (deadline). token=%llu",
++            g_fg_input.frames, g_fg_input.writes, g_fg_input.skipped_nr, g_present_adapter.token);
++        g_present_adapter.remaining = 0; return;
++    }
++    if (g_present_adapter.token != g_fg_input.token) {
++        g_fg_input.token = g_present_adapter.token;
++        g_fg_input.frames = g_fg_input.writes = g_fg_input.skipped_nr = 0;
++    }
++    unsigned index = 0;
++    const bool indexed = FgInputReadU(p, "DLSSG.MultiFrameIndex", &index);
++    if (indexed && index != 1) return;
++    if (!indexed) {
++        // Without an index, the real-output slot marks the first evaluate of a group.
++        const char *why_real = nullptr;
++        VkmRes real = {};
++        if (!VkmGetRes(p, "DLSSG.OutputReal", &real, &why_real)) return;
++    }
++    if (!PresentAdapterConfiguration()) { g_present_adapter.remaining = 0; g_present_adapter.refused = true; return; }
++    if (g_cfg.mode != 2) { FgInputRefuse("the experiment requires Bridge mode=2"); return; }
++    if (g_vkm_rt == nullptr) return;
++    reshade::api::device *rdev = g_vkm_rt->get_device();
++    if (rdev == nullptr || rdev->get_api() != reshade::api::device_api::vulkan) return;
++    if (!Synth12Open(g_vkm_rt) || !SynthVkOpen(g_vkm_rt)) { FgInputRefuse("private session unavailable"); return; }
++
++    const char *why = nullptr;
++    VkmRes hud = {}, back = {};
++    if (!VkmGetRes(p, "DLSSG.HUDLess", &hud, &why)) { FgInputRefuse("no HUD-less input; this feed requires the game's HUD-less image"); return; }
++    if (!VkmGetRes(p, "DLSSG.Backbuffer", &back, &why)) { FgInputRefuse("no backbuffer input"); return; }
++    if (hud.w != back.w || hud.h != back.h || hud.fmt != back.fmt || hud.w == 0 || hud.h == 0) {
++        FgInputRefuse("HUD-less and backbuffer differ in size or format"); return;
++    }
++    unsigned sub_w = 0, sub_h = 0, sub_x = 0, sub_y = 0;
++    FgInputReadU(p, "DLSSG.BackbufferSubrectWidth", &sub_w);
++    FgInputReadU(p, "DLSSG.BackbufferSubrectHeight", &sub_h);
++    FgInputReadU(p, "DLSSG.BackbufferSubrectBaseX", &sub_x);
++    FgInputReadU(p, "DLSSG.BackbufferSubrectBaseY", &sub_y);
++    if (sub_x != 0 || sub_y != 0 || (sub_w != 0 && sub_w != back.w) || (sub_h != 0 && sub_h != back.h)) {
++        FgInputRefuse("backbuffer subrect is not the whole image"); return;
++    }
++    const DXGI_FORMAT fmt = MapVkColor(back.fmt);
++    if (fmt != DXGI_FORMAT_R8G8B8A8_UNORM && fmt != DXGI_FORMAT_B8G8R8A8_UNORM) {
++        FgInputRefuse("only UNORM8 sRGB-encoded FG inputs are handled by this build"); return;
++    }
++    // The game's own guides at output resolution, as handed to frame generation.
++    static const uint32_t kVkFmtR16G16Sfloat = 83;
++    VkmRes mv = {}, depth = {};
++    const bool have_mv = VkmGetRes(p, "DLSSG.MVecs", &mv, &why) && mv.fmt == kVkFmtR16G16Sfloat &&
++                         mv.w == back.w && mv.h == back.h;
++    const bool have_depth = VkmGetRes(p, "DLSSG.Depth", &depth, &why) && depth.fmt == kVkFmtR32Sfloat &&
++                            depth.w == back.w && depth.h == back.h;
++    float mv_scale_x = 1.0f, mv_scale_y = 1.0f;
++    unsigned depth_inverted = 0;
++    if (have_mv) {
++        p->Get("DLSSG.MvecScaleX", &mv_scale_x);
++        p->Get("DLSSG.MvecScaleY", &mv_scale_y);
++    }
++    FgInputReadU(p, "DLSSG.DepthInverted", &depth_inverted);
++    if (!VkmEnsureEvents()) return;
++    if (g_vkm.idle != nullptr && WaitForSingleObject(g_vkm.idle, kVkmIdleMs) != WAIT_OBJECT_0) {
++        FgInputRefuse("the previous frame's park had not cleared"); return;
++    }
++    if (g_vkm.refused) return;
++
++    SynthBuild(&g_vkm.sp, back.w, back.h, fmt, reshade::api::resource{0}, reshade::api::resource{0},
++               reshade::api::resource{0}, 0, -1);
++    g_vkm.sp.Set("DLSS.Feature.Create.Flags", depth_inverted != 0 ? 0x08u : 0u);
++    if (have_mv) {
++        g_vkm.sp.Set("MV.Scale.X", mv_scale_x);
++        g_vkm.sp.Set("MV.Scale.Y", mv_scale_y);
++    }
++    const bool rebuild = g_s12.feature == nullptr || g_s12.w != back.w || g_s12.h != back.h ||
++                         g_s12.fmt != fmt || !g_s12.out_b || g_fg_input.vk_fmt != back.fmt;
++    if (rebuild) {
++        // The FG evaluate runs on Streamline's present thread while the render thread
++        // keeps submitting; a device-wide wait here deadlocks (measured2026-09-28). Only
++        // a first build, with nothing imported yet, is safe; a later shape change refuses.
++        if (g_s12.feature != nullptr || g_svk.img[SLOT_COLOR] != 0 || g_svk.img[kOutB] != 0) {
++            if (PresentAdapterFollow()) { g_fg_input.want_release = true; return; }
++            FgInputRefuse("the frame-generation input changed shape; rebuilding here would need a device-wide wait on the present thread");
++            return;
++        }
++        Log("[fg-input] building the private feature and its Vulkan import for %ux%u %s", back.w, back.h, FormatName(fmt));
++        // The synthetic source label selects the colour-conversion pass in Synth12Build.
++        InterlockedExchange(&g_source, SRC_SYNTH);
++        if (!Synth12Build(&g_vkm.sp, back.w, back.h, back.w, back.h, fmt, false, 0, 0, true,
++                          DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_UNKNOWN, true) || !g_s12.out_b) {
++            Synth12NoteBuildFailure(false);
++            FgInputRefuse("the private D3D12 feature or its second carrier could not be built"); return;
++        }
++        if (!SynthVkImport()) { SynthVkReleaseImages(); g_svk.ready = false; FgInputRefuse("import into the game's VkDevice failed"); return; }
++        if (!PresentAdapterCarrier()) { FgInputRefuse("private SR carrier hook unavailable"); return; }
++        PresentAdapterWitness();
++        if (!FgCompositeMake(g_s12.dev, g_s12.tex[SLOT_COLOR], g_s12.tex[SLOT_OUTPUT], g_s12.tex[kOutB])) {
++            FgInputRefuse("composite pass unavailable"); return;
++        }
++        g_fg_input.vk_fmt = back.fmt; g_fg_input.w = back.w; g_fg_input.h = back.h;
++        g_s12.need_reset = true;
++        InterlockedExchange(&g_adapter_owner, OWNER_FG);
++        Log("[fg-input] ready: HUD-less -> linear sRGB carrier -> Generic NR -> UI-preserving composite; FG interpolates processed frames. guides: mv=%s (scale %.3f,%.3f) depth=%s inverted=%u",
++            have_mv ? "game" : "zero", mv_scale_x, mv_scale_y, have_depth ? "game" : "zero", depth_inverted);
++    }
++
++    SVkCommandBuffer cb = reinterpret_cast<SVkCommandBuffer>(cmd_raw);
++    const LONG drain = InterlockedCompareExchange(&g_vkm.drain, 0, 0);
++    if (drain != 0) {
++        if (g_svk.EvStatus(g_svk.dev, g_vkm.ev_in[drain - 1]) != kSVkEventSet) return;
++        InterlockedExchange(&g_vkm.drain, 0);
++        return;
++    }
++    const int pair = g_vkm.next;
++    g_vkm.next ^= 1;
++    g_svk.EvReset(g_svk.dev, g_vkm.ev_in[pair]);
++    g_svk.EvReset(g_svk.dev, g_vkm.ev_out[pair]);
++    ResetEvent(g_vkm.idle);
++
++    const uint32_t first = g_svk.laid_out ? kSVkLayoutGeneral : kSVkLayoutUndefined;
++    SynthVkBarrier(cb, hud.image, kSVkLayoutGeneral, kSVkLayoutTransferSrc);
++    SynthVkBarrier(cb, back.image, kSVkLayoutGeneral, kSVkLayoutTransferSrc);
++    if (have_mv) SynthVkBarrier(cb, mv.image, kSVkLayoutGeneral, kSVkLayoutTransferSrc);
++    if (have_depth) SynthVkBarrier(cb, depth.image, kSVkLayoutGeneral, kSVkLayoutTransferSrc);
++    for (int i = 0; i < SLOT_COUNT; ++i) SynthVkBarrier(cb, g_svk.img[i], first, kSVkLayoutGeneral);
++    SynthVkBarrier(cb, g_svk.img[kOutB], first, kSVkLayoutGeneral);
++    const bool clear_guides = !g_svk.laid_out;
++    g_svk.laid_out = true;
++    SynthVkCopyImage(cb, hud.image, kSVkLayoutTransferSrc, g_svk.img[SLOT_COLOR], kSVkLayoutGeneral, back.w, back.h);
++    SynthVkCopyImage(cb, back.image, kSVkLayoutTransferSrc, g_svk.img[kOutB], kSVkLayoutGeneral, back.w, back.h);
++    if (have_mv)
++        SynthVkCopyImage(cb, mv.image, kSVkLayoutTransferSrc, g_svk.img[SLOT_MV], kSVkLayoutGeneral, back.w, back.h);
++    if (have_depth)
++        SynthVkCopyImage(cb, depth.image, kSVkLayoutTransferSrc, g_svk.img[SLOT_DEPTH], kSVkLayoutGeneral, back.w, back.h);
++    if (clear_guides && (!have_mv || !have_depth)) {
++        using ClearImage = void(*)(SVkCommandBuffer, SVkHandle, uint32_t, const void*, uint32_t, const SVkSubresourceRange*);
++        auto get_proc = reinterpret_cast<PFN_SVkGetDeviceProcAddr>(GetProcAddress(g_svk.lib, "vkGetDeviceProcAddr"));
++        auto clear = get_proc != nullptr ? reinterpret_cast<ClearImage>(get_proc(g_svk.dev, "vkCmdClearColorImage")) : nullptr;
++        const float zero[4] = {};
++        const SVkSubresourceRange range = {1, 0, 1, 0, 1};
++        if (clear != nullptr) {
++            if (!have_mv) clear(cb, g_svk.img[SLOT_MV], kSVkLayoutGeneral, zero, 1, &range);
++            if (!have_depth) clear(cb, g_svk.img[SLOT_DEPTH], kSVkLayoutGeneral, zero, 1, &range);
++        }
++    }
++    SynthVkBarrier(cb, hud.image, kSVkLayoutTransferSrc, kSVkLayoutGeneral);
++    SynthVkBarrier(cb, back.image, kSVkLayoutTransferSrc, kSVkLayoutGeneral);
++    if (have_mv) SynthVkBarrier(cb, mv.image, kSVkLayoutTransferSrc, kSVkLayoutGeneral);
++    if (have_depth) SynthVkBarrier(cb, depth.image, kSVkLayoutTransferSrc, kSVkLayoutGeneral);
++
++    g_svk.CmdSetEvent(cb, g_vkm.ev_in[pair], kSVkStageAllCommands);
++    g_vkm.cur = pair;
++    g_vkm.fg_arm = true;
++    --g_present_adapter.remaining;
++    SetEvent(g_vkm.wake);
++    {
++        SVkMemoryBarrier mb = {};
++        mb.sType = kSVkStMemoryBarrier;
++        mb.srcAccessMask = kSVkAccessMemoryRead | kSVkAccessMemoryWrite;
++        mb.dstAccessMask = kSVkAccessMemoryRead | kSVkAccessMemoryWrite;
++        const SVkHandle ev = g_vkm.ev_out[pair];
++        g_svk.CmdWaitEvents(cb, 1, &ev, kSVkStageHost, kSVkStageAllCommands, 1, &mb, 0, nullptr, 0, nullptr);
++    }
++    if (g_cfg.stage >= 3) {
++        SynthVkBarrier(cb, g_svk.img[SLOT_OUTPUT], kSVkLayoutGeneral, kSVkLayoutTransferSrc);
++        SynthVkBarrier(cb, g_svk.img[kOutB], kSVkLayoutGeneral, kSVkLayoutTransferSrc);
++        SynthVkBarrier(cb, hud.image, kSVkLayoutGeneral, kSVkLayoutTransferDst);
++        SynthVkBarrier(cb, back.image, kSVkLayoutGeneral, kSVkLayoutTransferDst);
++        SynthVkCopyImage(cb, g_svk.img[SLOT_OUTPUT], kSVkLayoutTransferSrc, hud.image, kSVkLayoutTransferDst, back.w, back.h);
++        SynthVkCopyImage(cb, g_svk.img[kOutB], kSVkLayoutTransferSrc, back.image, kSVkLayoutTransferDst, back.w, back.h);
++        SynthVkBarrier(cb, hud.image, kSVkLayoutTransferDst, kSVkLayoutGeneral);
++        SynthVkBarrier(cb, back.image, kSVkLayoutTransferDst, kSVkLayoutGeneral);
++        SynthVkBarrier(cb, g_svk.img[SLOT_OUTPUT], kSVkLayoutTransferSrc, kSVkLayoutGeneral);
++        SynthVkBarrier(cb, g_svk.img[kOutB], kSVkLayoutTransferSrc, kSVkLayoutGeneral);
++    }
++}
+diff --git a/src/present-adapter-config.h b/src/present-adapter-config.h
+new file mode 100644
+index 0000000..bd778b5
+--- /dev/null
++++ b/src/present-adapter-config.h
+@@ -0,0 +1,85 @@
++#pragma once
++
++// Restart-only opt-in: an in-flight presentation transport must not silently
++// change back into the game's DLSS mirror during a live configuration reload.
++static void PresentAdapterPath(wchar_t* path, size_t count, const wchar_t* leaf)
++{
++    path[0] = 0;
++    if (GetModuleFileNameW(g_self, path, static_cast<DWORD>(count)) == 0) return;
++    wchar_t* slash = wcsrchr(path, L'\\');
++    if (slash == nullptr) { path[0] = 0; return; }
++    slash[1] = 0;
++    wcscat_s(path, count, leaf);
++}
++
++static bool PresentationAdapterEnabled()
++{
++    static const bool enabled = [] {
++        wchar_t path[1024] = {};
++        PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
++        return path[0] != 0 && GetPrivateProfileIntW(L"Adapter", L"Enabled", 0, path) == 1;
++    }();
++    return enabled;
++}
++
++// Source=fg-input processes the real frame at the native frame-generation input;
++// any other value keeps the ReShade begin-effects (post-FG) path.
++static bool PresentAdapterFgInput()
++{
++    static const bool fg_input = [] {
++        wchar_t path[1024] = {};
++        PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
++        wchar_t value[64] = {};
++        if (path[0] == 0) return false;
++        GetPrivateProfileStringW(L"Adapter", L"Source", L"present", value, _countof(value), path);
++        return _wcsicmp(value, L"fg-input") == 0;
++    }();
++    return PresentationAdapterEnabled() && fg_input;
++}
++
++// AutoRun=1 starts continuous NR without a request file; a request with frames=0 still stops it.
++static bool PresentAdapterAutoRun()
++{
++    static const bool auto_run = [] {
++        wchar_t path[1024] = {};
++        PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
++        return path[0] != 0 && GetPrivateProfileIntW(L"Adapter", L"AutoRun", 0, path) == 1;
++    }();
++    return PresentAdapterFgInput() && auto_run;
++}
++
++// Follow=1: Generic's own hook point selects the path. Present(2) runs the FG-input
++// feed continuously; Upscaled(0)/Render(1) run the native mirror as before.
++static bool PresentAdapterFollow()
++{
++    static const bool follow = [] {
++        wchar_t path[1024] = {};
++        PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
++        return path[0] != 0 && GetPrivateProfileIntW(L"Adapter", L"Follow", 0, path) == 1;
++    }();
++    return PresentAdapterFgInput() && follow;
++}
++
++static int PresentAdapterHookPoint()
++{
++    static ULONGLONG next_read;
++    static int cached;
++    const ULONGLONG now = GetTickCount64();
++    if (now >= next_read) {
++        next_read = now + 500;
++        wchar_t ini[1024] = {};
++        PresentAdapterPath(ini, _countof(ini), L"ReShade.ini");
++        cached = GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint", 0, ini);
++    }
++    return cached;
++}
++
++// Which path holds the private session; mirror and FG-input never share it live.
++enum AdapterOwner { OWNER_NONE, OWNER_MIRROR, OWNER_FG };
++static volatile LONG g_adapter_owner = OWNER_NONE;
++
++static bool FgInputActive()
++{
++    if (!PresentAdapterFgInput()) return false;
++    return !PresentAdapterFollow() || PresentAdapterHookPoint() == 2;
++}
+diff --git a/src/present-adapter.inc b/src/present-adapter.inc
+new file mode 100644
+index 0000000..6501869
+--- /dev/null
++++ b/src/present-adapter.inc
+@@ -0,0 +1,445 @@
++extern "C" {
++void* g_present_nr_original = nullptr;
++void* g_present_sr_original = nullptr;
++void PresentAdapterNrHook();
++void PresentAdapterSrHook();
++}
++static thread_local bool g_present_nr_scope;
++static thread_local unsigned g_present_nr_entries;
++static thread_local unsigned g_present_sr_entries;
++static thread_local unsigned g_present_sr_copies;
++extern "C" void PresentAdapterNrEnter()
++{
++    if (g_present_nr_scope) ++g_present_nr_entries;
++}
++
++extern "C" NVSDK_NGX_Result PresentAdapterSrEnter(
++    ID3D12GraphicsCommandList* list, const NVSDK_NGX_Handle*,
++    const NVSDK_NGX_Parameter* params, void*)
++{
++    if (!g_present_nr_scope) return 0;
++    ++g_present_sr_entries;
++    if (list != UnwrapList(g_s12.list)) return 0;
++    ID3D12Resource* colour = nullptr;
++    ID3D12Resource* output = nullptr;
++    ID3D12Resource* expected_colour = g_s12.pq.in != nullptr ? g_s12.pq.in : g_s12.tex[SLOT_COLOR];
++    ID3D12Resource* expected_output = g_s12.pq.out != nullptr ? g_s12.pq.out : g_s12.tex[SLOT_OUTPUT];
++    if (params == nullptr || params->Get("Color", &colour) != NGX_SUCCESS ||
++        params->Get("Output", &output) != NGX_SUCCESS ||
++        colour != expected_colour || output != expected_output) return 0;
++    const D3D12_RESOURCE_DESC input_desc = colour->GetDesc();
++    const D3D12_RESOURCE_DESC output_desc = output->GetDesc();
++    if (input_desc.Width != output_desc.Width || input_desc.Height != output_desc.Height ||
++        input_desc.SampleDesc.Count != 1 || output_desc.SampleDesc.Count != 1 ||
++        Synth12UavFormat(input_desc.Format) != Synth12UavFormat(output_desc.Format)) return 0;
++    // Only the private carrier is replaced; game SR calls retain their original caller and implementation.
++    Barrier(list, colour, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_SOURCE);
++    Barrier(list, output, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
++    list->CopyResource(output, colour);
++    Barrier(list, output, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++    Barrier(list, colour, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++    ++g_present_sr_copies;
++    return NGX_SUCCESS;
++}
++
++struct PresentAdapterState {
++    bool request_seen, refused, nr_hook, sr_hook, run_nr, colour_roundtrip, stopped, continuous;
++    uint32_t source_space;
++    ULONGLONG poll_at, deadline, accepted;
++    unsigned long long token;
++    unsigned remaining, frames, writes, skipped_nr;
++    reshade::api::effect_runtime* owner;
++};
++static PresentAdapterState g_present_adapter = {};
++
++static bool PresentAdapterConfiguration()
++{
++    wchar_t ini[1024] = {};
++    PresentAdapterPath(ini, _countof(ini), L"ReShade.ini");
++    const int hook_point = GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint", 0, ini);
++    if (GetPrivateProfileIntW(L"RenoDX.DLSS5", L"EnableHooks", 2, ini) != 1 ||
++        (hook_point != 0 && hook_point != 2))
++    {
++        Log("[present-adapter] refused: keep EnableHooks=1 and NRHookPoint=0 (Upscaled) or2 (Present) for the D3D12 carrier.");
++        return false;
++    }
++    if (GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRSourceEncoding", 0, ini) != 0 ||
++        GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRSourcePrimaries", 0, ini) != 0 ||
++        GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRLinearUnitNits", 0, ini) != 0) {
++        Log("[present-adapter] refused: source encoding, primaries and linear-unit overrides must be Auto; the carrier supplies normalized SDR or scRGB.");
++        return false;
++    }
++    return true;
++}
++
++static bool PresentAdapterConsumer()
++{
++    const HMODULE consumer = GetModuleHandleW(L"renodx-dlss5.addon64");
++    wchar_t path[1024] = {};
++    char hash[65] = {};
++    if (consumer == nullptr || GetModuleFileNameW(consumer, path, _countof(path)) == 0 ||
++        !Sha256File(path, hash, sizeof(hash)) ||
++        _stricmp(hash, "DCD93881E976AD033D83C2BB01F4BC3E4DDC59C15FE0DD4CA165BC5FC7D1AC68") != 0)
++    {
++        Log("[present-adapter] refused: this experiment requires the unmodified Generic 8.5.0-rc10 DCD93881 build.");
++        return false;
++    }
++    return PresentAdapterConfiguration();
++}
++
++static bool PresentAdapterWitness()
++{
++    if (g_present_adapter.nr_hook) return true;
++    HMODULE runtime = GetModuleHandleW(L"nvngx_dlssnr.dll");
++    void* entry = runtime != nullptr
++        ? reinterpret_cast<void*>(GetProcAddress(runtime, "NVSDK_NGX_D3D12_EvaluateFeature")) : nullptr;
++    if (entry == nullptr) return false;
++    // The tail forward preserves the caller's return address and all four args.
++    // A module reference prevents a live hook from pointing into an unloaded DLL.
++    HMODULE keep = nullptr;
++    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
++                          reinterpret_cast<LPCWSTR>(entry), &keep)) return false;
++    const MH_STATUS made = MH_CreateHook(entry, reinterpret_cast<void*>(&PresentAdapterNrHook),
++                                         &g_present_nr_original);
++    if (made != MH_OK) return false;
++    const MH_STATUS enabled = MH_EnableHook(entry);
++    if (enabled != MH_OK) { MH_RemoveHook(entry); g_present_nr_original = nullptr; return false; }
++    g_present_adapter.nr_hook = true;
++    Log("[present-adapter] NR entry witness ready (tail-forward, CPU observation only).");
++    return true;
++}
++
++static HMODULE PresentAdapterSrModule()
++{
++    auto enumerate = reinterpret_cast<PFN_EnumProcessModules>(
++        GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "K32EnumProcessModules"));
++    HMODULE modules[512] = {};
++    DWORD needed = 0;
++    if (enumerate == nullptr || !enumerate(GetCurrentProcess(), modules, sizeof(modules), &needed) ||
++        needed > sizeof(modules)) return nullptr;
++    HMODULE found = nullptr;
++    for (DWORD i = 0; i < needed / sizeof(HMODULE); ++i) {
++        if (GetProcAddress(modules[i], "NVSDK_NGX_D3D12_EvaluateFeature") == nullptr) continue;
++        wchar_t path[1024] = {};
++        if (GetModuleFileNameW(modules[i], path, _countof(path)) == 0) continue;
++        DWORD ignored = 0;
++        const DWORD size = GetFileVersionInfoSizeW(path, &ignored);
++        if (size == 0) continue;
++        std::vector<unsigned char> version(size);
++        if (!GetFileVersionInfoW(path, 0, size, version.data())) continue;
++        struct Translation { WORD language, codepage; };
++        Translation* translations = nullptr;
++        UINT bytes = 0;
++        if (!VerQueryValueW(version.data(), L"\\VarFileInfo\\Translation",
++                            reinterpret_cast<void**>(&translations), &bytes)) continue;
++        bool is_sr = false;
++        for (UINT j = 0; j < bytes / sizeof(Translation); ++j) {
++            wchar_t* name = nullptr;
++            wchar_t* product = nullptr;
++            UINT length = 0;
++            wchar_t key[96] = {};
++            swprintf_s(key, L"\\StringFileInfo\\%04x%04x\\InternalName",
++                       translations[j].language, translations[j].codepage);
++            if (!VerQueryValueW(version.data(), key, reinterpret_cast<void**>(&name), &length) ||
++                name == nullptr || length == 0) continue;
++            swprintf_s(key, L"\\StringFileInfo\\%04x%04x\\ProductName",
++                       translations[j].language, translations[j].codepage);
++            if (!VerQueryValueW(version.data(), key, reinterpret_cast<void**>(&product), &length) ||
++                product == nullptr || length == 0) continue;
++            const wchar_t* leaf = wcsrchr(path, L'\\');
++            leaf = leaf != nullptr ? leaf + 1 : path;
++            // Full paths with non-ANSI characters print empty through %ls; the leaf is enough to identify the module.
++            Log("[present-adapter] NGX evaluate module: %ls internal=%ls product=%ls.", leaf, name, product);
++            // Ray Reconstruction shares InternalName=DLSS; only the super-sampling product is the SR carrier.
++            if (_wcsicmp(name, L"DLSS") == 0 &&
++                _wcsicmp(product, L"NVIDIA Deep Learning SuperSampling") == 0) is_sr = true;
++        }
++        if (!is_sr) continue;
++        if (found != nullptr && found != modules[i]) {
++            Log("[present-adapter] multiple SR modules found; refusing ambiguous carrier hook.");
++            return nullptr;
++        }
++        found = modules[i];
++    }
++    return found;
++}
++
++static bool PresentAdapterCarrier()
++{
++    if (g_present_adapter.sr_hook) return true;
++    const HMODULE runtime = PresentAdapterSrModule();
++    void* entry = runtime != nullptr
++        ? reinterpret_cast<void*>(GetProcAddress(runtime, "NVSDK_NGX_D3D12_EvaluateFeature")) : nullptr;
++    if (entry == nullptr) {
++        Log("[present-adapter] SR export unavailable: module=%p entry=%p error=%lu.", runtime, entry, GetLastError());
++        return false;
++    }
++    HMODULE keep = nullptr;
++    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
++                          reinterpret_cast<LPCWSTR>(entry), &keep)) return false;
++    const MH_STATUS made = MH_CreateHook(entry, reinterpret_cast<void*>(&PresentAdapterSrHook), &g_present_sr_original);
++    if (made != MH_OK) {
++        Log("[present-adapter] SR hook creation failed: status=%d entry=%p.", static_cast<int>(made), entry);
++        return false;
++    }
++    const MH_STATUS enabled = MH_EnableHook(entry);
++    if (enabled != MH_OK) {
++        Log("[present-adapter] SR hook enable failed: status=%d.", static_cast<int>(enabled));
++        MH_RemoveHook(entry);
++        g_present_sr_original = nullptr;
++        return false;
++    }
++    g_present_adapter.sr_hook = true;
++    Log("[present-adapter] private SR carrier copy ready; external SR calls remain tail-forwarded.");
++    return true;
++}
++
++static void PresentAdapterRequest()
++{
++    const ULONGLONG now = GetTickCount64();
++    if (now < g_present_adapter.poll_at) return;
++    g_present_adapter.poll_at = now + 500;
++    wchar_t path[1024] = {};
++    PresentAdapterPath(path, _countof(path), L"vk-present-adapter.request");
++    FILE* file = nullptr;
++    unsigned long long token = 0;
++    unsigned frames = 0, nr = 0;
++    if (_wfopen_s(&file, path, L"rb") == 0 && file != nullptr) {
++        if (fscanf_s(file, "%llu %u %u", &token, &frames, &nr) != 3) token = 0;
++        fclose(file);
++    }
++    if (!g_present_adapter.request_seen) {
++        g_present_adapter.request_seen = true;
++        g_present_adapter.token = token;
++        Log("[present-adapter] enabled, idle. Awaiting a new request token; existing requests are ignored.");
++        return;
++    }
++    if (token == 0 || token == g_present_adapter.token) return;
++    g_present_adapter.token = token;
++    if (frames == 0) { g_present_adapter.remaining = 0; g_present_adapter.stopped = true; g_present_adapter.continuous = false; Log("[present-adapter] stopped by request."); return; }
++    if (frames > 1800 || nr > 2 || g_present_adapter.refused) {
++        Log("[present-adapter] request refused (invalid count/mode or retired session)."); return;
++    }
++    if (!PresentAdapterConsumer()) { g_present_adapter.refused = true; return; }
++    g_present_adapter.remaining = frames;
++    g_present_adapter.stopped = false;
++    g_present_adapter.continuous = false;
++    g_present_adapter.run_nr = nr == 1;
++    g_present_adapter.colour_roundtrip = nr == 2;
++    // Frames between requests were not evaluated, so their temporal history is missing.
++    if (g_present_adapter.run_nr) g_s12.need_reset = true;
++    g_present_adapter.frames = g_present_adapter.writes = g_present_adapter.skipped_nr = 0;
++    g_present_adapter.accepted = now;
++    g_present_adapter.deadline = now + 60000;
++    Log("[present-adapter] request %llu accepted: max=%u frames, deadline=60s, mode=%s, guides=neutral.",
++        token, frames, nr == 1 ? "Generic NR via identity SR carrier" :
++                       nr == 2 ? "carrier colour roundtrip only" : "copy roundtrip only");
++}
++
++static bool PresentAdapterCopy12()
++{
++    const bool converted = g_present_adapter.colour_roundtrip && g_s12.pq.in != nullptr;
++    ID3D12Resource* colour = converted ? g_s12.pq.in : g_s12.tex[SLOT_COLOR];
++    ID3D12Resource* output = converted ? g_s12.pq.out : g_s12.tex[SLOT_OUTPUT];
++    if (Synth12UavFormat(colour->GetDesc().Format) != Synth12UavFormat(output->GetDesc().Format)) return false;
++    if (converted && !PqPassBefore(&g_s12.pq, g_s12.queue, 1000)) return false;
++    if (!Synth12Begin(1000)) return false;
++    const D3D12_RESOURCE_STATES input_state = converted ? D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE : D3D12_RESOURCE_STATE_COMMON;
++    const D3D12_RESOURCE_STATES output_state = converted ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : D3D12_RESOURCE_STATE_COMMON;
++    Barrier(g_s12.list, colour, input_state, D3D12_RESOURCE_STATE_COPY_SOURCE);
++    Barrier(g_s12.list, output, output_state, D3D12_RESOURCE_STATE_COPY_DEST);
++    g_s12.list->CopyResource(output, colour);
++    Barrier(g_s12.list, colour, D3D12_RESOURCE_STATE_COPY_SOURCE, input_state);
++    Barrier(g_s12.list, output, D3D12_RESOURCE_STATE_COPY_DEST, output_state);
++    UINT64 submitted = Synth12End();
++    if (converted) {
++        const UINT64 encoded = PqPassAfter(&g_s12.pq, g_s12.queue, g_s12.fence,
++                                           &g_s12.fence_value, submitted, 0, 1000);
++        if (encoded == submitted) return false;
++        submitted = encoded;
++    }
++    return Synth12WaitFence(submitted, 1000) && g_s12.dev->GetDeviceRemovedReason() == S_OK;
++}
++
++static void PresentAdapterFrame(reshade::api::effect_runtime* rt, reshade::api::command_list* cmd,
++                                reshade::api::resource_view rtv)
++{
++    using namespace reshade::api;
++    static thread_local bool in_frame;
++    if (in_frame) return;
++    if (rt == nullptr || cmd == nullptr || rtv.handle == 0) return;
++    if (PresentAdapterFgInput()) return;
++    device* dev = rt->get_device();
++    if (dev == nullptr || dev->get_api() != device_api::vulkan) return;
++    if (!TryEnterCriticalSection(&g_bridge_cs)) return;
++    struct Unlock { ~Unlock() { LeaveCriticalSection(&g_bridge_cs); } } unlock;
++    in_frame = true;
++    struct FrameScope { bool& value; ~FrameScope() { value = false; } } frame_scope{in_frame};
++    PresentAdapterRequest();
++    if (g_present_adapter.remaining == 0 || g_present_adapter.refused) return;
++    if (GetTickCount64() >= g_present_adapter.deadline) {
++        Log("[present-adapter] request complete: frames=%u writes=%u no_nr=%u (deadline).",
++            g_present_adapter.frames, g_present_adapter.writes, g_present_adapter.skipped_nr);
++        g_present_adapter.remaining = 0; return;
++    }
++    if (g_present_adapter.owner != nullptr && g_present_adapter.owner != rt) return;
++    if (!PresentAdapterConfiguration()) {
++        g_present_adapter.remaining = 0;
++        g_present_adapter.refused = true;
++        return;
++    }
++    if (g_cfg.mode != 2 || g_cfg.stage != 3) {
++        Log("[present-adapter] refused: the experiment requires Bridge mode=2, stage=3.");
++        g_present_adapter.refused = true; return;
++    }
++    SynthBound back = {};
++    SynthResolveView(dev, static_cast<uint32_t>(device_api::vulkan), rtv, &back);
++    if (back.res.handle == 0 || back.w == 0 || back.h == 0 || back.samples != 1 ||
++        (back.usage & static_cast<uint32_t>(resource_usage::copy_source)) == 0) return;
++    if (back.res.handle != rt->get_current_back_buffer().handle) return;
++    command_queue* queue = rt->get_command_queue();
++    if (queue == nullptr || queue->get_immediate_command_list() != cmd) {
++        Log("[present-adapter] refused: callback is not the queue's immediate command list.");
++        g_present_adapter.refused = true; return;
++    }
++    PresentSwapchainContract source;
++    {
++        std::lock_guard<std::mutex> lock(g_present_swapchain_mutex);
++        source = g_present_swapchain;
++    }
++    if (source.device != dev || source.window != rt->get_hwnd() || source.first_buffer == 0 ||
++        rt->get_back_buffer_count() == 0 || source.first_buffer != rt->get_back_buffer(0).handle) {
++        Log("[present-adapter] no matching swapchain colour contract; refusing processing.");
++        g_present_adapter.refused = true;
++        return;
++    }
++    const color_space space = source.space;
++    const bool floating = SynthFormatCanExceedOne(back.fmt);
++    const bool srgb = space == color_space::srgb && !floating;
++    const bool pq = space == color_space::hdr10_pq && !floating;
++    if (!srgb && !pq && !(space == color_space::scrgb && floating)) {
++        Log("[present-adapter] unsupported source colour contract: space=%u format=%u.",
++            static_cast<unsigned>(space), static_cast<unsigned>(back.fmt));
++        g_present_adapter.refused = true;
++        return;
++    }
++    g_present_adapter.owner = rt;
++    InterlockedExchange(&g_source, SRC_SYNTH);
++    SynthParams params;
++    SynthBuild(&params, back.w, back.h, back.fmt, back.res, resource{0}, resource{0}, 0, -1);
++    params.Set("DLSS.Feature.Create.Flags", srgb ? 0u : 1u);
++    if (!Synth12Open(rt) || !SynthVkOpen(rt)) {
++        g_present_adapter.refused = true; Log("[present-adapter] session creation failed; no image modified."); return;
++    }
++    const bool rebuild = g_s12.feature == nullptr || g_s12.w != back.w ||
++                         g_s12.h != back.h || g_s12.fmt != back.fmt ||
++                         g_present_adapter.source_space != static_cast<uint32_t>(space);
++    if (rebuild) {
++        queue->wait_idle();
++        if (!Synth12Drain(1000)) {
++            g_present_adapter.refused = true; return;
++        }
++        SynthVkPresentRelease();
++        SynthVkReleaseImages();
++        if (!Synth12Build(&params, back.w, back.h, back.w, back.h, back.fmt,
++                          false, 0, 0, false, DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_UNKNOWN, srgb, pq) ||
++            !SynthVkImport()) {
++            g_present_adapter.refused = true; Log("[present-adapter] image build/import failed."); return;
++        }
++        g_present_adapter.source_space = static_cast<uint32_t>(space);
++        Log("[present-adapter] source space=%u; working colour=%s.", static_cast<unsigned>(space),
++            srgb ? "linear normalized SDR" : "linear BT.709, 1.0=80 nits");
++    }
++    if (g_present_adapter.run_nr && !PresentAdapterCarrier()) {
++        g_present_adapter.refused = true;
++        Log("[present-adapter] private SR carrier hook unavailable; no image modified.");
++        return;
++    }
++    const bool draw = (back.usage & static_cast<uint32_t>(resource_usage::copy_dest)) == 0;
++    if (draw && (!SynthVkPresentOpen(dev, back.fmt) || !SynthVkPresentSize(back.w, back.h, back.fmt))) {
++        g_present_adapter.refused = true; Log("[present-adapter] draw-back resources failed."); return;
++    }
++    using ClearImage = void(*)(SVkCommandBuffer, SVkHandle, uint32_t, const void*, uint32_t,
++                               const SVkSubresourceRange*);
++    auto get_proc = reinterpret_cast<PFN_SVkGetDeviceProcAddr>(GetProcAddress(g_svk.lib, "vkGetDeviceProcAddr"));
++    auto clear = get_proc != nullptr ? reinterpret_cast<ClearImage>(get_proc(g_svk.dev, "vkCmdClearColorImage")) : nullptr;
++    if (clear == nullptr) { g_present_adapter.refused = true; return; }
++    const double t0 = SynthNowMs();
++    cmd->barrier(back.res, resource_usage::render_target, resource_usage::copy_source);
++    auto cb = reinterpret_cast<SVkCommandBuffer>(static_cast<uintptr_t>(cmd->get_native()));
++    const bool initialize_guides = !g_svk.laid_out;
++    for (int i = 0; i < SLOT_COUNT; ++i)
++        SynthVkBarrier(cb, g_svk.img[i], g_svk.laid_out ? kSVkLayoutGeneral : kSVkLayoutUndefined,
++                       kSVkLayoutGeneral);
++    g_svk.laid_out = true;
++    if (initialize_guides) {
++        const float zero[4] = {};
++        const SVkSubresourceRange range = {1, 0, 1, 0, 1};
++        clear(cb, g_svk.img[SLOT_DEPTH], kSVkLayoutGeneral, zero, 1, &range);
++        clear(cb, g_svk.img[SLOT_MV], kSVkLayoutGeneral, zero, 1, &range);
++        SynthVkBarrier(cb, g_svk.img[SLOT_DEPTH], kSVkLayoutGeneral, kSVkLayoutGeneral);
++        SynthVkBarrier(cb, g_svk.img[SLOT_MV], kSVkLayoutGeneral, kSVkLayoutGeneral);
++    }
++    SynthVkCopyImage(cb, static_cast<SVkHandle>(back.res.handle), kSVkLayoutTransferSrc,
++                     g_svk.img[SLOT_COLOR], kSVkLayoutGeneral, back.w, back.h);
++    // Flush the borrowed immediate list before D3D12 reads the imported image.
++    // No host-event park, guessed completion or writeback on a failed wait.
++    queue->wait_idle();
++    const double input_ready = SynthNowMs();
++    const bool history_reset = g_s12.need_reset;
++    bool ok = false;
++    unsigned nr_entries = 0, sr_entries = 0, sr_copies = 0;
++    if (g_present_adapter.run_nr) {
++        PresentAdapterWitness();
++        g_present_nr_entries = g_present_sr_entries = g_present_sr_copies = 0;
++        g_present_nr_scope = true;
++        if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
++        ok = Synth12EvaluateShared(&params, 1000);
++        if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
++        g_present_nr_scope = false;
++        nr_entries = g_present_nr_entries;
++        sr_entries = g_present_sr_entries;
++        sr_copies = g_present_sr_copies;
++        if (sr_entries != 1 || sr_copies != 1) {
++            Log("[present-adapter] carrier contract mismatch: sr_entries=%u sr_copies=%u; refusing writeback.",
++                sr_entries, sr_copies);
++            ok = false;
++        }
++    } else {
++        ok = PresentAdapterCopy12();
++    }
++    ok = ok && g_s12.dev->GetDeviceRemovedReason() == S_OK &&
++         g_s12.fence->GetCompletedValue() != UINT64_MAX;
++    cb = reinterpret_cast<SVkCommandBuffer>(static_cast<uintptr_t>(cmd->get_native()));
++    const bool write = ok && (!g_present_adapter.run_nr || nr_entries != 0);
++    if (write && draw) {
++        SynthVkPresentDraw(cmd, cb, back.res, rtv, back.w, back.h, g_svk.img[SLOT_OUTPUT]);
++    } else if (write) {
++        cmd->barrier(back.res, resource_usage::copy_source, resource_usage::copy_dest);
++        SynthVkBarrier(cb, g_svk.img[SLOT_OUTPUT], kSVkLayoutGeneral, kSVkLayoutGeneral);
++        SynthVkCopyImage(cb, g_svk.img[SLOT_OUTPUT], kSVkLayoutGeneral,
++                         static_cast<SVkHandle>(back.res.handle), kSVkLayoutTransferDst, back.w, back.h);
++        cmd->barrier(back.res, resource_usage::copy_dest, resource_usage::render_target);
++    } else {
++        cmd->barrier(back.res, resource_usage::copy_source, resource_usage::render_target);
++    }
++    ++g_present_adapter.frames;
++    if (write) ++g_present_adapter.writes;
++    if (ok && g_present_adapter.run_nr && nr_entries == 0) ++g_present_adapter.skipped_nr;
++    --g_present_adapter.remaining;
++    if (g_present_adapter.frames <= 3 || g_present_adapter.frames % 120 == 0 ||
++        g_present_adapter.remaining == 0 || !ok)
++        Log("[present-adapter] frame=%u input=backbuffer-before-ReShade %ux%u fmt=%u image=0x%llX mode=%s nr_entries=%u completed=%d writeback=%d cpu_ms=%.2f. token=%llu reset=%d sr_entries=%u sr_copies=%u input_wait_ms=%.2f.",
++            g_present_adapter.frames, back.w, back.h, static_cast<unsigned>(back.fmt),
++            back.res.handle, g_present_adapter.run_nr ? "NR" : g_present_adapter.colour_roundtrip ? "carrier" : "copy", nr_entries,
++            ok ? 1 : 0, write ? 1 : 0, SynthNowMs() - t0,
++            g_present_adapter.token, history_reset ? 1 : 0, sr_entries, sr_copies, input_ready - t0);
++    if (!ok) {
++        g_present_adapter.refused = true;
++        Log("[present-adapter] stopped after failed processing/completion; no copyback recorded for this frame.");
++    }
++    if (g_present_adapter.remaining == 0)
++        Log("[present-adapter] request complete: frames=%u writes=%u no_nr=%u. token=%llu",
++            g_present_adapter.frames, g_present_adapter.writes, g_present_adapter.skipped_nr,
++            g_present_adapter.token);
++}
+diff --git a/src/present-nr-witness.asm b/src/present-nr-witness.asm
+new file mode 100644
+index 0000000..53fbf1e
+--- /dev/null
++++ b/src/present-nr-witness.asm
+@@ -0,0 +1,44 @@
++option casemap:none
++EXTERN PresentAdapterNrEnter:PROC
++EXTERN PresentAdapterSrEnter:PROC
++EXTERN g_present_nr_original:QWORD
++EXTERN g_present_sr_original:QWORD
++.code
++PresentAdapterNrHook PROC FRAME
++    sub rsp, 68h
++    .allocstack 68h
++    .endprolog
++    mov [rsp+30h], rcx
++    mov [rsp+38h], rdx
++    mov [rsp+40h], r8
++    mov [rsp+48h], r9
++    call PresentAdapterNrEnter
++    mov rcx, [rsp+30h]
++    mov rdx, [rsp+38h]
++    mov r8, [rsp+40h]
++    mov r9, [rsp+48h]
++    add rsp, 68h
++    jmp QWORD PTR [g_present_nr_original]
++PresentAdapterNrHook ENDP
++PresentAdapterSrHook PROC FRAME
++    sub rsp, 68h
++    .allocstack 68h
++    .endprolog
++    mov [rsp+30h], rcx
++    mov [rsp+38h], rdx
++    mov [rsp+40h], r8
++    mov [rsp+48h], r9
++    call PresentAdapterSrEnter
++    test eax, eax
++    jnz sr_handled
++    mov rcx, [rsp+30h]
++    mov rdx, [rsp+38h]
++    mov r8, [rsp+40h]
++    mov r9, [rsp+48h]
++    add rsp, 68h
++    jmp QWORD PTR [g_present_sr_original]
++sr_handled:
++    add rsp, 68h
++    ret
++PresentAdapterSrHook ENDP
++END
+diff --git a/src/synth.inc b/src/synth.inc
+index f15f027..a16fcb9 100644
+--- a/src/synth.inc
++++ b/src/synth.inc
+@@ -1211,6 +1211,7 @@ struct Synth12
+ {
+     bool tried;      // the session open was attempted; a failure is never retried
+     bool ready;      // device, NGX session, queue, allocator ring
++    bool resources_retained;
+ 
+     // The device is this add-on's own rather than the game's, so all four
+     // textures have to be created shareable and the frame has to be carried
+@@ -1359,19 +1360,35 @@ static void Synth12CopyF(const NVSDK_NGX_Parameter *src, NVSDK_NGX_Parameter *ds
+ static bool Synth12WaitFence(UINT64 value, DWORD ms)
+ {
+     if (g_s12.fence == nullptr || g_s12.event == nullptr) return false;
+-    if (g_s12.fence->GetCompletedValue() >= value) return true;
++    const UINT64 completed = g_s12.fence->GetCompletedValue();
++    if (completed == UINT64_MAX) return false;
++    if (completed >= value) return true;
+     if (FAILED(g_s12.fence->SetEventOnCompletion(value, g_s12.event))) return false;
+     if (WaitForSingleObject(g_s12.event, ms) != WAIT_OBJECT_0) return false;
+-    return g_s12.fence->GetCompletedValue() >= value;
++    const UINT64 after = g_s12.fence->GetCompletedValue();
++    return after != UINT64_MAX && after >= value;
++}
++
++static bool Synth12Drain(DWORD wait_ms = 4000)
++{
++    if (g_s12.resources_retained) return false;
++    if ((g_s12.fence != nullptr && !Synth12WaitFence(g_s12.fence_value, wait_ms)) ||
++        !PqPassWait(&g_s12.pq, g_s12.pq.fv, wait_ms)) {
++        g_s12.resources_retained = true;
++        g_s12.ready = false;
++        Log("[synth] GPU completion unproven; retaining the private feature, images and colour-pass resources.");
++        return false;
++    }
++    return true;
+ }
+ 
+ // D3D12 keeps no reference to the resources a submitted command list names, so
+ // the last frame has to be finished with before any of them is freed. This runs
+ // on a resolution change, which is rare enough that a full wait costs nothing
+ // and a use-after-free costs a GPU reset.
+-static void Synth12ReleaseTextures()
++static bool Synth12ReleaseTextures()
+ {
+-    Synth12WaitFence(g_s12.fence_value, 4000);
++    if (!Synth12Drain()) return false;
+     if (g_s12.feature != nullptr && g_s12.release_feature != nullptr)
+         g_s12.release_feature(g_s12.feature);
+     g_s12.feature = nullptr;
+@@ -1430,7 +1447,7 @@ static void Synth12ReleaseTextures()
+     if (g_s12.cvt_heap  != nullptr) { g_s12.cvt_heap->Release();  g_s12.cvt_heap  = nullptr; }
+     if (g_s12.cvt_pso   != nullptr) { g_s12.cvt_pso->Release();   g_s12.cvt_pso   = nullptr; }
+     if (g_s12.cvt_rs    != nullptr) { g_s12.cvt_rs->Release();    g_s12.cvt_rs    = nullptr; }
+-    PqPassRelease(&g_s12.pq);
++    return PqPassRelease(&g_s12.pq);
+ }
+ 
+ // wait_ms is how long the command allocator's own retire fence is waited for,
+@@ -2009,9 +2026,10 @@ static bool Synth12Build(const SynthParams *sp, UINT w, UINT h, UINT out_w, UINT
+                          DXGI_FORMAT back_fmt, bool depth_packed = false,
+                          UINT exp_w = 0, UINT exp_h = 0, bool out_pair = false,
+                          DXGI_FORMAT exp_fmt = DXGI_FORMAT_R32_FLOAT,
+-                         DXGI_FORMAT output_fmt = DXGI_FORMAT_UNKNOWN)
++                         DXGI_FORMAT output_fmt = DXGI_FORMAT_UNKNOWN,
++                         bool srgb = false, bool hdr10 = false)
+ {
+-    Synth12ReleaseTextures();
++    if (!Synth12ReleaseTextures()) return false;
+     g_s12.w = w; g_s12.h = h; g_s12.fmt = back_fmt;
+     g_s12.out_w = out_w; g_s12.out_h = out_h;
+     g_s12.depth_packed = depth_packed;
+@@ -2020,7 +2038,7 @@ static bool Synth12Build(const SynthParams *sp, UINT w, UINT h, UINT out_w, UINT
+     // when the frame has to cross into this device, because then they are not
+     // the game's resources any more but copies of them.
+     const DXGI_FORMAT slot_fmt[SLOT_COUNT] = {
+-        TypedFormat(back_fmt),
++        srgb ? Synth12UavFormat(back_fmt) : TypedFormat(back_fmt),
+         Synth12UavFormat(output_fmt == DXGI_FORMAT_UNKNOWN ? back_fmt : output_fmt),
+         // R32_FLOAT rather than any depth format: a depth-stencil resource is
+         // not in the kernel's shared-format list, and NGX reads depth through
+@@ -2086,9 +2104,9 @@ static bool Synth12Build(const SynthParams *sp, UINT w, UINT h, UINT out_w, UINT
+     // passes no exp_w and no depth_packed, so on the one transport that pipelines
+     // there is nothing to double.
+     if (g_s12.shared && InterlockedCompareExchange(&g_source, 0, 0) != SRC_MIRROR &&
+-        PqBackBuffer(back_fmt) &&
++        (PqBackBuffer(back_fmt) || srgb || hdr10) &&
+         !PqPassMake(&g_s12.pq, g_s12.dev, g_s12.tex[SLOT_COLOR], g_s12.tex[SLOT_OUTPUT],
+-                    g_s12.tex[kOutB]))
++                    g_s12.tex[kOutB], srgb))
+     { Synth12ReleaseTextures(); return false; }
+ 
+     Log("[synth] colour in %s, output %s -- the frame is copied into the first and the "
+@@ -2732,12 +2750,15 @@ static bool Synth12EvaluateShared(const SynthParams *sp, DWORD wait_ms = 4000,
+         Barrier(g_s12.list, g_s12.depth_cvt, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+                 D3D12_RESOURCE_STATE_COMMON);
+     UINT64 v = Synth12End();
+-    if (g_s12.pq.in != nullptr)
+-        // The encode has to land in the Output this frame's evaluate belongs to,
+-        // which under the pipeline alternates. The decode does not: colour is one
+-        // texture in every mode.
+-        v = PqPassAfter(&g_s12.pq, g_s12.queue, g_s12.fence, &g_s12.fence_value, v,
+-                        out_slot == SLOT_OUTPUT ? 0 : 1, wait_ms);
++    if (g_s12.pq.in != nullptr) {
++        const UINT64 encoded = PqPassAfter(&g_s12.pq, g_s12.queue, g_s12.fence, &g_s12.fence_value, v,
++                                          out_slot == SLOT_OUTPUT ? 0 : 1, wait_ms);
++        if (encoded == v) {
++            Log("[synth] output encoding failed; the completed NR submission is not an encoded output.");
++            return false;
++        }
++        v = encoded;
++    }
+ 
+     if (code != 0)
+     {
+@@ -7426,7 +7447,15 @@ static void SynthVkShutdownForDevice()
+         return;
+     }
+     Breadcrumb("shutdown: waiting the game's Vulkan queue idle");
+-    if (g_svk.DeviceWaitIdle != nullptr) g_svk.DeviceWaitIdle(g_svk.dev);
++    const bool vulkan_idle = g_svk.DeviceWaitIdle != nullptr && g_svk.DeviceWaitIdle(g_svk.dev) == 0;
++    if (!vulkan_idle || !Synth12Drain()) {
++        g_s12.resources_retained = true;
++        g_s12.ready = false;
++        g_svk.ready = false;
++        g_svk.dev = nullptr;
++        Log("[synth] shutdown completion unproven; retaining imported images and private resources.");
++        return;
++    }
+ 
+     // And only now the four park events, for the reason SynthVkParkStop's header
+     // gives: setting an event does not retire the queued vkCmdWaitEvents that
+@@ -8219,9 +8248,28 @@ static void SynthForget()
+ 
+ // The colour space the game presents in, as ReShade reads it off the swapchain
+ // it just created or resized. Kept for the feature-build line and the panel.
++struct PresentSwapchainContract {
++    reshade::api::device* device;
++    void* window;
++    uint64_t first_buffer;
++    reshade::api::color_space space;
++};
++static std::mutex g_present_swapchain_mutex;
++static PresentSwapchainContract g_present_swapchain = {};
++
+ static void OnSynthInitSwapchain(reshade::api::swapchain *sc, bool)
+ {
+-    if (sc != nullptr) InterlockedExchange(&g_present_space, static_cast<LONG>(sc->get_color_space()));
++    if (sc == nullptr) return;
++    const auto space = sc->get_color_space();
++    InterlockedExchange(&g_present_space, static_cast<LONG>(space));
++    if (PresentationAdapterEnabled() && sc->get_device()->get_api() == reshade::api::device_api::vulkan) {
++        const PresentSwapchainContract observed = {
++            sc->get_device(), sc->get_hwnd(),
++            sc->get_back_buffer_count() != 0 ? sc->get_back_buffer(0).handle : 0, space
++        };
++        std::lock_guard<std::mutex> lock(g_present_swapchain_mutex);
++        g_present_swapchain = observed;
++    }
+ }
+ 
+ static void OnSynthInitEffectRuntime(reshade::api::effect_runtime *)
+@@ -8467,6 +8515,8 @@ static void SynthReleaseLatch(ULONGLONG quiet_ms)
+             "releases are not reported. The status panel shows which source is running now.");
+ }
+ 
++#include "present-adapter.inc"
++
+ static void OnSynthBeginEffects(reshade::api::effect_runtime *rt,
+                                 reshade::api::command_list   *cmd,
+                                 reshade::api::resource_view   rtv,
+@@ -8487,6 +8537,12 @@ static void OnSynthBeginEffects(reshade::api::effect_runtime *rt,
+     // closes that wait cycle until the worker's 300 ms timeout fires.
+     if (!TryReloadPresentConfig(g_bridge_cs, [] { CfgReload(); })) return;
+ 
++    if (PresentationAdapterEnabled())
++    {
++        PresentAdapterFrame(rt, cmd, rtv);
++        return;
++    }
++
+     if (!SynthEnabled() || rt == nullptr || cmd == nullptr) return;
+ 
+     // The only per-frame present-thread code this add-on has, so it is the only
+diff --git a/src/version.rc b/src/version.rc
+index b75d918..8241545 100644
+--- a/src/version.rc
++++ b/src/version.rc
+@@ -3,8 +3,8 @@
+ // ReShade reads the add-on's version from here and shows it in its overlay, so
+ // a bug report can name the exact build instead of describing it.
+ VS_VERSION_INFO VERSIONINFO
+- FILEVERSION    1,4,13,8
+- PRODUCTVERSION 1,4,13,8
++ FILEVERSION    1,4,13,9
++ PRODUCTVERSION 1,4,13,9
+  FILEOS         VOS_NT_WINDOWS32
+  FILETYPE       VFT_DLL
+ BEGIN
+@@ -13,11 +13,11 @@ BEGIN
+         BLOCK "040904b0"
+         BEGIN
+             VALUE "FileDescription",  "DLSS 5 Bridge"
+-            VALUE "FileVersion",      "1.4.13-pre8"
++            VALUE "FileVersion",      "1.4.13-pre8-vk-fginput"
+             VALUE "InternalName",     "dlss5-bridge"
+             VALUE "OriginalFilename", "dlss5-bridge.addon64"
+             VALUE "ProductName",      "DLSS 5 Bridge"
+-            VALUE "ProductVersion",   "1.4.13-pre8"
++            VALUE "ProductVersion",   "1.4.13-pre8-vk-fginput"
+         END
+     END
+     BLOCK "VarFileInfo"
+diff --git a/src/vk-present-adapter.ini.example b/src/vk-present-adapter.ini.example
+new file mode 100644
+index 0000000..b9db9dc
+--- /dev/null
++++ b/src/vk-present-adapter.ini.example
+@@ -0,0 +1,26 @@
++[Adapter]
++; Optional, read once at start-up. Without this file the bridge behaves exactly as before.
++;
++; Enabled=1     Enable the final-image adapter. The bridge stops mirroring the game's own
++;               DLSS evaluate and instead feeds Generic the frame chosen by Source below.
++; Source        fg-input  Process each real frame once at the native DLSS Frame Generation
++;                         evaluate (feature 11): HUD-less -> Generic NR -> UI-preserving
++;                         composite into the back buffer, then FG interpolates from the
++;                         processed frames. Presented multiplier is preserved.
++;               present   (default) Process every ReShade begin-effects present, including
++;                         FG-generated ones. Correct picture but bounded by NR throughput
++;                         (~29 presents/s at 5120x2160 with two NR passes); kept for
++;                         reference and for the offline round-trip test.
++; Follow=1      Let Generic's own "Hook point" select the path: Present (2) runs the
++;               fg-input feed continuously; Upscaled (0) / Render (1) run the native mirror.
++;               The private D3D12 session is handed over on the render thread when the
++;               setting changes. Only meaningful with Source=fg-input.
++; AutoRun=1     Run the fg-input feed continuously without a request file (ignored when
++;               Follow=1, which already runs it while Present is selected).
++;
++; Request file (vk-present-adapter.request, "token frames mode", mode 0=copy 1=NR
++; 2=colour round-trip): a new token starts a bounded run of up to 1800 frames / 60 s;
++; frames=0 stops any run, including AutoRun/Follow, until the game restarts.
++Enabled=0
++Source=fg-input
++Follow=1
+diff --git a/src/vkmirror.inc b/src/vkmirror.inc
+index 63a40b6..7c238c9 100644
+--- a/src/vkmirror.inc
++++ b/src/vkmirror.inc
+@@ -278,6 +278,8 @@ struct VkMirror
+     SVkHandle ev_out[2]; // host -> device: the D3D12 evaluate is done
+     int       next;      // the pair the next frame takes; render thread only
+     volatile LONG cur;   // the pair the worker is servicing
++    // The armed frame belongs to the FG-input feed rather than the DLSS mirror.
++    volatile LONG fg_arm;
+     HANDLE    idle;      // manual reset, set while no frame is parked
+     HANDLE    wake;      // auto reset, kicks the worker
+     HANDLE    worker;
+@@ -575,6 +577,8 @@ static void VkmRefuse(const char *why)
+ // The worker
+ // ---------------------------------------------------------------------------
+ 
++static bool FgInputWorker();
++
+ static DWORD WINAPI VkmWorkerProc(LPVOID)
+ {
+     PollYield poll_yield;
+@@ -623,13 +627,20 @@ static DWORD WINAPI VkmWorkerProc(LPVOID)
+             // the detour returns -- but it is the last point this thread can
+             // observe, and stage 2 records no copy back at all.
+             // Serialised against the game's own NGX evaluate -- see g_ngx_cs.
+-            if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
+-            // The game's GPU is parked behind every GPU wait inside this call,
+-            // so it is not the synthetic path's four seconds. Passed rather than
+-            // set on a global: the same global was still standing at 900 for the
+-            // D3D11/D3D12 transport, which parks nothing.
+-            const bool ev_ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs);
+-            if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
++            const bool fg_frame = InterlockedExchange(&g_vkm.fg_arm, 0) != 0;
++            bool ev_ok;
++            if (fg_frame)
++                ev_ok = FgInputWorker();
++            else
++            {
++                if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
++                // The game's GPU is parked behind every GPU wait inside this call,
++                // so it is not the synthetic path's four seconds. Passed rather than
++                // set on a global: the same global was still standing at 900 for the
++                // D3D11/D3D12 transport, which parks nothing.
++                ev_ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs);
++                if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
++            }
+             if (ev_ok)
+             {
+                 // Both counters clear here: a frame that arrived and evaluated is
+@@ -1771,6 +1782,8 @@ typedef NVSDK_NGX_Result (*PFN_VkCreate1)(void *, void *, int, NVSDK_NGX_Paramet
+     if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs); \
+     return r_;
+ 
++#include "fg-input.inc"
++
+ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
+                                           const NVSDK_NGX_Handle *handle,
+                                           const NVSDK_NGX_Parameter *p, void *cb)
+@@ -1798,7 +1811,41 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
+         VKM_FORWARD(fwd(cmd, handle, p, cb))
+     }
+ 
+-    if (IsOtherFeature(handle)) { VKM_FORWARD(fwd(cmd, handle, p, cb)) }
++    if (IsOtherFeature(handle))
++    {
++        // Never block the present thread on the render thread's lock: a skipped
++        // frame keeps the game's own image, a blocked one can deadlock the device.
++        if (PresentAdapterFgInput() && FgInputIsFgHandle(handle) && TryEnterCriticalSection(&g_bridge_cs))
++        {
++            FgInputFrame(cmd, p);
++            LeaveCriticalSection(&g_bridge_cs);
++        }
++        VKM_FORWARD(fwd(cmd, handle, p, cb))
++    }
++
++    // Present selected in Generic: the FG-input feed owns the session; the mirror
++    // stands aside and hands its resources over on the render thread.
++    const bool fg_selected = PresentAdapterFgInput() && FgInputActive();
++    if (PresentAdapterFollow())
++    {
++        EnterCriticalSection(&g_bridge_cs);
++        const LONG owner = InterlockedCompareExchange(&g_adapter_owner, 0, 0);
++        if (fg_selected && owner == OWNER_MIRROR) MirrorReleaseForFgInput();
++        else if (owner == OWNER_FG && (!fg_selected || g_fg_input.want_release)) FgInputRelease();
++        LeaveCriticalSection(&g_bridge_cs);
++    }
++    if ((PresentationAdapterEnabled() && !PresentAdapterFollow()) || fg_selected)
++    {
++        static bool said = false;
++        if (!said)
++        {
++            said = true;
++            Log(PresentAdapterFgInput()
++                ? "[fg-input] native Vulkan DLSS is forwarded without a mirror; the real frame is processed once at the frame-generation input."
++                : "[present-adapter] native Vulkan DLSS is forwarded without a mirror; final-colour processing is request-controlled at ReShade begin-effects.");
++        }
++        VKM_FORWARD(fwd(cmd, handle, p, cb))
++    }
+ 
+     // source=synth pins the synthetic contract, so the mirror stands aside even
+     // when the game has DLSS of its own. See the same block in dlss5-bridge.cpp:
+@@ -1868,6 +1915,7 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
+         g_s12.w = 0;
+         g_s12.need_reset = true;
+     }
++    if (PresentAdapterFollow()) InterlockedExchange(&g_adapter_owner, OWNER_MIRROR);
+     VkMirrorFrame(cmd, p);
+     LeaveCriticalSection(&g_bridge_cs);
+ 
+@@ -1881,6 +1929,7 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
+ static void VkmNoteCreated(int feature_id, NVSDK_NGX_Result r, NVSDK_NGX_Handle **out)
+ {
+     if (r != NGX_SUCCESS || out == nullptr || *out == nullptr) return;
++    FgInputNoteCreated(feature_id, r, out);
+ 
+     if (feature_id == 1)
+     {
+@@ -1920,6 +1969,7 @@ static void VkmNoteCreated(int feature_id, NVSDK_NGX_Result r, NVSDK_NGX_Handle
+ static void VkmNoteGameCreate(int feature_id, NVSDK_NGX_Result r,
+                               const NVSDK_NGX_Parameter *p)
+ {
++    if (PresentationAdapterEnabled() && !PresentAdapterFollow()) return;
+     if (r != NGX_SUCCESS || feature_id != 1) return;
+ 
+     unsigned int cw = 0, ch = 0, cow = 0, coh = 0;
+diff --git a/tests/vulkan-fg-input/build-roundtrip.cmd b/tests/vulkan-fg-input/build-roundtrip.cmd
+new file mode 100644
+index 0000000..55ff897
+--- /dev/null
++++ b/tests/vulkan-fg-input/build-roundtrip.cmd
+@@ -0,0 +1,9 @@
++@echo off
++setlocal
++call "%~dp0vcvars.cmd"
++if errorlevel 1 exit /b 1
++if not defined VULKAN_SDK ( echo VULKAN_SDK is not set & exit /b 1 )
++cd /d "%~dp0"
++if not exist build mkdir build
++cl /nologo /W4 /WX /O2 /MT /EHsc /std:c++17 /I"%VULKAN_SDK%\Include" roundtrip-host.cpp /Fo:build\roundtrip-host.obj /Fe:build\roundtrip-host.exe /link /LIBPATH:"%VULKAN_SDK%\Lib" vulkan-1.lib user32.lib
++exit /b %errorlevel%
+diff --git a/tests/vulkan-fg-input/roundtrip-host.cpp b/tests/vulkan-fg-input/roundtrip-host.cpp
+new file mode 100644
+index 0000000..2761bff
+--- /dev/null
++++ b/tests/vulkan-fg-input/roundtrip-host.cpp
+@@ -0,0 +1,326 @@
++#define VK_USE_PLATFORM_WIN32_KHR
++#define WIN32_LEAN_AND_MEAN
++#define NOMINMAX
++#include <windows.h>
++#include <vulkan/vulkan.h>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <vector>
++#include <algorithm>
++#include <string>
++
++static void Check(VkResult r, const char* step) {
++    if (r != VK_SUCCESS) { std::printf("FAIL %s VkResult=%d\n", step, r); std::exit(2); }
++}
++static LRESULT CALLBACK WindowProc(HWND w, UINT m, WPARAM a, LPARAM b) {
++    return DefWindowProcW(w, m, a, b);
++}
++static void Barrier(VkCommandBuffer cb, VkImage image, VkImageLayout from, VkImageLayout to,
++                    VkAccessFlags src, VkAccessFlags dst) {
++    VkImageMemoryBarrier b{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
++    b.oldLayout = from; b.newLayout = to; b.srcAccessMask = src; b.dstAccessMask = dst;
++    b.srcQueueFamilyIndex = b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
++    b.image = image; b.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
++    vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
++                         0, 0, nullptr, 0, nullptr, 1, &b);
++}
++static void Request(unsigned token, unsigned frames, unsigned mode) {
++    FILE* f = nullptr;
++    if (fopen_s(&f, "vk-present-adapter.request", "wb") || !f) std::exit(3);
++    const int written = std::fprintf(f, "%u %u %u\n", token, frames, mode);
++    const int closed = std::fclose(f);
++    if (written < 0 || closed != 0) std::exit(3);
++    std::printf("request_sent token=%u frames=%u mode=%u\n", token, frames, mode);
++}
++static unsigned long long Field(const std::string& line, const char* key) {
++    const size_t at = line.find(key);
++    if (at == std::string::npos) return UINT64_MAX;
++    return std::strtoull(line.c_str() + at + std::string(key).size(), nullptr, 0);
++}
++static bool Completed(const std::string& log, unsigned token) {
++    size_t at = 0;
++    while ((at = log.find("[present-adapter] request complete:", at)) != std::string::npos) {
++        const size_t end = log.find('\n', at);
++        if (Field(log.substr(at, end - at), " token=") == token) return true;
++        ++at;
++    }
++    return false;
++}
++struct Presented {
++    int frame = -1;
++    unsigned token = 0, bridge_frame = 0;
++};
++struct PixelStats {
++    unsigned checked = 0, mismatches = 0, maximum[4] = {};
++};
++static uint32_t Fixture(unsigned x, unsigned y, unsigned frame, VkExtent2D size, VkFormat format) {
++    static const unsigned palette[16][3] = {
++        {0,0,0}, {8,8,8}, {32,32,32}, {64,64,64},
++        {96,96,96}, {128,128,128}, {160,160,160}, {192,192,192},
++        {224,224,224}, {255,255,255}, {32,96,192}, {192,64,16},
++        {96,192,48}, {224,32,128}, {8,160,224}, {200,128,48}
++    };
++    unsigned cell = (x / 64 + 4 * (y / 64)) % 16;
++    if ((x + frame * 3 + y) % 96 < 12) cell = (cell + frame + 5) % 16;
++    if (x >= size.width - 48 && x < size.width - 32 &&
++        y >= size.height - 48 && y < size.height - 32) {
++        const unsigned rx = x - (size.width - 48), ry = y - (size.height - 48);
++        cell = (rx / 4 + 4 * (ry / 4) + (ry >= 12 ? frame : 0)) % 16;
++    }
++    unsigned r = palette[cell][0], g = palette[cell][1], b = palette[cell][2];
++    if (format == VK_FORMAT_A2B10G10R10_UNORM_PACK32) {
++        r = (r * 1023 + 127) / 255; g = (g * 1023 + 127) / 255; b = (b * 1023 + 127) / 255;
++        return r | (g << 10) | (b << 20) | (3u << 30);
++    }
++    if (format == VK_FORMAT_B8G8R8A8_UNORM) std::swap(r, b);
++    return r | (g << 8) | (b << 16) | (255u << 24);
++}
++static std::string BridgeLog() {
++    FILE* f=nullptr;
++    if(fopen_s(&f,"dlss5-bridge.log","rb") || !f) return {};
++    std::string result; char buffer[4096]; size_t n=0;
++    while((n=fread(buffer,1,sizeof(buffer),f))!=0 && result.size()<1024*1024) result.append(buffer,n);
++    fclose(f);return result;
++}
++int main(int argc, char** argv) {
++    bool hdr=false, full_resolution=false, load_rr=false;
++    for(int i=1;i<argc;++i) {
++        if(std::strcmp(argv[i],"hdr")==0) hdr=true;
++        else if(std::strcmp(argv[i],"full")==0) full_resolution=true;
++        else if(std::strcmp(argv[i],"load-rr")==0) load_rr=true;
++        else return 64;
++    }
++    if(load_rr) {
++        wchar_t rr_path[MAX_PATH]={};
++        if(GetFullPathNameW(L"nvngx_dlssd.dll",MAX_PATH,rr_path,nullptr)==0 ||
++           !LoadLibraryExW(rr_path,nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)) {
++            std::printf("FAIL load-rr error=%lu\n",GetLastError());return 13;
++        }
++        std::printf("RR_MODULE_LOADED=nvngx_dlssd.dll\n");
++    }
++    const int width=full_resolution ? 5120 : 800, height=full_resolution ? 2160 : 600;
++    std::setvbuf(stdout, nullptr, _IONBF, 0);
++    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
++    WNDCLASSW wc{}; wc.lpfnWndProc = WindowProc; wc.hInstance = GetModuleHandleW(nullptr);
++    wc.lpszClassName = L"VulkanPresentAdapterHost";
++    if (!RegisterClassW(&wc)) return 4;
++    HWND window = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wc.lpszClassName,
++        L"Independent Vulkan colour transport test", WS_POPUP, -20000, -20000, width, height,
++        nullptr, nullptr, wc.hInstance, nullptr);
++    if (!window) return 5;
++    const char* layer = "VK_LAYER_reshade";
++    const char* ie[] = {VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
++                       VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME};
++    VkApplicationInfo ai{VK_STRUCTURE_TYPE_APPLICATION_INFO}; ai.pApplicationName = "PresentAdapterTest";
++    ai.apiVersion = VK_API_VERSION_1_3;
++    VkInstanceCreateInfo ici{VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO}; ici.pApplicationInfo = &ai;
++    ici.enabledLayerCount = 1; ici.ppEnabledLayerNames = &layer;
++    ici.enabledExtensionCount = hdr ? 3u : 2u; ici.ppEnabledExtensionNames = ie;
++    VkInstance instance{}; Check(vkCreateInstance(&ici,nullptr,&instance),"instance");
++    VkWin32SurfaceCreateInfoKHR sci{VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR};
++    sci.hinstance = wc.hInstance; sci.hwnd = window;
++    VkSurfaceKHR surface{}; Check(vkCreateWin32SurfaceKHR(instance,&sci,nullptr,&surface),"surface");
++    uint32_t count = 0; Check(vkEnumeratePhysicalDevices(instance,&count,nullptr),"enumerate");
++    std::vector<VkPhysicalDevice> devices(count); Check(vkEnumeratePhysicalDevices(instance,&count,devices.data()),"devices");
++    VkPhysicalDevice physical{};
++    for (auto d : devices) { VkPhysicalDeviceProperties p{}; vkGetPhysicalDeviceProperties(d,&p);
++        if (p.vendorID == 0x10de) { physical = d; std::printf("GPU=%s\n",p.deviceName); break; } }
++    if (!physical) return 6;
++    uint32_t qcount = 0; vkGetPhysicalDeviceQueueFamilyProperties(physical,&qcount,nullptr);
++    std::vector<VkQueueFamilyProperties> queues(qcount); vkGetPhysicalDeviceQueueFamilyProperties(physical,&qcount,queues.data());
++    uint32_t family = qcount;
++    for (uint32_t i=0;i<qcount;++i) { VkBool32 supports=0; Check(vkGetPhysicalDeviceSurfaceSupportKHR(physical,i,surface,&supports),"surface support");
++        if (supports && (queues[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) { family=i;break; } }
++    if (family==qcount) return 7;
++    const float priority = 1;
++    VkDeviceQueueCreateInfo qci{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
++    qci.queueFamilyIndex=family;qci.queueCount=1;qci.pQueuePriorities=&priority;
++    const char* de[]={VK_KHR_SWAPCHAIN_EXTENSION_NAME,VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME,
++                      VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME,VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME};
++    VkPhysicalDeviceTimelineSemaphoreFeatures timeline{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES};
++    timeline.timelineSemaphore=VK_TRUE;
++    VkDeviceCreateInfo dci{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};dci.pNext=&timeline;
++    dci.queueCreateInfoCount=1;dci.pQueueCreateInfos=&qci;dci.enabledExtensionCount=4;dci.ppEnabledExtensionNames=de;
++    VkDevice device{};Check(vkCreateDevice(physical,&dci,nullptr,&device),"device");
++    VkQueue queue{};vkGetDeviceQueue(device,family,0,&queue);
++    VkSurfaceCapabilitiesKHR caps{};Check(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical,surface,&caps),"caps");
++    uint32_t fc=0;Check(vkGetPhysicalDeviceSurfaceFormatsKHR(physical,surface,&fc,nullptr),"formats");
++    std::vector<VkSurfaceFormatKHR> formats(fc);Check(vkGetPhysicalDeviceSurfaceFormatsKHR(physical,surface,&fc,formats.data()),"formats data");
++    VkSurfaceFormatKHR chosen{};
++    if(hdr) {
++        for(auto f:formats) if(f.format==VK_FORMAT_A2B10G10R10_UNORM_PACK32 &&
++                              f.colorSpace==VK_COLOR_SPACE_HDR10_ST2084_EXT) {chosen=f;break;}
++    } else {
++        for(auto f:formats) if(f.format==VK_FORMAT_R8G8B8A8_UNORM) {chosen=f;break;}
++        if(chosen.format==VK_FORMAT_UNDEFINED) for(auto f:formats) if(f.format==VK_FORMAT_B8G8R8A8_UNORM) {chosen=f;break;}
++    }
++    if(chosen.format==VK_FORMAT_UNDEFINED) {std::printf("SKIP requested HDR=%d surface unavailable\n",hdr);return 8;}
++    VkExtent2D size = caps.currentExtent;
++    if(size.width==UINT32_MAX) size={static_cast<uint32_t>(width),static_cast<uint32_t>(height)};
++    if(size.width!=static_cast<uint32_t>(width) || size.height!=static_cast<uint32_t>(height)) {
++        std::printf("FAIL requested_extent=%dx%d actual_extent=%ux%u\n",width,height,size.width,size.height);
++        return 12;
++    }
++    const VkImageUsageFlags usage=VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
++    if((caps.supportedUsageFlags & usage)!=usage) return 9;
++    VkSwapchainCreateInfoKHR swapci{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
++    swapci.surface=surface;swapci.minImageCount=std::max(caps.minImageCount,2u);
++    if(caps.maxImageCount && swapci.minImageCount>caps.maxImageCount) swapci.minImageCount=caps.maxImageCount;
++    swapci.imageFormat=chosen.format;swapci.imageColorSpace=chosen.colorSpace;swapci.imageExtent=size;
++    swapci.imageArrayLayers=1;swapci.imageUsage=usage;swapci.imageSharingMode=VK_SHARING_MODE_EXCLUSIVE;
++    swapci.preTransform=caps.currentTransform;swapci.compositeAlpha=VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
++    swapci.presentMode=VK_PRESENT_MODE_FIFO_KHR;swapci.clipped=VK_TRUE;
++    VkSwapchainKHR swap{};Check(vkCreateSwapchainKHR(device,&swapci,nullptr,&swap),"swapchain");
++    uint32_t ic=0;Check(vkGetSwapchainImagesKHR(device,swap,&ic,nullptr),"images");
++    std::vector<VkImage> images(ic);Check(vkGetSwapchainImagesKHR(device,swap,&ic,images.data()),"images data");
++    std::printf("surface=%ux%u format=%u images=%u\n",size.width,size.height,chosen.format,ic);
++    VkBufferCreateInfo bci{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};bci.size=16*16*4;bci.usage=VK_BUFFER_USAGE_TRANSFER_DST_BIT;
++    VkBuffer buffer{};Check(vkCreateBuffer(device,&bci,nullptr,&buffer),"readback buffer");
++    VkMemoryRequirements req{};vkGetBufferMemoryRequirements(device,buffer,&req);
++    VkPhysicalDeviceMemoryProperties mp{};vkGetPhysicalDeviceMemoryProperties(physical,&mp);
++    uint32_t mt=mp.memoryTypeCount;
++    for(uint32_t i=0;i<mp.memoryTypeCount;++i) if((req.memoryTypeBits&(1u<<i)) &&
++        (mp.memoryTypes[i].propertyFlags&(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))==
++         (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {mt=i;break;}
++    if(mt==mp.memoryTypeCount) return 10;
++    VkMemoryAllocateInfo mai{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};mai.allocationSize=req.size;mai.memoryTypeIndex=mt;
++    VkDeviceMemory memory{};Check(vkAllocateMemory(device,&mai,nullptr,&memory),"readback memory");
++    Check(vkBindBufferMemory(device,buffer,memory,0),"bind readback");
++    unsigned char* mapped=nullptr;Check(vkMapMemory(device,memory,0,VK_WHOLE_SIZE,0,reinterpret_cast<void**>(&mapped)),"map");
++    if(size.width < 48 || size.height < 48) return 12;
++    bci.size=static_cast<VkDeviceSize>(size.width)*size.height*4;bci.usage=VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
++    VkBuffer upload{};Check(vkCreateBuffer(device,&bci,nullptr,&upload),"upload buffer");
++    vkGetBufferMemoryRequirements(device,upload,&req);
++    mt=mp.memoryTypeCount;
++    for(uint32_t i=0;i<mp.memoryTypeCount;++i) if((req.memoryTypeBits&(1u<<i)) &&
++        (mp.memoryTypes[i].propertyFlags&(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))==
++         (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {mt=i;break;}
++    if(mt==mp.memoryTypeCount) return 10;
++    mai.allocationSize=req.size;mai.memoryTypeIndex=mt;
++    VkDeviceMemory upload_memory{};Check(vkAllocateMemory(device,&mai,nullptr,&upload_memory),"upload memory");
++    Check(vkBindBufferMemory(device,upload,upload_memory,0),"bind upload");
++    uint32_t* upload_pixels=nullptr;
++    Check(vkMapMemory(device,upload_memory,0,VK_WHOLE_SIZE,0,reinterpret_cast<void**>(&upload_pixels)),"map upload");
++    VkCommandPoolCreateInfo pci{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};pci.queueFamilyIndex=family;pci.flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
++    VkCommandPool pool{};Check(vkCreateCommandPool(device,&pci,nullptr,&pool),"pool");
++    VkCommandBufferAllocateInfo cai{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};cai.commandPool=pool;cai.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY;cai.commandBufferCount=1;
++    VkCommandBuffer command{};Check(vkAllocateCommandBuffers(device,&cai,&command),"command");
++    VkSemaphoreCreateInfo se{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};VkSemaphore acquired{}, rendered{};
++    Check(vkCreateSemaphore(device,&se,nullptr,&acquired),"acquired semaphore");Check(vkCreateSemaphore(device,&se,nullptr,&rendered),"render semaphore");
++    VkFenceCreateInfo fci{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};VkFence fence{};Check(vkCreateFence(device,&fci,nullptr,&fence),"fence");
++    std::vector<Presented> prior(ic);PixelStats stats[2];
++    unsigned sent=0, pause_presents=0;
++    bool accepted[4]={}, finished[4]={}, completed=false;
++    ULONGLONG pause_start=0, pause_ms=0;
++    const ULONGLONG start=GetTickCount64();
++    std::printf("FIXTURE version=gray-colour-stripes-v1 hdr=%d roi=16x16 offset=-48,-48\n",hdr);
++    for(unsigned frame=0;frame<600 && GetTickCount64()-start<45000;++frame) {
++        MSG msg{};while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}
++        const std::string log=BridgeLog();
++        for(unsigned token=1;token<=4;++token) {
++            if(!accepted[token-1] && log.find("[present-adapter] request "+std::to_string(token)+" accepted:")!=std::string::npos) {
++                accepted[token-1]=true;std::printf("bridge_accepted token=%u\n",token);
++            }
++            if(!finished[token-1] && Completed(log,token)) {
++                finished[token-1]=true;std::printf("bridge_completed token=%u\n",token);
++            }
++        }
++        if(sent==0 && log.find("enabled, idle")!=std::string::npos) {Request(1,12,0);sent=1;}
++        if(sent==1 && finished[0]) {Request(2,12,2);sent=2;}
++        if(sent==2 && finished[1]) {Request(3,16,1);sent=3;}
++        if(sent==3 && finished[2]) {
++            if(!pause_start) pause_start=GetTickCount64();
++            if(GetTickCount64()-pause_start>=750 && pause_presents>0) {
++                pause_ms=GetTickCount64()-pause_start;
++                Request(4,16,1);sent=4;
++            }
++        }
++        if(sent==4 && finished[3]) {completed=true;break;}
++        if(frame%30==0) std::printf("host_frame=%u last_sent_token=%u\n",frame,sent);
++        Check(vkQueueWaitIdle(queue),"queue idle");
++        uint32_t index=0;Check(vkAcquireNextImageKHR(device,swap,3000000000ull,acquired,VK_NULL_HANDLE,&index),"acquire");
++        for(unsigned y=0;y<size.height;++y) for(unsigned x=0;x<size.width;++x)
++            upload_pixels[static_cast<size_t>(y)*size.width+x]=Fixture(x,y,frame,size,chosen.format);
++        Check(vkResetCommandBuffer(command,0),"reset command");VkCommandBufferBeginInfo cbi{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
++        Check(vkBeginCommandBuffer(command,&cbi),"begin");
++        if(prior[index].frame>=0) {
++            Barrier(command,images[index],VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,0,VK_ACCESS_TRANSFER_READ_BIT);
++            VkBufferImageCopy region{};region.imageSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
++            region.imageOffset={static_cast<int32_t>(size.width)-48,static_cast<int32_t>(size.height)-48,0};region.imageExtent={16,16,1};
++            vkCmdCopyImageToBuffer(command,images[index],VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,buffer,1,&region);
++            VkBufferMemoryBarrier bb{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};bb.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;bb.dstAccessMask=VK_ACCESS_HOST_READ_BIT;
++            bb.srcQueueFamilyIndex=bb.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;bb.buffer=buffer;bb.size=VK_WHOLE_SIZE;
++            vkCmdPipelineBarrier(command,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_HOST_BIT,0,0,nullptr,1,&bb,0,nullptr);
++            Barrier(command,images[index],VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_ACCESS_TRANSFER_READ_BIT,VK_ACCESS_TRANSFER_WRITE_BIT);
++        } else Barrier(command,images[index],VK_IMAGE_LAYOUT_UNDEFINED,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,0,VK_ACCESS_TRANSFER_WRITE_BIT);
++        VkBufferImageCopy upload_region{};upload_region.imageSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
++        upload_region.imageExtent={size.width,size.height,1};
++        vkCmdCopyBufferToImage(command,upload,images[index],VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&upload_region);
++        Barrier(command,images[index],VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,VK_ACCESS_TRANSFER_WRITE_BIT,0);
++        Check(vkEndCommandBuffer(command),"end");Check(vkResetFences(device,1,&fence),"reset fence");
++        VkPipelineStageFlags stage=VK_PIPELINE_STAGE_TRANSFER_BIT;VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
++        submit.waitSemaphoreCount=1;submit.pWaitSemaphores=&acquired;submit.pWaitDstStageMask=&stage;
++        submit.commandBufferCount=1;submit.pCommandBuffers=&command;submit.signalSemaphoreCount=1;submit.pSignalSemaphores=&rendered;
++        Check(vkQueueSubmit(queue,1,&submit,fence),"submit");Check(vkWaitForFences(device,1,&fence,VK_TRUE,3000000000ull),"fence wait");
++        const Presented old=prior[index];
++        if(old.token==1 || old.token==2) {
++            PixelStats& s=stats[old.token-1];
++            const unsigned tolerance=old.token==1 ? 0u : (hdr ? 2u : 1u);
++            unsigned maximum[4]={};
++            for(unsigned y=0;y<16;++y) for(unsigned x=0;x<16;++x) {
++                const uint32_t expected=Fixture(size.width-48+x,size.height-48+y,
++                    static_cast<unsigned>(old.frame),size,chosen.format);
++                const uint32_t actual=reinterpret_cast<const uint32_t*>(mapped)[y*16+x];
++                for(unsigned c=0;c<4;++c) {
++                    const unsigned channel=!hdr && chosen.format==VK_FORMAT_B8G8R8A8_UNORM && c<3 ? 2-c : c;
++                    const unsigned shift=channel*(hdr ? 10u : 8u), mask=hdr ? (c==3 ? 3u : 1023u) : 255u;
++                    const int delta=static_cast<int>((actual>>shift)&mask)-static_cast<int>((expected>>shift)&mask);
++                    maximum[c]=std::max(maximum[c],static_cast<unsigned>(std::abs(delta)));
++                }
++            }
++            bool match=maximum[3]==0;
++            for(unsigned c=0;c<4;++c) {s.maximum[c]=std::max(s.maximum[c],maximum[c]);if(c<3 && maximum[c]>tolerance) match=false;}
++            ++s.checked;if(!match) ++s.mismatches;
++            std::printf("PIXEL_SAMPLE token=%u bridge_frame=%u host_frame=%d image=0x%llX max_error=%u,%u,%u,%u tolerance=%u\n",
++                old.token,old.bridge_frame,old.frame,static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(images[index])),
++                maximum[0],maximum[1],maximum[2],maximum[3],tolerance);
++        }
++        prior[index]={static_cast<int>(frame),0,0};
++        VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};present.waitSemaphoreCount=1;present.pWaitSemaphores=&rendered;
++        present.swapchainCount=1;present.pSwapchains=&swap;present.pImageIndices=&index;
++        const size_t before=BridgeLog().size();
++        Check(vkQueuePresentKHR(queue,&present),"present");
++        const std::string after=BridgeLog();
++        size_t at=before;
++        while((at=after.find("[present-adapter] frame=",at))!=std::string::npos) {
++            const std::string line=after.substr(at,after.find('\n',at)-at);
++            const auto token=Field(line," token=");
++            const bool mode=(token==1 && line.find(" mode=copy ")!=std::string::npos) ||
++                            (token==2 && line.find(" mode=carrier ")!=std::string::npos);
++            if(mode && Field(line," image=")==reinterpret_cast<uintptr_t>(images[index]) &&
++                Field(line," completed=")==1 && Field(line," writeback=")==1) {
++                prior[index].token=static_cast<unsigned>(token);
++                prior[index].bridge_frame=static_cast<unsigned>(Field(line," frame="));
++            }
++            ++at;
++        }
++        if(pause_start && sent==3) ++pause_presents;
++        Sleep(10);
++    }
++    Request(5,0,0);Check(vkDeviceWaitIdle(device),"final idle");
++    unsigned accepted_count=0,completed_count=0;
++    for(unsigned i=0;i<4;++i) {accepted_count+=accepted[i];completed_count+=finished[i];}
++    std::printf("SCENARIO requests_sent=%u accepted=%u completed=%u pause_ms=%llu pause_presents=%u stop_token=5\n",
++        sent,accepted_count,completed_count,pause_ms,pause_presents);
++    for(unsigned i=0;i<2;++i) std::printf("%s_PIXELS checked=%u mismatches=%u max_error=%u,%u,%u,%u tolerance=%u\n",
++        i==0 ? "COPY" : "CARRIER",stats[i].checked,stats[i].mismatches,
++        stats[i].maximum[0],stats[i].maximum[1],stats[i].maximum[2],stats[i].maximum[3],i==0 ? 0u : (hdr ? 2u : 1u));
++    vkUnmapMemory(device,upload_memory);vkDestroyBuffer(device,upload,nullptr);vkFreeMemory(device,upload_memory,nullptr);
++    vkUnmapMemory(device,memory);vkDestroyBuffer(device,buffer,nullptr);vkFreeMemory(device,memory,nullptr);
++    vkDestroyFence(device,fence,nullptr);vkDestroySemaphore(device,acquired,nullptr);vkDestroySemaphore(device,rendered,nullptr);
++    vkDestroyCommandPool(device,pool,nullptr);vkDestroySwapchainKHR(device,swap,nullptr);vkDestroyDevice(device,nullptr);
++    vkDestroySurfaceKHR(instance,surface,nullptr);vkDestroyInstance(instance,nullptr);DestroyWindow(window);
++    return completed && accepted_count==4 && completed_count==4 && pause_ms>=750 && pause_presents>0 &&
++        stats[0].checked>0 && stats[1].checked>0 && stats[0].mismatches==0 && stats[1].mismatches==0 ? 0 : 11;
++}
+diff --git a/tests/vulkan-fg-input/run-roundtrip.py b/tests/vulkan-fg-input/run-roundtrip.py
+new file mode 100644
+index 0000000..ca6f3c2
+--- /dev/null
++++ b/tests/vulkan-fg-input/run-roundtrip.py
+@@ -0,0 +1,133 @@
++"""Run the Vulkan adapter's Source=present path in an isolated, off-screen host.
++
++Requires an assets directory holding the third-party files this repository does
++not ship: renodx-dlss5.addon64 (Generic 8.5.0-rc10), nvngx_dlss.dll,
++nvngx_dlssnr.dll, optionally nvngx_dlssd.dll (for --with-rr-module), plus a
++ReShade.ini with a [RenoDX.DLSS5] section (EnableHooks=1, NRHookPoint=0,
++NRSourceEncoding=0) and a TestPreset.ini. ReShade 6.8 must be installed as the
++VK_LAYER_reshade layer. Exit 0 means the bounded transport/NR/workset checks in
++validate-roundtrip.py passed; it says nothing about game quality or FG coverage.
++"""
++import argparse
++import csv
++import hashlib
++import json
++import os
++import runpy
++import shutil
++import subprocess
++from datetime import datetime
++from pathlib import Path
++
++validate = runpy.run_path(str(Path(__file__).with_name('validate-roundtrip.py')))['validate']
++
++GENERIC_SHA256 = 'dcd93881e976ad033d83c2bb01f4bc3e4ddc59c15fe0dd4ca165bc5fc7d1ac68'
++
++
++def digest(path: Path) -> str:
++    return hashlib.sha256(path.read_bytes()).hexdigest()
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
++    parser.add_argument('directory', type=Path, help='new evidence directory (must not exist)')
++    parser.add_argument('--assets', type=Path, required=True, help='directory with the third-party files listed above')
++    parser.add_argument('--bridge', type=Path, default=Path(__file__).resolve().parents[2] / 'src/dlss5-bridge.addon64')
++    parser.add_argument('--hdr', action='store_true')
++    parser.add_argument('--full-resolution', action='store_true', help='use 5120x2160; exit the game first')
++    parser.add_argument('--with-rr-module', action='store_true', help='also load nvngx_dlssd.dll as a game process does')
++    parser.add_argument('--source-encoding', type=int, choices=(0, 1), default=0)
++    parser.add_argument('--hook-point', type=int, choices=(0, 1, 2), default=0)
++    args = parser.parse_args()
++    if args.full_resolution:
++        processes = subprocess.run(['tasklist.exe', '/FI', 'IMAGENAME eq Endfield.exe', '/FO', 'CSV', '/NH'],
++                                   capture_output=True, check=True)
++        rows = csv.reader(processes.stdout.decode('utf-8', errors='replace').splitlines())
++        if any(row and row[0].casefold() == 'endfield.exe' for row in rows):
++            parser.error('Exit the game before the 5120x2160 test to avoid competing NR allocations.')
++    source = Path(__file__).resolve().parents[2] / 'src'
++    assets = args.assets.resolve()
++    directory = args.directory.resolve()
++    directory.mkdir(parents=True, exist_ok=False)
++    files = {
++        'roundtrip-host.exe': Path(__file__).parent / 'build/roundtrip-host.exe',
++        'dlss5-bridge.addon64': args.bridge,
++        'renodx-dlss5.addon64': assets / 'renodx-dlss5.addon64',
++        'nvngx_dlss.dll': assets / 'nvngx_dlss.dll',
++        'nvngx_dlssnr.dll': assets / 'nvngx_dlssnr.dll',
++        'AdapterEvents.fx': source / 'AdapterEvents.fx',
++        'TestPreset.ini': assets / 'TestPreset.ini',
++    }
++    if args.with_rr_module:
++        files['nvngx_dlssd.dll'] = assets / 'nvngx_dlssd.dll'
++    identities = {}
++    for name, original in files.items():
++        target = directory / name
++        shutil.copy2(original, target)
++        expected = digest(original)
++        if digest(target) != expected:
++            raise RuntimeError(f'Copy verification failed: {name}')
++        identities[name] = {'source': str(original), 'sha256': expected}
++    if identities['renodx-dlss5.addon64']['sha256'] != GENERIC_SHA256:
++        raise RuntimeError('The isolated test requires the unmodified Generic 8.5.0-rc10 binary')
++    ini = (assets / 'ReShade.ini').read_text(encoding='utf-8-sig')
++    for key, value in (('NRSourceEncoding', args.source_encoding), ('NRHookPoint', args.hook_point)):
++        if ini.count(f'{key}=0') != 1:
++            raise RuntimeError(f'Expected exactly one baseline {key}=0 setting in the assets ReShade.ini')
++        ini = ini.replace(f'{key}=0', f'{key}={value}')
++    (directory / 'ReShade.ini').write_text(ini, encoding='utf-8')
++    (directory / 'dlss5-bridge.cfg').write_text('# dlss5-bridge keep\nmode=2\nstage=3\nunwrap=1\nvk_mirror=1\nsynth=0\n', encoding='ascii')
++    (directory / 'vk-present-adapter.ini').write_text('[Adapter]\nEnabled=1\n', encoding='ascii')
++    (directory / 'vk-present-adapter.request').write_text('0 0 0\n', encoding='ascii')
++    env = os.environ.copy()
++    env['RESHADE_BASE_PATH_OVERRIDE'] = str(directory)
++    env['VK_LOADER_LAYERS_DISABLE'] = '~implicit~'
++    env.pop('DISABLE_VK_LAYER_reshade_1', None)
++    command = [str(directory / 'roundtrip-host.exe')]
++    if args.hdr:
++        command.append('hdr')
++    if args.full_resolution:
++        command.append('full')
++    if args.with_rr_module:
++        command.append('load-rr')
++    scenario = {
++        'name': 'copy12-carrier12-nr16-present-pause-nr16',
++        'requests': [dict(token=1, mode=0, frames=12), dict(token=2, mode=2, frames=12),
++                     dict(token=3, mode=1, frames=16),
++                     dict(token=4, mode=1, frames=16, minimum_presenting_pause_ms=750),
++                     dict(token=5, mode=0, frames=0)],
++    }
++    parameters = {
++        'hdr': args.hdr, 'source_encoding': args.source_encoding, 'rr_module_loaded': args.with_rr_module,
++        'nr_hook_point': args.hook_point,
++        'requested_extent': [5120, 2160] if args.full_resolution else [800, 600],
++        'fixture': 'gray-colour-stripes-v1',
++        'roi_extent': [16, 16], 'roi_offset_from_bottom_right': [-48, -48],
++        'copy_rgb_tolerance': 0, 'carrier_rgb_tolerance': 2 if args.hdr else 1,
++        'alpha_tolerance': 0, 'nr_passes': 2, 'host_frame_limit': 600,
++        'host_time_limit_ms': 45000, 'process_timeout_s': 60,
++        'reshade_ini_sha256': digest(directory / 'ReShade.ini'),
++    }
++    report = {'started_at': datetime.now().astimezone().isoformat(), 'command': command,
++              'scenario': scenario, 'parameters': parameters, 'files': identities, 'timeout': False}
++    print(json.dumps({'directory': str(directory), 'command': command, 'parameters': parameters}, indent=2), flush=True)
++    try:
++        process = subprocess.run(command, cwd=directory, env=env, capture_output=True,
++                                 timeout=parameters['process_timeout_s'])
++        report.update(exit_code=process.returncode,
++                      stdout=process.stdout.decode('utf-8', errors='replace'),
++                      stderr=process.stderr.decode('utf-8', errors='replace'))
++    except subprocess.TimeoutExpired as error:
++        report.update(exit_code=None, timeout=True,
++                      stdout=(error.stdout or b'').decode('utf-8', errors='replace'),
++                      stderr=(error.stderr or b'').decode('utf-8', errors='replace'))
++    report['finished_at'] = datetime.now().astimezone().isoformat()
++    (directory / 'result.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
++    validation = validate(directory)
++    (directory / 'post-exit-validation.json').write_text(json.dumps(validation, indent=2), encoding='utf-8')
++    print(json.dumps({'directory': str(directory), **validation}, indent=2))
++    return 0 if validation['passed'] else 1
++
++
++if __name__ == '__main__':
++    raise SystemExit(main())
+diff --git a/tests/vulkan-fg-input/test-composite.cmd b/tests/vulkan-fg-input/test-composite.cmd
+new file mode 100644
+index 0000000..4f50200
+--- /dev/null
++++ b/tests/vulkan-fg-input/test-composite.cmd
+@@ -0,0 +1,10 @@
++@echo off
++setlocal
++call "%~dp0vcvars.cmd"
++if errorlevel 1 exit /b 1
++cd /d "%~dp0"
++if not exist build mkdir build
++cl /nologo /W4 /WX /O2 /MT /EHsc /std:c++17 test-composite.cpp /Fo:build\test-composite.obj /Fe:build\test-composite.exe /link d3d12.lib d3dcompiler.lib dxgi.lib
++if errorlevel 1 exit /b 1
++build\test-composite.exe
++exit /b %errorlevel%
+diff --git a/tests/vulkan-fg-input/test-composite.cpp b/tests/vulkan-fg-input/test-composite.cpp
+new file mode 100644
+index 0000000..51b2720
+--- /dev/null
++++ b/tests/vulkan-fg-input/test-composite.cpp
+@@ -0,0 +1,165 @@
++// Offline check of the FG-input UI-preserving composite on a D3D12 device.
++#define WIN32_LEAN_AND_MEAN
++#include <windows.h>
++#include <d3d12.h>
++#include <d3dcompiler.h>
++#include <dxgi1_4.h>
++#include <cstdio>
++#include <cstdint>
++#include <cstdlib>
++#include <algorithm>
++#include <vector>
++#include "../../src/fg-composite-shader.h"
++
++static const UINT kW = 64, kH = 48;
++static ID3D12Device* g_dev;
++static ID3D12CommandQueue* g_queue;
++static ID3D12CommandAllocator* g_alloc;
++static ID3D12GraphicsCommandList* g_list;
++static ID3D12Fence* g_fence;
++static UINT64 g_fv;
++static HANDLE g_ev;
++
++static void Fail(const char* what, HRESULT hr = S_OK) { std::printf("FAIL %s hr=0x%08lX\n", what, hr); std::exit(2); }
++static void Barrier(ID3D12Resource* r, D3D12_RESOURCE_STATES a, D3D12_RESOURCE_STATES b) {
++    D3D12_RESOURCE_BARRIER x{}; x.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
++    x.Transition.pResource = r; x.Transition.StateBefore = a; x.Transition.StateAfter = b;
++    x.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES; g_list->ResourceBarrier(1, &x);
++}
++static void Submit() {
++    g_list->Close(); ID3D12CommandList* l[] = { g_list }; g_queue->ExecuteCommandLists(1, l);
++    g_queue->Signal(g_fence, ++g_fv);
++    if (g_fence->GetCompletedValue() < g_fv) { g_fence->SetEventOnCompletion(g_fv, g_ev); WaitForSingleObject(g_ev, 10000); }
++    g_alloc->Reset(); g_list->Reset(g_alloc, nullptr);
++}
++static ID3D12Resource* Texture(bool uav) {
++    D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
++    D3D12_RESOURCE_DESC rd{}; rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D; rd.Width = kW; rd.Height = kH;
++    rd.DepthOrArraySize = 1; rd.MipLevels = 1; rd.Format = DXGI_FORMAT_R8G8B8A8_UNORM; rd.SampleDesc.Count = 1;
++    rd.Flags = uav ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
++    ID3D12Resource* r = nullptr;
++    HRESULT hr = g_dev->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, __uuidof(ID3D12Resource), reinterpret_cast<void**>(&r));
++    if (FAILED(hr)) Fail("texture", hr);
++    return r;
++}
++static ID3D12Resource* Buffer(UINT64 size, D3D12_HEAP_TYPE type) {
++    D3D12_HEAP_PROPERTIES hp{ type };
++    D3D12_RESOURCE_DESC rd{}; rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER; rd.Width = size; rd.Height = 1;
++    rd.DepthOrArraySize = 1; rd.MipLevels = 1; rd.SampleDesc.Count = 1; rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
++    ID3D12Resource* r = nullptr;
++    HRESULT hr = g_dev->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, type == D3D12_HEAP_TYPE_UPLOAD ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COPY_DEST, nullptr, __uuidof(ID3D12Resource), reinterpret_cast<void**>(&r));
++    if (FAILED(hr)) Fail("buffer", hr);
++    return r;
++}
++static const UINT kPitch = 256;  // kW*4 rounded to D3D12 row pitch alignment
++static void Upload(ID3D12Resource* tex, const std::vector<uint32_t>& pixels) {
++    ID3D12Resource* up = Buffer(kPitch * kH, D3D12_HEAP_TYPE_UPLOAD);
++    uint8_t* mapped = nullptr; up->Map(0, nullptr, reinterpret_cast<void**>(&mapped));
++    for (UINT y = 0; y < kH; ++y) memcpy(mapped + y * kPitch, &pixels[y * kW], kW * 4);
++    up->Unmap(0, nullptr);
++    D3D12_TEXTURE_COPY_LOCATION src{}; src.pResource = up; src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
++    src.PlacedFootprint.Footprint = { DXGI_FORMAT_R8G8B8A8_UNORM, kW, kH, 1, kPitch };
++    D3D12_TEXTURE_COPY_LOCATION dst{}; dst.pResource = tex; dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
++    Barrier(tex, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
++    g_list->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
++    Barrier(tex, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
++    Submit();
++}
++static std::vector<uint32_t> Download(ID3D12Resource* tex) {
++    ID3D12Resource* rb = Buffer(kPitch * kH, D3D12_HEAP_TYPE_READBACK);
++    D3D12_TEXTURE_COPY_LOCATION src{}; src.pResource = tex; src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
++    D3D12_TEXTURE_COPY_LOCATION dst{}; dst.pResource = rb; dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
++    dst.PlacedFootprint.Footprint = { DXGI_FORMAT_R8G8B8A8_UNORM, kW, kH, 1, kPitch };
++    Barrier(tex, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
++    g_list->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
++    Barrier(tex, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON);
++    Submit();
++    std::vector<uint32_t> out(kW * kH);
++    uint8_t* mapped = nullptr; rb->Map(0, nullptr, reinterpret_cast<void**>(&mapped));
++    for (UINT y = 0; y < kH; ++y) memcpy(&out[y * kW], mapped + y * kPitch, kW * 4);
++    rb->Unmap(0, nullptr);
++    return out;
++}
++static bool IsUi(UINT x, UINT y) { return x >= 8 && x < 24 && y >= 8 && y < 20; }
++
++int main() {
++    std::setvbuf(stdout, nullptr, _IONBF, 0);
++    if (FAILED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, __uuidof(ID3D12Device), reinterpret_cast<void**>(&g_dev)))) Fail("device");
++    D3D12_COMMAND_QUEUE_DESC qd{};
++    g_dev->CreateCommandQueue(&qd, __uuidof(ID3D12CommandQueue), reinterpret_cast<void**>(&g_queue));
++    g_dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandAllocator), reinterpret_cast<void**>(&g_alloc));
++    g_dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, g_alloc, nullptr, __uuidof(ID3D12GraphicsCommandList), reinterpret_cast<void**>(&g_list));
++    g_dev->CreateFence(0, D3D12_FENCE_FLAG_NONE, __uuidof(ID3D12Fence), reinterpret_cast<void**>(&g_fence));
++    g_ev = CreateEventW(nullptr, FALSE, FALSE, nullptr);
++
++    std::vector<uint32_t> hud(kW * kH), nr(kW * kH), back(kW * kH);
++    for (UINT y = 0; y < kH; ++y) for (UINT x = 0; x < kW; ++x) {
++        const uint32_t scene = (x * 4) | ((y * 5) << 8) | (((x + y) * 3 & 255) << 16) | (255u << 24);
++        hud[y * kW + x] = scene;
++        nr[y * kW + x] = ((x * 4 + 17) & 255) | (((y * 5 + 31) & 255) << 8) | ((((x + y) * 3 + 90) & 255) << 16) | (255u << 24);
++        // UI covers scene opaquely in one block and blends by one code value on its right edge.
++        uint32_t b = scene;
++        if (IsUi(x, y)) b = 0x80F0F0F0u;
++        else if (x == 24 && y >= 8 && y < 20) b = scene + 1;  // one-code-value blend must count as UI
++        back[y * kW + x] = b;
++    }
++    ID3D12Resource *th = Texture(false), *tn = Texture(false), *tb = Texture(true);
++    Upload(th, hud); Upload(tn, nr); Upload(tb, back);
++
++    ID3DBlob *code = nullptr, *err = nullptr;
++    if (FAILED(D3DCompile(kFgCompositeShader, sizeof(kFgCompositeShader) - 1, "fgc", nullptr, nullptr, "main", "cs_5_0", 0, 0, &code, &err)))
++        Fail(err ? static_cast<const char*>(err->GetBufferPointer()) : "compile");
++    D3D12_DESCRIPTOR_RANGE ranges[2]{};
++    ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV; ranges[0].NumDescriptors = 2;
++    ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV; ranges[1].NumDescriptors = 1; ranges[1].OffsetInDescriptorsFromTableStart = 2;
++    D3D12_ROOT_PARAMETER param{}; param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
++    param.DescriptorTable.NumDescriptorRanges = 2; param.DescriptorTable.pDescriptorRanges = ranges;
++    D3D12_ROOT_SIGNATURE_DESC rsd{}; rsd.NumParameters = 1; rsd.pParameters = &param;
++    ID3DBlob* rsb = nullptr; if (FAILED(D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &rsb, nullptr))) Fail("rootsig");
++    ID3D12RootSignature* rs = nullptr; g_dev->CreateRootSignature(0, rsb->GetBufferPointer(), rsb->GetBufferSize(), __uuidof(ID3D12RootSignature), reinterpret_cast<void**>(&rs));
++    D3D12_COMPUTE_PIPELINE_STATE_DESC pd{}; pd.pRootSignature = rs; pd.CS = { code->GetBufferPointer(), code->GetBufferSize() };
++    ID3D12PipelineState* pso = nullptr; if (FAILED(g_dev->CreateComputePipelineState(&pd, __uuidof(ID3D12PipelineState), reinterpret_cast<void**>(&pso)))) Fail("pso");
++    D3D12_DESCRIPTOR_HEAP_DESC hd{ D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 3, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE };
++    ID3D12DescriptorHeap* heap = nullptr; g_dev->CreateDescriptorHeap(&hd, __uuidof(ID3D12DescriptorHeap), reinterpret_cast<void**>(&heap));
++    const UINT inc = g_dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
++    D3D12_CPU_DESCRIPTOR_HANDLE cpu = heap->GetCPUDescriptorHandleForHeapStart();
++    D3D12_SHADER_RESOURCE_VIEW_DESC sd{}; sd.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D; sd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING; sd.Texture2D.MipLevels = 1; sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
++    g_dev->CreateShaderResourceView(th, &sd, cpu); cpu.ptr += inc;
++    g_dev->CreateShaderResourceView(tn, &sd, cpu); cpu.ptr += inc;
++    D3D12_UNORDERED_ACCESS_VIEW_DESC ud{}; ud.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D; ud.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
++    g_dev->CreateUnorderedAccessView(tb, nullptr, &ud, cpu);
++
++    Barrier(th, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++    Barrier(tn, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++    Barrier(tb, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++    ID3D12DescriptorHeap* heaps[] = { heap };
++    g_list->SetDescriptorHeaps(1, heaps); g_list->SetComputeRootSignature(rs); g_list->SetPipelineState(pso);
++    g_list->SetComputeRootDescriptorTable(0, heap->GetGPUDescriptorHandleForHeapStart());
++    g_list->Dispatch((kW + 7) / 8, (kH + 7) / 8, 1);
++    Barrier(tb, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
++    Barrier(th, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON);
++    Barrier(tn, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON);
++    Submit();
++
++    const std::vector<uint32_t> out = Download(tb);
++    auto channel = [](uint32_t v, unsigned c) { return static_cast<int>((v >> (8 * c)) & 255u); };
++    unsigned scene_ok = 0, ui_ok = 0, blend_ok = 0, bad = 0;
++    for (UINT y = 0; y < kH; ++y) for (UINT x = 0; x < kW; ++x) {
++        const uint32_t v = out[y * kW + x], b = back[y * kW + x], s = hud[y * kW + x], n = nr[y * kW + x];
++        int diff = 0;
++        for (unsigned c = 0; c < 3; ++c) diff = diff > std::abs(channel(b, c) - channel(s, c)) ? diff : std::abs(channel(b, c) - channel(s, c));
++        const float weight = 1.0f - (diff / 255.0f) / 0.25f > 0.0f ? 1.0f - (diff / 255.0f) / 0.25f : 0.0f;
++        bool match = channel(v, 3) == channel(b, 3);
++        for (unsigned c = 0; c < 3; ++c) {
++            const float raw = channel(b, c) + (channel(n, c) - channel(s, c)) * weight;
++            const float expected = raw < 0.0f ? 0.0f : raw > 255.0f ? 255.0f : raw;
++            if (std::abs(channel(v, c) - expected) > 1.0f) match = false;
++        }
++        if (!match) { ++bad; continue; }
++        if (IsUi(x, y)) { if (v == b) ++ui_ok; else ++bad; }
++        else if (x == 24 && y >= 8 && y < 20) ++blend_ok;
++        else ++scene_ok;
++    }
++    std::printf("COMPOSITE scene_pixels=%u opaque_ui_kept=%u translucent_blended=%u mismatches=%u\n", scene_ok, ui_ok, blend_ok, bad);
++    return bad == 0 && ui_ok == 16 * 12 && blend_ok == 12 && scene_ok == kW * kH - ui_ok - blend_ok ? 0 : 1;
++}
+diff --git a/tests/vulkan-fg-input/test-witness.cmd b/tests/vulkan-fg-input/test-witness.cmd
+new file mode 100644
+index 0000000..5de58ae
+--- /dev/null
++++ b/tests/vulkan-fg-input/test-witness.cmd
+@@ -0,0 +1,12 @@
++@echo off
++setlocal
++call "%~dp0vcvars.cmd"
++if errorlevel 1 exit /b 1
++cd /d "%~dp0"
++if not exist build mkdir build
++ml64 /nologo /c /Fo build\present-nr-witness.obj ..\..\src\present-nr-witness.asm
++if errorlevel 1 exit /b 1
++cl /nologo /W4 /WX /O2 /MT /EHsc /std:c++17 test-witness.cpp build\present-nr-witness.obj /Fo:build\test-witness.obj /Fe:build\test-witness.exe
++if errorlevel 1 exit /b 1
++build\test-witness.exe
++exit /b %errorlevel%
+diff --git a/tests/vulkan-fg-input/test-witness.cpp b/tests/vulkan-fg-input/test-witness.cpp
+new file mode 100644
+index 0000000..ab60128
+--- /dev/null
++++ b/tests/vulkan-fg-input/test-witness.cpp
+@@ -0,0 +1,69 @@
++#include <windows.h>
++#include <intrin.h>
++#include <cstdio>
++#include <cstdint>
++#include <thread>
++
++using Entry = int(*)(void*, const void*, const void*, void*);
++extern "C" {
++void* g_present_nr_original;
++void* g_present_sr_original;
++int PresentAdapterNrHook(void*, const void*, const void*, void*);
++int PresentAdapterSrHook(void*, const void*, const void*, void*);
++}
++static unsigned before_count, target_count;
++static thread_local int sr_result;
++static uintptr_t sr_received[4];
++extern "C" int PresentAdapterSrEnter(void* a, const void* b, const void* c, void* d) {
++    sr_received[0] = reinterpret_cast<uintptr_t>(a);
++    sr_received[1] = reinterpret_cast<uintptr_t>(b);
++    sr_received[2] = reinterpret_cast<uintptr_t>(c);
++    sr_received[3] = reinterpret_cast<uintptr_t>(d);
++    return sr_result;
++}
++static bool scoped;
++static void* target_return;
++static uintptr_t received[4];
++extern "C" void PresentAdapterNrEnter() { if (scoped) ++before_count; }
++static __declspec(noinline) int Target(void* a, const void* b, const void* c, void* d) {
++    ++target_count;
++    target_return = _ReturnAddress();
++    received[0] = reinterpret_cast<uintptr_t>(a);
++    received[1] = reinterpret_cast<uintptr_t>(b);
++    received[2] = reinterpret_cast<uintptr_t>(c);
++    received[3] = reinterpret_cast<uintptr_t>(d);
++    return static_cast<int>(0xbad00002u);
++}
++extern "C" void* g_present_nr_original = reinterpret_cast<void*>(&Target);
++static __declspec(noinline) int Invoke(Entry fn) {
++    volatile int result = fn(reinterpret_cast<void*>(0x1111222233334444ull),
++                            reinterpret_cast<void*>(0x5555666677778888ull),
++                            reinterpret_cast<void*>(0x9999aaaabbbbccccull),
++                            reinterpret_cast<void*>(0xddddeeeeffff0000ull));
++    return result;
++}
++int main() {
++    const int baseline = Invoke(&Target);
++    void* baseline_return = target_return;
++    scoped = true;
++    const int forwarded = Invoke(&PresentAdapterNrHook);
++    if (baseline != forwarded || target_return != baseline_return || target_count != 2 || before_count != 1) return 1;
++    if (received[0] != 0x1111222233334444ull || received[1] != 0x5555666677778888ull ||
++        received[2] != 0x9999aaaabbbbccccull || received[3] != 0xddddeeeeffff0000ull) return 2;
++    scoped = false;
++    if (Invoke(&PresentAdapterNrHook) != baseline || target_count != 3 || before_count != 1) return 3;
++    g_present_sr_original = reinterpret_cast<void*>(&Target);
++    if (Invoke(&PresentAdapterSrHook) != baseline || target_count != 4 || target_return != baseline_return) return 4;
++    for (unsigned i = 0; i < 4; ++i) if (sr_received[i] != received[i]) return 5;
++    sr_result = 1;
++    if (Invoke(&PresentAdapterSrHook) != 1 || target_count != 4) return 6;
++    int other_thread_result = 0;
++    std::thread other([&] { other_thread_result = Invoke(&PresentAdapterSrHook); });
++    other.join();
++    if (other_thread_result != baseline || target_count != 5 || target_return != baseline_return) return 7;
++    if (Invoke(&PresentAdapterSrHook) != 1 || target_count != 5) return 8;
++    sr_result = 0;
++    if (Invoke(&PresentAdapterSrHook) != baseline || target_count != 6 || target_return != baseline_return) return 9;
++    std::puts("PASS NR tail forwarding; SR identity-return gate, four arguments, caller address and thread-local isolation");
++    return 0;
++}
+diff --git a/tests/vulkan-fg-input/validate-roundtrip.py b/tests/vulkan-fg-input/validate-roundtrip.py
+new file mode 100644
+index 0000000..82a32d9
+--- /dev/null
++++ b/tests/vulkan-fg-input/validate-roundtrip.py
+@@ -0,0 +1,148 @@
++"""Validate copy, carrier and two two-pass NR requests in a fixed-size Vulkan host.
++
++Run after the host exits so ReShade's buffered log is complete. Exit 0 means
++the bounded transport/NR/workset checks passed, not game quality or FG support.
++The evidence directory must contain result.json, ReShade.log and the Bridge log.
++"""
++import argparse
++import json
++import math
++import re
++from pathlib import Path
++
++
++SCOPE = ('fixed-size independent host; sampled ROI and NR/SR evidence only; '
++         'no game/MFG/motion-quality coverage')
++REQUESTS = [(1, 12, 0), (2, 12, 2), (3, 16, 1), (4, 16, 1), (5, 0, 0)]
++
++
++def validate_logs(result: dict, nr: str, bridge: str) -> dict:
++    stdout = result.get('stdout', '').replace('\r\n', '\n')
++    adapter = [line for line in bridge.splitlines() if '[present-adapter]' in line]
++    accepted = [tuple(map(int, m)) for m in re.findall(
++        r'\[present-adapter\] request (\d+) accepted: max=(\d+) frames,', bridge)]
++    summaries = [dict(zip(('frames', 'writes', 'no_nr', 'token'), map(int, m)))
++                 for m in re.findall(r'\[present-adapter\] request complete: frames=(\d+) '
++                                     r'writes=(\d+) no_nr=(\d+)\. token=(\d+)(?=\s|$)', bridge)]
++    sample_lines = [line for line in adapter if '[present-adapter] frame=' in line]
++    samples, parse_errors = [], []
++    for line in sample_lines:
++        fields = dict(re.findall(r'\b(\w+)=([^\s,;]+)', line))
++        try:
++            sample = {key: int(fields[key]) for key in
++                      ('frame', 'token', 'nr_entries', 'completed', 'writeback', 'reset', 'sr_entries', 'sr_copies')}
++            sample.update(mode=fields['mode'], image=int(fields['image'], 16),
++                          cpu_ms=float(fields['cpu_ms'].rstrip('.')),
++                          input_wait_ms=float(fields['input_wait_ms'].rstrip('.')))
++            samples.append(sample)
++        except (KeyError, ValueError) as error:
++            parse_errors.append(f'{error}: {line}')
++    grouped = {token: [s for s in samples if s['token'] == token] for token in range(1, 5)}
++    modes = {1: 'copy', 2: 'carrier', 3: 'NR', 4: 'NR'}
++    fixture = re.findall(r'^FIXTURE version=gray-colour-stripes-v1 hdr=([01]) roi=16x16 offset=-48,-48$',
++                         stdout, re.M)
++    hdr = len(fixture) == 1 and fixture[0] == '1'
++    scenario = re.findall(r'^SCENARIO requests_sent=(\d+) accepted=(\d+) completed=(\d+) '
++                          r'pause_ms=(\d+) pause_presents=(\d+) stop_token=(\d+)$', stdout, re.M)
++    scenario = list(map(int, scenario[0])) if len(scenario) == 1 else []
++    sent = [tuple(map(int, m)) for m in re.findall(
++        r'^request_sent token=(\d+) frames=(\d+) mode=(\d+)$', stdout, re.M)]
++    created = nr.count('created inline NR resources ws')
++    failures = [line for line in adapter if re.search(
++        r'mismatch|refus(?:ed|ing|al)|fail(?:ed|ure)?\b|unavailable', line, re.I)]
++    checks = {
++        'host_exit_zero': result.get('exit_code') == 0 and not result.get('timeout', False),
++        'fixture_identified': len(fixture) == 1,
++        'requests_sent_in_order': sent == REQUESTS,
++        'four_requests_accepted': (accepted == [(t, f) for t, f, _ in REQUESTS[:4]] and
++                                   sum(' accepted:' in line for line in adapter) == 4),
++        'four_requests_completed': (len(summaries) == 4 and
++            sum('request complete:' in line for line in adapter) == 4 and
++            [(s['token'], s['frames']) for s in summaries] == [(t, f) for t, f, _ in REQUESTS[:4]]),
++        'host_observed_completion': bool(scenario and scenario[:3] == [4, 4, 4] and scenario[5] == 5),
++        'pause_with_new_presents': bool(scenario and scenario[3] >= 750 and scenario[4] > 0),
++        'copy_carrier_all_written': all(any(s == {'token': t, 'frames': 12, 'writes': 12, 'no_nr': 0}
++                                                      for s in summaries) for t in (1, 2)),
++        'both_nr_requests_written': all(any(s['token'] == t and s['frames'] == 16 and
++                                            0 < s['writes'] <= 16 and s['no_nr'] == 16 - s['writes']
++                                            for s in summaries) for t in (3, 4)),
++        'sample_schema_complete': not parse_errors and len(samples) == 16,
++        'sample_frames_complete': all([s['frame'] for s in grouped[t]] == [1, 2, 3, 12 if t < 3 else 16]
++                                     for t in grouped),
++        'sample_mode_completion': bool(samples) and all(
++            s['mode'] == modes.get(s['token']) and s['completed'] == 1 and s['image'] != 0 and
++            s['reset'] in (0, 1) and 0 <= s['nr_entries'] <= 2 and
++            (s['writeback'] == 1 and s['nr_entries'] == 0 if s['token'] < 3 else
++             s['writeback'] == int(s['nr_entries'] > 0)) for s in samples),
++        'nr_private_sr_identity_once': all(grouped[t] and all(s['sr_entries'] == s['sr_copies'] == 1
++                                                              for s in grouped[t]) for t in (3, 4)),
++        'nr_reset_first_only': all(grouped[t] and all(s['reset'] == int(s['frame'] == 1)
++                                                     for s in grouped[t]) for t in (3, 4)),
++        'nr_hot_last_frame_two_pass': all(any(s['frame'] == 16 and s['nr_entries'] == 2 and
++                                               s['sr_entries'] == s['sr_copies'] == 1 and
++                                               s['completed'] == s['writeback'] == 1
++                                               for s in grouped[t]) for t in (3, 4)),
++        'sample_timings_valid': bool(samples) and all(math.isfinite(s[k]) and s[k] >= 0
++                                                      for s in samples for k in ('cpu_ms', 'input_wait_ms')),
++        'author_two_pass_success': bool(re.search(r'inline feature 18 evaluation succeeded[^\r\n]*2 stack pass\(es\)', nr)),
++        'fixed_input_workset_stable': created == 1,
++        'no_adapter_processing_failure': not failures,
++    }
++    pixel_reports = {}
++    pixel_pattern = (r'^PIXEL_SAMPLE token=(\d+) bridge_frame=(\d+) host_frame=(\d+) image=(0x[0-9A-Fa-f]+) '
++                     r'max_error=(\d+),(\d+),(\d+),(\d+) tolerance=(\d+)$')
++    pixel_samples = [dict(token=int(m[0]), frame=int(m[1]), host_frame=int(m[2]), image=int(m[3], 16),
++                          maximum=list(map(int, m[4:8])), tolerance=int(m[8]))
++                     for m in re.findall(pixel_pattern, stdout, re.M)]
++    checks['pixel_sample_schema'] = (len(pixel_samples) == stdout.count('PIXEL_SAMPLE ') and
++                                     all(p['token'] in (1, 2) for p in pixel_samples))
++    for token, label in ((1, 'COPY'), (2, 'CARRIER')):
++        rows = re.findall(rf'^{label}_PIXELS checked=(\d+) mismatches=(\d+) '
++                          r'max_error=(\d+),(\d+),(\d+),(\d+) tolerance=(\d+)$', stdout, re.M)
++        p = [s for s in pixel_samples if s['token'] == token]
++        tolerance = 0 if token == 1 else (2 if hdr else 1)
++        checked, mismatches, *rest = map(int, rows[0]) if len(rows) == 1 else [0, 0, 0, 0, 0, 0, -1]
++        maximum = rest[:4]
++        measured = [max(s['maximum'][c] for s in p) for c in range(4)] if p else None
++        bad = sum(any(v > tolerance for v in s['maximum'][:3]) or s['maximum'][3] != 0 for s in p)
++        evidence = all(any(s['frame'] == v['frame'] and s['image'] == v['image'] and
++                           s['completed'] == s['writeback'] == 1 and s['nr_entries'] == 0
++                           for s in grouped[token]) for v in p)
++        checks[f'{label.lower()}_pixels_checked'] = (
++            len(rows) == 1 and checked == len(p) > 0 and mismatches == bad == 0 and
++            len({s['frame'] for s in p}) == len(p) and len({s['host_frame'] for s in p}) == len(p) and
++            maximum == measured and rest[4] == tolerance and
++            all(s['tolerance'] == tolerance for s in p) and evidence)
++        pixel_reports[label.lower()] = dict(checked=checked, mismatches=mismatches, max_error=maximum,
++                                            tolerance=tolerance, samples=p)
++    timings = {}
++    for token, group in grouped.items():
++        timings[token] = {}
++        for key in ('cpu_ms', 'input_wait_ms'):
++            values = [s[key] for s in group if math.isfinite(s[key])]
++            if values:
++                timings[token][key] = dict(count=len(values), minimum=min(values), maximum=max(values),
++                                          mean=sum(values) / len(values))
++    return {'checks': checks, 'created_worksets': created, 'accepted': accepted, 'summaries': summaries,
++            'samples': samples, 'pixels': pixel_reports, 'sample_timings': timings,
++            'pause_ms': scenario[3] if scenario else None, 'pause_presents': scenario[4] if scenario else None,
++            'parse_errors': parse_errors, 'adapter_failures': failures, 'passed': all(checks.values()), 'scope': SCOPE}
++
++
++def validate(directory: Path) -> dict:
++    try:
++        result = json.loads((directory / 'result.json').read_text(encoding='utf-8-sig'))
++        nr = (directory / 'ReShade.log').read_text(encoding='utf-8-sig', errors='replace')
++        bridge = (directory / 'dlss5-bridge.log').read_text(encoding='utf-8-sig', errors='replace')
++    except (OSError, ValueError) as error:
++        return {'checks': {'evidence_readable': False}, 'error': str(error), 'passed': False, 'scope': SCOPE}
++    return validate_logs(result, nr, bridge)
++
++
++if __name__ == '__main__':
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('directory', type=Path)
++    args = parser.parse_args()
++    report = validate(args.directory)
++    print(json.dumps(report, indent=2))
++    raise SystemExit(0 if report['passed'] else 1)
+diff --git a/tests/vulkan-fg-input/vcvars.cmd b/tests/vulkan-fg-input/vcvars.cmd
+new file mode 100644
+index 0000000..e1ce3d9
+--- /dev/null
++++ b/tests/vulkan-fg-input/vcvars.cmd
+@@ -0,0 +1,9 @@
++@echo off
++rem Shared toolchain lookup for the tests: honor VCVARS, else the latest installed VC++ tools.
++if defined VCVARS goto found
++set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
++if not exist "%VSWHERE%" ( echo vswhere.exe not found; set VCVARS to vcvars64.bat & exit /b 1 )
++for /f "usebackq delims=" %%I in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VCVARS=%%I\VC\Auxiliary\Build\vcvars64.bat"
++:found
++if not exist "%VCVARS%" ( echo no vcvars64.bat at "%VCVARS%" & exit /b 1 )
++call "%VCVARS%" >nul 2>&1

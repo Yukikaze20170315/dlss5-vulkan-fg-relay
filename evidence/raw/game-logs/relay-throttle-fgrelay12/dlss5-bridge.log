@@ -1,0 +1,781 @@
+10:26:06.010  dlss5-bridge 1.4.13-pre8-endfield1-vk-fgrelay12 (built Sep 29 2026 10:23:25) attached.
+10:26:06.011    host: C:\Program Files\Hypergryph Launcher\games\Endfield Game\Endfield.exe
+10:26:06.011    d3d11.dll: C:\Program Files\Hypergryph Launcher\games\Endfield Game\Endfield.exe
+10:26:06.011    reshade: C:\ProgramData\ReShade\ReShade64.dll
+10:26:06.011    windows: Windows 11, 10.0 build 26200
+10:26:06.011    files next to this add-on:
+10:26:06.037      nvngx_dlssnr.dll           present  version 310.8.0.0, 165840496 bytes, 2026-09-11 22:41
+10:26:06.038      nvngx_dlss.dll             present  version 310.5.2.0, 54779504 bytes, 2026-07-11 10:59
+10:26:06.038    add-ons present:
+10:26:06.038      dlss5-bridge.addon64         version 1.4.13.8119, 647168 bytes, 2026-09-29 02:23
+10:26:06.038          loaded at 00007FFA8D240000
+10:26:06.039      nr-parameter-probe.addon64.disabled-20260926   version no version resource, 371200 bytes, 2026-09-20 15:08
+10:26:06.039      renodx-dlss5.addon64         version 0.2026.926.210, 3141632 bytes, 2026-09-27 13:21
+10:26:06.041          sha256 DCD93881E976AD033D83C2BB01F4BC3E4DDC59C15FE0DD4CA165BC5FC7D1AC68 -- not on this add-on's measured list, which is one machine's experience and not a compatibility statement. If its panel says active while the picture does not change, unwrap=0 in dlss5-bridge.cfg is the first thing to try.
+10:26:06.041    DLSS 5 add-on settings, read from ReShade.ini [RenoDX.DLSS5]:
+10:26:06.041      ConfigVersion=7
+10:26:06.041      EnableHooks=1
+10:26:06.041      NeuralUplift=1
+10:26:06.041      NRAdaptiveExposure=1
+10:26:06.041      NRAutoMask=1
+10:26:06.041      NRChainedHistory=1
+10:26:06.041      NRChromaClamp=1
+10:26:06.042      NRCodecMode=0
+10:26:06.042      NRColorStrength=1
+10:26:06.042      NRCostMeter=1
+10:26:06.042      NRDepthMode=0
+10:26:06.042      NRDetailStability=0
+10:26:06.042      NRDiffuseWhiteNits=203
+10:26:06.042      NRDisableRelease=0
+10:26:06.042      NRDisplayPedestal=1
+10:26:06.042      NREditTrace=0
+10:26:06.042      NREnableUpscaling=0
+10:26:06.042      NRFeedMode=2
+10:26:06.042      NRFollowInputRes=0
+10:26:06.042      NRGlobalTone=2
+10:26:06.042      NRGpuTimers=0
+10:26:06.043      NRHookPoint=2
+10:26:06.043      NRIntensity=2
+10:26:06.043      NRLinearUnitNits=0
+10:26:06.043      NRLocalStructure=1
+10:26:06.043      NRLocalTone=2
+10:26:06.043      NRLookBrighten=1
+10:26:06.043      NRLookColour=1
+10:26:06.043      NRLookDarken=1
+10:26:06.043      NRLookDetail=1
+10:26:06.043      NRLookDetailRadius=1
+10:26:06.043      NRLookHalo=0
+10:26:06.044      NRLookHaloBrightSide=0
+10:26:06.044      NRLookHighlights=1
+10:26:06.044      NRLookHue=1
+10:26:06.044      NRLookMaxBrighten=0
+10:26:06.044      NRLookMaxColour=0
+10:26:06.044      NRLookMaxDarken=0
+10:26:06.044      NRLookMidtones=1
+10:26:06.044      NRLookMode=1
+10:26:06.044      NRLookShadows=1
+10:26:06.044      NRLookStabilize=0
+10:26:06.044      NRLookStabilizeDetail=0
+10:26:06.044      NRLookStabilizeMs=60
+10:26:06.044      NRLookStrength=1
+10:26:06.045      NRLookTone=1
+10:26:06.045      NRLookUpsample=0
+10:26:06.045      NRMaxWorksets=4
+10:26:06.045      NRMVecScaleX=1
+10:26:06.045      NRMVecScaleY=1
+10:26:06.045      NRNeuralFloorGuard=1
+10:26:06.045      NRNormAttackStops=4
+10:26:06.045      NRNormCutAware=1
+10:26:06.045      NRNormGovernor=0
+10:26:06.045      NRNormReleaseStops=0.5
+10:26:06.045      NRNormSlewStops=0.02
+10:26:06.045      NRPaperWhiteScale=2.5375
+10:26:06.045      NRPass2AutoMask=1
+10:26:06.045      NRPass2Color=1
+10:26:06.046      NRPass2FollowPass1=0
+10:26:06.046      NRPass2Intensity=2
+10:26:06.046      NRPass2LocalTone=1.5
+10:26:06.046      NRPass2Skin=0
+10:26:06.046      NRPass2Structure=1.25
+10:26:06.046      NRPass2Style=2
+10:26:06.046      NRPass2Transfer=1
+10:26:06.046      NRPass2UICorrection=1
+10:26:06.046      NRPass3AutoMask=0
+10:26:06.046      NRPass3Color=1
+10:26:06.046      NRPass3FollowPass1=0
+10:26:06.046      NRPass3Intensity=2
+10:26:06.046      NRPass3LocalTone=1
+10:26:06.047      NRPass3Skin=-1
+10:26:06.047      NRPass3Structure=1
+10:26:06.047      NRPass3Style=0
+10:26:06.047      NRPass3Transfer=1
+10:26:06.047      NRPass3UICorrection=0
+10:26:06.047      NRPass4AutoMask=0
+10:26:06.047      NRPass4Color=1
+10:26:06.047      NRPass4FollowPass1=0
+10:26:06.047      NRPass4Intensity=2
+10:26:06.047      NRPass4LocalTone=1
+10:26:06.047      NRPass4Skin=-1
+10:26:06.047      NRPass4Structure=1
+10:26:06.047      NRPass4Style=0
+10:26:06.048      NRPass4Transfer=0
+10:26:06.048      NRPass4UICorrection=0
+10:26:06.048      NRPasses=2
+10:26:06.048      NRPQCalibration=1
+10:26:06.048      NRPresentEncoding=0
+10:26:06.048      NRPresentFgSource=1
+10:26:06.048      NRPresentFrames=0
+10:26:06.048      NRPresentGuides=0
+10:26:06.048      NRPresentUICorrection=1
+10:26:06.048      NRPresentWhiteNits=0
+10:26:06.048      NRPreset=2
+10:26:06.048      NRPreUpscale=0
+10:26:06.048      NRProxyAnchor=4
+10:26:06.048      NRResolutionScale=1
+10:26:06.048      NRScreenshotFormat=0
+10:26:06.048      NRScreenshotJpegQuality=95
+10:26:06.049      NRScreenshotKey=116
+10:26:06.049      NRScreenshotLayout=0
+10:26:06.049      NRScreenshotMaxMB=10
+10:26:06.049      NRScreenshotSource=0
+10:26:06.049      NRShutdownQuiesce=1
+10:26:06.049      NRSkinIndependent=1
+10:26:06.049      NRSkinStructure=0
+10:26:06.049      NRSourceEncoding=0
+10:26:06.049      NRSourcePrimaries=0
+10:26:06.049      NRStyle=2
+10:26:06.049      NRStyleHighlightGuard=0
+10:26:06.049      NRToggleKey=106
+10:26:06.049      NRTransferMode=1
+10:26:06.049      NRTransferStrength=1
+10:26:06.049      NRUICorrection=1
+10:26:06.049      NRWorksetFreePolicy=0
+10:26:06.049      UiIssueNotice=1
+10:26:06.050      UiLanguage=zh-Hans
+10:26:06.050      UiMode=modern
+10:26:06.050      UiWelcomed=1
+10:26:06.050  [bridge] config: stage=3 mode=2 flags=-1 subrects=1 reset_every=0 pixels=0 skip_game=1 dred=1 skip_exe=1 unwrap=1 source=auto synth=0 hash_out=1 synth_after=0 mv_sign_x=0 mv_sign_y=0 ofa_grid=2 ofa_perf=20 vk_present=1 vk_sync=0
+10:26:06.050  [bridge] settings read from C:\Program Files\Hypergryph Launcher\games\Endfield Game\dlss5-bridge.cfg
+10:26:06.059  [bridge] the driver's route to neural rendering is closed for this process: entry 18 of the loader's feature table at 00007FFA3F3F43E0 named "dlssnr" and now names nothing, which is what the previous driver had there. The DLSS 5 add-on drives that feature itself, as it did before the driver update. Nothing on disk is changed and no other feature is touched. Set ngx_loader=1 in dlss5-bridge.cfg to leave the driver's route alone.
+10:26:06.059  [synth] registered for ReShade effect events at add-on API 18 (synth floor 10).
+10:26:06.059  [vkmirror] colour format tables agree on 7 of 7 entries.
+10:26:06.060  [vkmirror] vk_mirror=1: the Vulkan NGX entry points will be hooked and a Vulkan game's own DLSS contract mirrored onto the private D3D12 session.
+10:26:06.060  [panel] status panel registered in ReShade's overlay. Asked for the ImGui 19000 function table; ReShade reports its own ImGui as 1.92.5.
+10:26:06.060  NGX layer 0: C:\WINDOWS\System32\DriverStore\FileRepository\nv_dispsi.inf_amd64_b8459fc8f905f657\_nvngx.dll (base=00007FFA3F320000)
+10:26:06.061    version 32.0.16.1692
+10:26:06.061    NVSDK_NGX_D3D11_CreateFeature     = 00007FFA3F385C60
+10:26:06.061    NVSDK_NGX_D3D11_EvaluateFeature   = 00007FFA3F385E30
+10:26:06.061    NVSDK_NGX_D3D11_EvaluateFeature_C = 0000000000000000
+10:26:06.062    CreateFeature    prologue: 48 89 6C 24 18 56 57 41 56 48 83 EC 40 48 
+10:26:06.062    EvaluateFeature  prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+10:26:06.253    hooked: CreateFeature=yes EvaluateFeature=yes EvaluateFeature_C=absent
+10:26:06.253    NVSDK_NGX_VULKAN_CreateFeature     = 00007FFA3F32D230
+10:26:06.253    NVSDK_NGX_VULKAN_CreateFeature1    = 00007FFA3F32D340
+10:26:06.254    NVSDK_NGX_VULKAN_EvaluateFeature   = 00007FFA3F32D4E0
+10:26:06.254    NVSDK_NGX_VULKAN_EvaluateFeature_C = 0000000000000000
+10:26:06.254    VK CreateFeature prologue: 48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 
+10:26:06.254    VK CreateFeature1 prologue: 48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 
+10:26:06.254    VK EvaluateFeature prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+10:26:06.500    hooked: VULKAN CreateFeature=yes CreateFeature1=yes EvaluateFeature=yes EvaluateFeature_C=absent
+10:26:06.584  [fg-relay] Import=1: the ReShade layer's vkCreateDevice at 00007FF9518B07A0 is hooked. Every device created from here on gets VK_KHR_external_semaphore_win32 appended to its extension list, and a driver that refuses the name gets the caller's own list retried unchanged.
+10:26:07.182  qpc=2226635942178 [fg-relay] interposer hook: present=hooked
+10:26:07.183  qpc=2226638300320 [fg-trace] queue discovery exports: get_queue=hooked get_queue2=hooked
+10:26:07.625  NGX layer 1: C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlss.dll (base=00007FF9310E0000)
+10:26:07.625    version 310.5.2.0
+10:26:07.625    NVSDK_NGX_D3D11_CreateFeature     = 00007FF931125160
+10:26:07.626    NVSDK_NGX_D3D11_EvaluateFeature   = 00007FF9311252C0
+10:26:07.626    NVSDK_NGX_D3D11_EvaluateFeature_C = 0000000000000000
+10:26:07.626    CreateFeature    prologue: 48 89 5C 24 08 48 89 6C 24 10 56 57 41 56 
+10:26:07.626    EvaluateFeature  prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+10:26:07.798    hooked: CreateFeature=yes EvaluateFeature=yes EvaluateFeature_C=absent
+10:26:07.798    NVSDK_NGX_VULKAN_CreateFeature     = 00007FF9311A79C0
+10:26:07.798    NVSDK_NGX_VULKAN_CreateFeature1    = 00007FF9311A79E0
+10:26:07.798    NVSDK_NGX_VULKAN_EvaluateFeature   = 00007FF9311A79F0
+10:26:07.799    NVSDK_NGX_VULKAN_EvaluateFeature_C = 0000000000000000
+10:26:07.799    VK CreateFeature prologue: 48 83 EC 38 4C 89 4C 24 20 4D 8B C8 44 8B 
+10:26:07.799    VK CreateFeature1 prologue: E9 4B F1 FF FF CC CC CC CC CC CC CC CC CC  <== a thunk into its own module, not a hook
+10:26:07.799        the hook jumps into C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlss.dll +0xC6B30
+10:26:07.799    VK EvaluateFeature prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+10:26:07.893      00007FF9311A79E0 is a thunk table entry; the hook goes to its destination 00007FF9311A6B30 so the patch does not overwrite the entries beside it.
+10:26:08.071    hooked: VULKAN CreateFeature=yes CreateFeature1=yes EvaluateFeature=yes EvaluateFeature_C=absent
+10:26:08.090  NGX layer 1 retirement finalized.
+10:26:08.090    leaving nvngx_dlssg.dll untouched: Frame Generation is not an SR entry point.
+10:26:08.230  NGX layer 1: C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_deepdvc.dll (base=00007FF9A6390000)
+10:26:08.230    version 310.5.2.0
+10:26:08.230    NVSDK_NGX_D3D11_CreateFeature     = 00007FF9A63B0140
+10:26:08.230    NVSDK_NGX_D3D11_EvaluateFeature   = 00007FF9A63B0260
+10:26:08.230    NVSDK_NGX_D3D11_EvaluateFeature_C = 0000000000000000
+10:26:08.231    CreateFeature    prologue: 48 89 5C 24 10 48 89 6C 24 18 57 48 83 EC 
+10:26:08.231    EvaluateFeature  prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+10:26:08.424    hooked: CreateFeature=yes EvaluateFeature=yes EvaluateFeature_C=absent
+10:26:08.424    NVSDK_NGX_VULKAN_CreateFeature     = 00007FF9A63B44E0
+10:26:08.425    NVSDK_NGX_VULKAN_CreateFeature1    = 00007FF9A63B4500
+10:26:08.425    NVSDK_NGX_VULKAN_EvaluateFeature   = 00007FF9A63B4510
+10:26:08.425    NVSDK_NGX_VULKAN_EvaluateFeature_C = 0000000000000000
+10:26:08.426    VK CreateFeature prologue: 48 83 EC 38 4C 89 4C 24 20 4D 8B C8 44 8B 
+10:26:08.426    VK CreateFeature1 prologue: E9 8B F2 FF FF CC CC CC CC CC CC CC CC CC  <== a thunk into its own module, not a hook
+10:26:08.426        the hook jumps into C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_deepdvc.dll +0x23790
+10:26:08.426    VK EvaluateFeature prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+10:26:08.531      00007FF9A63B4500 is a thunk table entry; the hook goes to its destination 00007FF9A63B3790 so the patch does not overwrite the entries beside it.
+10:26:08.715    hooked: VULKAN CreateFeature=yes CreateFeature1=yes EvaluateFeature=yes EvaluateFeature_C=absent
+10:26:08.741  NGX layer 2: C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlssd.dll (base=00007FF935E50000)
+10:26:08.742    version 310.5.2.0
+10:26:08.742    NVSDK_NGX_D3D11_CreateFeature     = 00007FF935E8A930
+10:26:08.742    NVSDK_NGX_D3D11_EvaluateFeature   = 00007FF935E8AA90
+10:26:08.742    NVSDK_NGX_D3D11_EvaluateFeature_C = 0000000000000000
+10:26:08.742    CreateFeature    prologue: 48 89 5C 24 08 48 89 6C 24 10 56 57 41 56 
+10:26:08.742    EvaluateFeature  prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+10:26:08.940    hooked: CreateFeature=yes EvaluateFeature=yes EvaluateFeature_C=absent
+10:26:08.940    NVSDK_NGX_VULKAN_CreateFeature     = 00007FF935F0B4C0
+10:26:08.940    NVSDK_NGX_VULKAN_CreateFeature1    = 00007FF935F0B4E0
+10:26:08.940    NVSDK_NGX_VULKAN_EvaluateFeature   = 00007FF935F0B4F0
+10:26:08.940    NVSDK_NGX_VULKAN_EvaluateFeature_C = 0000000000000000
+10:26:08.940    VK CreateFeature prologue: 48 83 EC 38 4C 89 4C 24 20 4D 8B C8 44 8B 
+10:26:08.941    VK CreateFeature1 prologue: E9 4B F1 FF FF CC CC CC CC CC CC CC CC CC  <== a thunk into its own module, not a hook
+10:26:08.941        the hook jumps into C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlssd.dll +0xBA630
+10:26:08.941    VK EvaluateFeature prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+10:26:09.042      00007FF935F0B4E0 is a thunk table entry; the hook goes to its destination 00007FF935F0A630 so the patch does not overwrite the entries beside it.
+10:26:09.260    hooked: VULKAN CreateFeature=yes CreateFeature1=yes EvaluateFeature=yes EvaluateFeature_C=absent
+10:26:09.369  qpc=2226660170715 [fg-relay] Reflex sleep hook: slGetPluginFunction=00007FFA3F66E0E0 slReflexSleep=00007FFA3F66DE60 hooked
+10:26:10.330  [fg-relay] Import=1: the device created at 000000002F8F00D0 already carried VK_KHR_external_semaphore_win32; it is recorded for the import.
+10:26:10.571  NGX layer 3: C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlss.dll (base=00007FF9310E0000)
+10:26:10.571    version 310.5.2.0
+10:26:10.572    NVSDK_NGX_D3D11_CreateFeature     = 00007FF931125160
+10:26:10.572    NVSDK_NGX_D3D11_EvaluateFeature   = 00007FF9311252C0
+10:26:10.572    NVSDK_NGX_D3D11_EvaluateFeature_C = 0000000000000000
+10:26:10.572    CreateFeature    prologue: 48 89 5C 24 08 48 89 6C 24 10 56 57 41 56 
+10:26:10.572    EvaluateFeature  prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+10:26:10.784    hooked: CreateFeature=yes EvaluateFeature=yes EvaluateFeature_C=absent
+10:26:10.784    NVSDK_NGX_VULKAN_CreateFeature     = 00007FF9311A79C0
+10:26:10.784    NVSDK_NGX_VULKAN_CreateFeature1    = 00007FF9311A79E0
+10:26:10.784    NVSDK_NGX_VULKAN_EvaluateFeature   = 00007FF9311A79F0
+10:26:10.784    NVSDK_NGX_VULKAN_EvaluateFeature_C = 0000000000000000
+10:26:10.784    VK CreateFeature prologue: 48 83 EC 38 4C 89 4C 24 20 4D 8B C8 44 8B 
+10:26:10.785    VK CreateFeature1 prologue: E9 4B F1 FF FF CC CC CC CC CC CC CC CC CC  <== a thunk into its own module, not a hook
+10:26:10.785        the hook jumps into C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlss.dll +0xC6B30
+10:26:10.785    VK EvaluateFeature prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+10:26:10.888      00007FF9311A79E0 is a thunk table entry; the hook goes to its destination 00007FF9311A6B30 so the patch does not overwrite the entries beside it.
+10:26:11.105    hooked: VULKAN CreateFeature=yes CreateFeature1=yes EvaluateFeature=yes EvaluateFeature_C=absent
+10:26:11.129  NGX layer 3 retirement finalized.
+10:26:13.055  [vkmirror] ReShade created an effect runtime on Vulkan. The mirror takes it.
+10:26:13.156  qpc=2226698039348 [fg-trace] layer queue discovery: 00007FF9D9316D70 hooked
+10:26:13.337  [vkmirror] ReShade created an effect runtime on Vulkan. The mirror takes it.
+10:26:13.493  [vkmirror] ReShade created an effect runtime on Vulkan. The mirror takes it.
+10:26:15.087  NGX layer 3: C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlssnr.dll (base=00007FF8F6A70000)
+10:26:15.088    version 310.8.0.0
+10:26:15.088    NVSDK_NGX_D3D11_CreateFeature     = 00007FF8F6A838B0
+10:26:15.088    NVSDK_NGX_D3D11_EvaluateFeature   = 00007FF8F6A83B20
+10:26:15.088    NVSDK_NGX_D3D11_EvaluateFeature_C = 0000000000000000
+10:26:15.088    CreateFeature    prologue: 40 53 55 56 48 81 EC 80 02 00 00 48 8B 05 
+10:26:15.088    EvaluateFeature  prologue: 40 53 55 56 57 41 56 48 81 EC 60 02 00 00 
+10:26:15.270    hooked: CreateFeature=yes EvaluateFeature=yes EvaluateFeature_C=absent
+10:26:15.270    NVSDK_NGX_VULKAN_CreateFeature     = 00007FF8F6A94A20
+10:26:15.270    NVSDK_NGX_VULKAN_CreateFeature1    = 00007FF8F6A94B70
+10:26:15.270    NVSDK_NGX_VULKAN_EvaluateFeature   = 00007FF8F6A94C80
+10:26:15.270    NVSDK_NGX_VULKAN_EvaluateFeature_C = 0000000000000000
+10:26:15.270    VK CreateFeature prologue: 40 53 55 56 57 41 56 48 81 EC 60 02 00 00 
+10:26:15.270    VK CreateFeature1 prologue: 40 53 55 56 57 41 56 48 81 EC 60 02 00 00 
+10:26:15.270    VK EvaluateFeature prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+10:26:15.522    hooked: VULKAN CreateFeature=yes CreateFeature1=yes EvaluateFeature=yes EvaluateFeature_C=absent
+10:26:28.882  qpc=2226855288120 [fg-trace] vkGetDeviceQueue(layer) family=0 index=1 -> queue=000000002E8028D0 thread=39080
+10:26:28.883  qpc=2226855290720 [fg-trace] vkGetDeviceQueue(layer) family=2 index=1 -> queue=000000002E8050D0 thread=39080
+10:26:28.903  [vkmirror] ReShade created an effect runtime on Vulkan. The mirror takes it.
+10:26:28.908  === Vulkan CreateFeature1 #1  feature_id=1  VkDevice=000000002F8F00D0  thread 69676 ===
+10:26:28.932  === Vulkan CreateFeature1 #1 returned 1, handle=00000004F4EEB430 ===
+10:26:28.932  [vkmirror] the game's create states 5120x2160 -> 5120x2160. That is the shape the mirror will use, in preference to the four scalars its evaluates carry.
+10:26:28.933  [fg-input] native Vulkan DLSS is forwarded without a mirror; the real frame is processed once at the frame-generation input.
+10:26:29.053  === Vulkan CreateFeature1 #2  feature_id=18  VkDevice=000000002F8F00D0  thread 69676 ===
+10:26:29.054  === Vulkan CreateFeature1 #2 returned -1160773630, handle=0000000000000000 ===
+10:26:29.055  qpc=2226857020771 [fg-trace] vkGetDeviceQueue(layer) family=0 index=0 -> queue=000000002E8014D0 thread=69676
+10:26:29.056  qpc=2226857021601 [fg-trace] vkGetDeviceQueue(layer) family=2 index=0 -> queue=000000002E803CD0 thread=69676
+10:26:29.110  [vkmirror] ReShade created an effect runtime on Vulkan. The mirror takes it.
+10:26:29.141  [vkmirror] ReShade created an effect runtime on Vulkan. The mirror takes it.
+10:26:29.197  === Vulkan CreateFeature1 #3  feature_id=18  VkDevice=000000002F8F00D0  thread 69676 ===
+10:26:29.197  === Vulkan CreateFeature1 #3 returned -1160773630, handle=0000000000000000 ===
+10:26:29.250  [vkmirror] ReShade created an effect runtime on Vulkan. The mirror takes it.
+10:26:30.202  === Vulkan CreateFeature1 #4  feature_id=18  VkDevice=000000002F8F00D0  thread 69676 ===
+10:26:30.202  === Vulkan CreateFeature1 #4 returned -1160773630, handle=0000000000000000 ===
+10:26:32.204  === Vulkan CreateFeature1 #5  feature_id=18  VkDevice=000000002F8F00D0  thread 69676 ===
+10:26:32.204  === Vulkan CreateFeature1 #5 returned -1160773630, handle=0000000000000000 ===
+10:26:43.098  === Vulkan CreateFeature1 #6  feature_id=1  VkDevice=000000002F8F00D0  thread 69676 ===
+10:26:43.121  === Vulkan CreateFeature1 #6 returned 1, handle=00000026FD589130 ===
+10:26:43.123  === Vulkan CreateFeature1 #7  feature_id=18  VkDevice=000000002F8F00D0  thread 69676 ===
+10:26:43.123  === Vulkan CreateFeature1 #7 returned -1160773630, handle=0000000000000000 ===
+10:26:43.124  === Vulkan CreateFeature1 #8  feature_id=11  VkDevice=000000002F8F00D0  thread 69676 ===
+10:26:43.151  === Vulkan CreateFeature1 #8 returned 1, handle=000000268E980D10 ===
+10:26:43.151    feature 11 is not super resolution; evaluates on this handle will be forwarded and otherwise ignored.
+10:26:43.189  === Vulkan CreateFeature1 #9  feature_id=18  VkDevice=000000002F8F00D0  thread 69676 ===
+10:26:43.189  === Vulkan CreateFeature1 #9 returned -1160773630, handle=0000000000000000 ===
+10:26:43.227  [present-adapter] enabled, idle. Awaiting a new request token; existing requests are ignored.
+10:26:43.230  [fg-input] AutoRun: continuous NR at the frame-generation input; a request with frames=0 stops it. pipeline=serial park
+10:26:43.231  
+10:26:43.231  ################ synth: opening on this add-on's own D3D12 device ################
+10:26:43.235  [bridge] D3D12 device created at feature level 12_1.
+10:26:43.235  [bridge] the D3D12 device came back wrapped by ReShade: 000000268EFF80D0 over 000000013DCDAAB0. NGX is given the unwrapped one, so no other add-on is handed D3D12 objects it never asked for.
+10:26:43.235  [bridge] add-ons loaded at this point, with their bases:
+10:26:43.235  [bridge]   dlss5-bridge.addon64 at 00007FFA8D240000
+10:26:43.235  [bridge]   renodx-dlss5.addon64 at 00007FF9A7060000
+10:26:43.270  [synth] this add-on's own D3D12 device is 000000013DCDAAB0 and its graphics queue is 00000028D7EB4A20
+10:26:43.270  [bridge] NGX D3D12 entry points taken from C:\WINDOWS\System32\DriverStore\FileRepository\nv_dispsi.inf_amd64_b8459fc8f905f657\_nvngx.dll
+10:26:43.270  [synth] NGX data path: C:\Program Files\Hypergryph Launcher\games\Endfield Game\
+10:26:43.464  NGX layer 4: C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlss.dll (base=00007FF8CD170000)
+10:26:43.465    version 310.5.2.0
+10:26:43.465    NVSDK_NGX_D3D11_CreateFeature     = 00007FF8CD1B5160
+10:26:43.465    NVSDK_NGX_D3D11_EvaluateFeature   = 00007FF8CD1B52C0
+10:26:43.465    NVSDK_NGX_D3D11_EvaluateFeature_C = 0000000000000000
+10:26:43.465    CreateFeature    prologue: 48 89 5C 24 08 48 89 6C 24 10 56 57 41 56 
+10:26:43.465    EvaluateFeature  prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+10:26:43.647    hooked: CreateFeature=yes EvaluateFeature=yes EvaluateFeature_C=absent
+10:26:43.647    NVSDK_NGX_VULKAN_CreateFeature     = 00007FF8CD2379C0
+10:26:43.647    NVSDK_NGX_VULKAN_CreateFeature1    = 00007FF8CD2379E0
+10:26:43.647    NVSDK_NGX_VULKAN_EvaluateFeature   = 00007FF8CD2379F0
+10:26:43.647    NVSDK_NGX_VULKAN_EvaluateFeature_C = 0000000000000000
+10:26:43.647    VK CreateFeature prologue: 48 83 EC 38 4C 89 4C 24 20 4D 8B C8 44 8B 
+10:26:43.648    VK CreateFeature1 prologue: E9 4B F1 FF FF CC CC CC CC CC CC CC CC CC  <== a thunk into its own module, not a hook
+10:26:43.648        the hook jumps into C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlss.dll +0xC6B30
+10:26:43.648    VK EvaluateFeature prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+10:26:43.738      00007FF8CD2379E0 is a thunk table entry; the hook goes to its destination 00007FF8CD236B30 so the patch does not overwrite the entries beside it.
+10:26:43.908    hooked: VULKAN CreateFeature=yes CreateFeature1=yes EvaluateFeature=yes EvaluateFeature_C=absent
+10:26:44.194  [synth] Init_Ext(version=0x13) -> ok
+10:26:44.194  [synth] D3D12 session ready on this add-on's own D3D12 device. The frame does not start on this device, so every texture NGX reads is created shareable here and imported by the API the game renders with.
+10:26:44.195  [synth] Vulkan side ready: VkDevice 000000002F8F00D0, VK_KHR_external_memory_win32 enabled, VK_KHR_push_descriptor enabled, 22 entry points resolved out of vulkan-1.dll with no import of it.
+10:26:44.195  [fg-input] building the private feature and its Vulkan import for 5120x2160 R8G8B8A8_UNORM
+10:26:44.202  [bridge] shader compiler: C:\Program Files\Hypergryph Launcher\games\Endfield Game\d3dcompiler_47.dll
+10:26:44.209  [bridge] sRGB conversion ready: R8G8B8A8_UNORM -> linear BT.709 (normalized SDR) -> original encoding.
+10:26:44.209  [synth] colour in R8G8B8A8_UNORM, output R8G8B8A8_UNORM -- the frame is copied into the first and the result is copied back out of the second, because NGX reads one as a shader resource and writes the other through a UAV in the same call.
+10:26:44.209  [synth]   Color  fmt 28 5120x2160 flags=0x20: sample yes, typed UAV yes, UAV load yes, UAV store yes
+10:26:44.209  [synth]   Output fmt 28 5120x2160 flags=0x24: sample yes, typed UAV yes, UAV load yes, UAV store yes
+10:26:44.209  [synth]   Depth  fmt 41 5120x2160 flags=0x20: sample yes, typed UAV yes, UAV load yes, UAV store yes
+10:26:44.209  [synth]   MV     fmt 34 5120x2160 flags=0x20: sample yes, typed UAV yes, UAV load yes, UAV store yes
+10:26:44.209  [bridge] the synthetic contract's create flags 8: DepthInverted
+10:26:44.314  [synth] feature ready on this add-on's own D3D12 device: 5120x2160 -> 5120x2160 handle=00000028FD3ED990
+10:26:44.314  [synth] imported memory: the image allows types 0x00000003, the imported handle allows 0x00000002 (query returned 0), and the lowest of the two together is taken, index 1. UNVERIFIED on AMD and on Intel -- if the import fails or the picture is wrong on one of those, this line is the first thing to compare.
+10:26:44.315  [synth] 5 D3D12 textures imported into the game's VkDevice -- the four slots, and the pipeline's second Output -- and a 44236800-byte buffer made for the depth aspect to travel through.
+10:26:44.315  [present-adapter] NGX evaluate module: _nvngx.dll internal=nvngx.dll product=NGX.
+10:26:44.315  [present-adapter] NGX evaluate module: 160_E658700.bin internal=DLSS product=NVIDIA Deep Learning SuperSampling.
+10:26:44.315  [present-adapter] NGX evaluate module: nvngx_dlssg.dll internal=DLSS-G product=NVIDIA DLSS-G MFGLW.
+10:26:44.316  [present-adapter] NGX evaluate module: nvngx_deepdvc.dll internal=DEEPDVC product=NVIDIA DEEPDVC.
+10:26:44.316  [present-adapter] NGX evaluate module: nvngx_dlssd.dll internal=DLSS product=NVIDIA DLSS Ray Reconstruction.
+10:26:44.317  [present-adapter] NGX evaluate module: nvngx_dlssnr.dll internal=DLSSNR product=NVIDIA DLSSNR.
+10:26:44.400  [present-adapter] private SR carrier copy ready; external SR calls remain tail-forwarded.
+10:26:44.482  [present-adapter] NR entry witness ready (tail-forward, CPU observation only).
+10:26:44.486  [fg-input] ready: HUD-less -> linear sRGB carrier -> Generic NR -> UI-preserving composite; FG interpolates processed frames. guides: mv=game (scale 5120.000,2160.000) depth=game inverted=1
+10:26:44.488  === Vulkan CreateFeature1 #10  feature_id=18  VkDevice=000000002F8F00D0  thread 69676 ===
+10:26:44.488  === Vulkan CreateFeature1 #10 returned -1160773630, handle=0000000000000000 ===
+10:26:44.489  [fg-census] evaluate observed: MultiFrameIndex=2 thread=58628
+10:26:44.489  [fg-census] pass 1 begins: 131 keys, types tried u/i/f/d/ull/ptr.
+10:26:44.489  [fg-census] DLSSG.AutomodeOverrideReset u=0 i=0 f=0 d=0 ull=0
+10:26:44.489  [fg-census] DLSSG.Backbuffer ptr=000000012465C688
+10:26:44.489  [fg-census] DLSSG.BackbufferFormat u=37 i=37 f=37 d=37 ull=37
+10:26:44.489  [fg-census] DLSSG.BackbufferFrameID ptr=0000000000000232
+10:26:44.489  [fg-census] DLSSG.BackbufferSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.489  [fg-census] DLSSG.BackbufferSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.489  [fg-census] DLSSG.BackbufferSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.489  [fg-census] DLSSG.BackbufferSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.489  [fg-census] DLSSG.BidirectionalDistortionField ptr=0000000000000000
+10:26:44.489  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.Bias u=0 i=0 f=0 d=0 ull=0
+10:26:44.489  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.IsLowPrecision u=0 i=0 f=0 d=0 ull=0
+10:26:44.489  [fg-relay] rate/15.4s p2 import_opt=1: presents=36.4/s present-gate[point=36.4 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+10:26:44.489  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.Scale u=1 i=1 f=1 d=1 ull=1
+10:26:44.490  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.490  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.490  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.490  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.489  [fg-relay] rate2: fginput eval=0.1/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.1 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+10:26:44.490  [fg-census] DLSSG.CameraAspectRatio u=2 i=2 f=2.37037 d=2.37037039 ull=2
+10:26:44.490  [fg-relay] rate3: arm->arm avg=0.00ms max=0.00ms n=0 | arm->work avg=0.00ms max=0.00ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.000ms max=0.000ms | copy-land<= avg=0.00ms max=0.00ms | work avg=0.00ms max=0.00ms | totals armed=0 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=0 conflicts=0
+10:26:44.491  [fg-census] DLSSG.CameraFOV u=1 i=1 f=1.01229 d=1.01229095 ull=1
+10:26:44.491  [fg-relay] rate4: throttle depth=1 off=0 | sleep calls=36.5/s waits=0.0/s clear=0.0/s timeouts=0.0/s avg=0.00ms | present calls=36.4/s waits=0.0/s clear=0.0/s timeouts=0.0/s avg=0.00ms | max=0.00ms (process)
+10:26:44.491  [fg-census] DLSSG.CameraFar u=10000 i=10000 f=10000 d=10000 ull=10000
+10:26:44.491  [fg-census] DLSSG.CameraFwdX u=0 i=0 f=-0.199642 d=-0.199642152 ull=0
+10:26:44.491  [fg-census] DLSSG.CameraFwdY u=0 i=0 f=0.170969 d=0.170968682 ull=0
+10:26:44.491  [fg-census] DLSSG.CameraFwdZ u=0 i=0 f=-0.964838 d=-0.964838147 ull=0
+10:26:44.491  [fg-census] DLSSG.CameraMotionIncluded u=1 i=1 f=1 d=1 ull=1
+10:26:44.491  [fg-census] DLSSG.CameraNear u=0 i=0 f=0.1 d=0.100000001 ull=0
+10:26:44.492  [fg-census] DLSSG.CameraPinholeOffsetX u=0 i=0 f=0 d=0 ull=0
+10:26:44.492  [fg-census] DLSSG.CameraPinholeOffsetY u=0 i=0 f=0 d=0 ull=0
+10:26:44.492  [fg-census] DLSSG.CameraPosX u=0 i=0 f=0 d=0 ull=0
+10:26:44.492  [fg-census] DLSSG.CameraPosY u=4294967295 i=-1 f=-1.37852 d=-1.37852454 ull=18446744073709551615
+10:26:44.492  [fg-census] DLSSG.CameraPosZ u=4294967293 i=-3 f=-3.86705 d=-3.8670547 ull=18446744073709551613
+10:26:44.492  [fg-census] DLSSG.CameraRightX u=0 i=0 f=-0.979869 d=-0.979868889 ull=0
+10:26:44.492  [fg-census] DLSSG.CameraRightY u=0 i=0 f=-0.0348338 d=-0.0348338038 ull=0
+10:26:44.492  [fg-census] DLSSG.CameraRightZ u=0 i=0 f=0.19658 d=0.196579754 ull=0
+10:26:44.492  [fg-input] frame=1 5120x2160 vkfmt=37 mode=NR pipeline=serial nr_entries=0 sr_entries=1 sr_copies=1 ok=1 busy_skips=0 token=1.
+10:26:44.492  [fg-census] DLSSG.CameraUpX u=0 i=0 f=-1.86265e-09 d=-1.86264515e-09 ull=0
+10:26:44.492  [fg-census] DLSSG.CameraUpY u=0 i=0 f=0.984661 d=0.984660506 ull=0
+10:26:44.492  [fg-census] DLSSG.CameraUpZ u=0 i=0 f=0.174481 d=0.174481183 ull=0
+10:26:44.492  [fg-census] DLSSG.CameraViewToClip ptr=000000012465C8D8 m=[0.7611 0 0 0 | 0 1.804 0 0 | 0 0 9.954e-06 -1 | 0 0 0.1 0]
+10:26:44.493  [fg-census] DLSSG.ClipToCameraView ptr=000000012465C918 m=[1.314 -0 -0 0 | 0 -0.5543 -0 0 | 0 -0 -0 10 | 0 -0 -1 9.954e-05]
+10:26:44.493  [fg-census] DLSSG.ClipToLensClip ptr=000000012465C958 m=[1 0 0 0 | 0 1 0 0 | 0 0 1 0 | 0 0 0 1]
+10:26:44.493  [fg-census] DLSSG.ClipToPrevClip ptr=000000012465C998 m=[1 -7.451e-09 0 0 | 0 1 -1.136e-13 7.446e-09 | 0 1.907e-06 1 0 | 0 3.702e-08 -9.095e-13 1]
+10:26:44.493  [fg-census] DLSSG.CmdAlloc ptr=0000000042BE14D0
+10:26:44.493  [fg-census] DLSSG.CmdQueue ptr=000000002E803CD0
+10:26:44.493  [fg-census] DLSSG.ColorBuffersHDR u=0 i=0 f=0 d=0 ull=0
+10:26:44.493  [fg-census] DLSSG.Depth ptr=000000012465C568
+10:26:44.493  [fg-census] DLSSG.DepthInverted u=1 i=1 f=1 d=1 ull=1
+10:26:44.493  [fg-census] DLSSG.DepthSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.493  [fg-census] DLSSG.DepthSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.493  [fg-census] DLSSG.DepthSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.493  [fg-census] DLSSG.DepthSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.493  [fg-census] DLSSG.Dynamic.ReflexDriven u=0 i=0 f=0 d=0 ull=0
+10:26:44.493  [fg-census] DLSSG.DynamicMaxFrameCount u=5 i=5 f=5 d=5 ull=5
+10:26:44.493  [fg-census] DLSSG.DynamicResolution u=0 i=0 f=0 d=0 ull=0
+10:26:44.493  [fg-census] DLSSG.EnableInterp u=1 i=1 f=1 d=1 ull=1
+10:26:44.494  [fg-census] DLSSG.EstimateVRAMCallback ptr=00007FF94BFD7A70
+10:26:44.494  [fg-census] DLSSG.EvalFlags u=0 i=0 f=0 d=0 ull=0
+10:26:44.494  [fg-census] DLSSG.FenceEvent ptr=0000000000000000
+10:26:44.494  [fg-census] DLSSG.FlipMetering u=0 i=0 f=0 d=0 ull=0
+10:26:44.494  [fg-census] DLSSG.HUDLess ptr=000000012465C6E8
+10:26:44.494  [fg-census] DLSSG.HUDLessSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.494  [fg-census] DLSSG.HUDLessSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.494  [fg-census] DLSSG.HUDLessSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.494  [fg-census] DLSSG.HUDLessSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.494  [fg-census] DLSSG.Height u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.494  [fg-census] DLSSG.InternalHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.494  [fg-census] DLSSG.InternalWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.494  [fg-census] DLSSG.IsRecording u=1 i=1 f=1 d=1 ull=1
+10:26:44.494  [fg-census] DLSSG.JitterOffsetX u=0 i=0 f=-0.125 d=-0.125 ull=0
+10:26:44.494  [fg-census] DLSSG.JitterOffsetY u=0 i=0 f=-0.277778 d=-0.277777791 ull=0
+10:26:44.494  [fg-census] DLSSG.MVecs ptr=000000012465C5C8
+10:26:44.494  [fg-census] DLSSG.MVecsSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.495  [fg-census] DLSSG.MVecsSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.495  [fg-census] DLSSG.MVecsSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.495  [fg-census] DLSSG.MVecsSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.495  [fg-census] DLSSG.MenuDetectionEnabled u=0 i=0 f=0 d=0 ull=0
+10:26:44.495  [fg-census] DLSSG.MinRelativeLinearDepthObjectSeparation u=40 i=40 f=40 d=40 ull=40
+10:26:44.495  [fg-census] DLSSG.ModelVersion u=512 i=512 f=512 d=512 ull=512
+10:26:44.495  [fg-census] DLSSG.MultiFrameCount u=5 i=5 f=5 d=5 ull=5
+10:26:44.495  [fg-census] DLSSG.MultiFrameCountMax u=5 i=5 f=5 d=5 ull=5
+10:26:44.495  [fg-census] DLSSG.MultiFrameIndex u=2 i=2 f=2 d=2 ull=2
+10:26:44.495  [fg-census] DLSSG.MvecDilated u=0 i=0 f=0 d=0 ull=0
+10:26:44.495  [fg-census] DLSSG.MvecInvalidValue u=0 i=-2147483648 f=3.40282e+38 d=3.40282347e+38 ull=9223372036854775808
+10:26:44.495  [fg-census] DLSSG.MvecJittered u=0 i=0 f=0 d=0 ull=0
+10:26:44.495  [fg-census] DLSSG.MvecScaleX u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.495  [fg-census] DLSSG.MvecScaleY u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.495  [fg-census] DLSSG.NoWarp ptr=0000000000000000
+10:26:44.495  [fg-census] DLSSG.NoWarpSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.495  [fg-census] DLSSG.NoWarpSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.495  [fg-census] DLSSG.NoWarpSubrectHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.496  [fg-census] DLSSG.NoWarpSubrectWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.496  [fg-census] DLSSG.NotRenderingGameFrames u=0 i=0 f=0 d=0 ull=0
+10:26:44.496  [fg-census] DLSSG.NvAppOvrAppliedVal.MultiFrameCount u=5 i=5 f=5 d=5 ull=5
+10:26:44.496  [fg-census] DLSSG.NvAppOvrAppliedVal.StreamlineMode u=1 i=1 f=1 d=1 ull=1
+10:26:44.496  [fg-census] DLSSG.OrthoProjection u=0 i=0 f=0 d=0 ull=0
+10:26:44.496  [fg-census] DLSSG.OutputDisableInterpolation ptr=000000012465C868
+10:26:44.496  [fg-census] DLSSG.OutputInterpolated ptr=000000272EF51D28
+10:26:44.496  [fg-census] DLSSG.OutputReal ptr=0000000000000000
+10:26:44.496  [fg-census] DLSSG.PrevClipToClip ptr=000000012465C9D8 m=[1 7.451e-09 8.467e-22 -5.548e-17 | 0 1 1.136e-13 -7.446e-09 | 0 -1.907e-06 1 1.42e-14 | 0 -3.702e-08 9.095e-13 1]
+10:26:44.496  [fg-census] DLSSG.QueueSubmitCallback ptr=0000000000000000
+10:26:44.496  [fg-census] DLSSG.QueueSubmitCallbackData ptr=0000000000000000
+10:26:44.497  [fg-census] DLSSG.RefreshRate u=119 i=119 f=119.996 d=119.996002 ull=119
+10:26:44.497  [fg-census] DLSSG.Reset u=1 i=1 f=1 d=1 ull=1
+10:26:44.497  [fg-census] DLSSG.StreamlineMode u=1 i=1 f=1 d=1 ull=1
+10:26:44.497  [fg-census] DLSSG.StreamlineVersionTag ptr=00007FFA3F91CB50
+10:26:44.497  [fg-census] DLSSG.SyncFlushCallback ptr=0000000000000000
+10:26:44.497  [fg-census] DLSSG.SyncFlushCallbackData ptr=0000000000000000
+10:26:44.497  [fg-census] DLSSG.SyncSignalCallback ptr=0000000000000000
+10:26:44.497  [fg-census] DLSSG.SyncSignalCallbackData ptr=0000000000000000
+10:26:44.497  [fg-census] DLSSG.SyncSignalOnlyCallback ptr=0000000000000000
+10:26:44.497  [fg-census] DLSSG.SyncSignalOnlyCallbackData ptr=0000000000000000
+10:26:44.497  [fg-census] DLSSG.SyncWaitCallback ptr=0000000000000000
+10:26:44.497  [fg-census] DLSSG.SyncWaitCallbackData ptr=0000000000000000
+10:26:44.497  [fg-census] DLSSG.SyncWaitOnlyCallback ptr=0000000000000000
+10:26:44.497  [fg-census] DLSSG.SyncWaitOnlyCallbackData ptr=0000000000000000
+10:26:44.497  [fg-census] DLSSG.TargetFrameRate u=119 i=119 f=119.996 d=119.996002 ull=119
+10:26:44.497  [fg-census] DLSSG.UI ptr=0000000000000000
+10:26:44.497  [fg-census] DLSSG.UIAlpha ptr=0000000000000000
+10:26:44.498  [fg-census] DLSSG.UIAlphaSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.498  [fg-census] DLSSG.UIAlphaSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.498  [fg-census] DLSSG.UIAlphaSubrectHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.498  [fg-census] DLSSG.UIAlphaSubrectWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.498  [fg-census] DLSSG.UISubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.498  [fg-census] DLSSG.UISubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.498  [fg-census] DLSSG.UISubrectHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.498  [fg-census] DLSSG.UISubrectWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.498  [fg-census] DLSSG.UserInterfaceRecompositionEnabled u=0 i=0 f=0 d=0 ull=0
+10:26:44.498  [fg-census] DLSSG.VSyncDriverRequested u=1 i=1 f=1 d=1 ull=1
+10:26:44.498  [fg-census] DLSSG.VSyncOn u=0 i=0 f=0 d=0 ull=0
+10:26:44.498  [fg-census] DLSSG.VSyncSupported u=0 i=0 f=0 d=0 ull=0
+10:26:44.498  [fg-census] DLSSG.VkOFAModeRequest u=1 i=1 f=1 d=1 ull=1
+10:26:44.498  [fg-census] DLSSG.Width u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.498  [fg-census] DLSSG.run_lowres_mvec_pass u=1 i=1 f=1 d=1 ull=1
+10:26:44.498  [fg-census] pass 1 ends.
+10:26:44.499  [fg-census] evaluate observed: MultiFrameIndex=3 thread=58628
+10:26:44.499  [fg-census] pass 2 begins: 131 keys, types tried u/i/f/d/ull/ptr.
+10:26:44.499  [fg-census] DLSSG.AutomodeOverrideReset u=0 i=0 f=0 d=0 ull=0
+10:26:44.499  [fg-census] DLSSG.Backbuffer ptr=000000012465C688
+10:26:44.499  [fg-census] DLSSG.BackbufferFormat u=37 i=37 f=37 d=37 ull=37
+10:26:44.499  [fg-census] DLSSG.BackbufferFrameID ptr=0000000000000232
+10:26:44.499  [fg-census] DLSSG.BackbufferSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.499  [fg-census] DLSSG.BackbufferSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.499  [fg-census] DLSSG.BackbufferSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.499  [fg-census] DLSSG.BackbufferSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.499  [fg-census] DLSSG.BidirectionalDistortionField ptr=0000000000000000
+10:26:44.499  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.Bias u=0 i=0 f=0 d=0 ull=0
+10:26:44.499  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.IsLowPrecision u=0 i=0 f=0 d=0 ull=0
+10:26:44.499  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.Scale u=1 i=1 f=1 d=1 ull=1
+10:26:44.499  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.499  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.499  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.499  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.499  [fg-census] DLSSG.CameraAspectRatio u=2 i=2 f=2.37037 d=2.37037039 ull=2
+10:26:44.499  [fg-census] DLSSG.CameraFOV u=1 i=1 f=1.01229 d=1.01229095 ull=1
+10:26:44.499  [fg-census] DLSSG.CameraFar u=10000 i=10000 f=10000 d=10000 ull=10000
+10:26:44.500  [fg-census] DLSSG.CameraFwdX u=0 i=0 f=-0.199642 d=-0.199642152 ull=0
+10:26:44.500  [fg-census] DLSSG.CameraFwdY u=0 i=0 f=0.170969 d=0.170968682 ull=0
+10:26:44.500  [fg-census] DLSSG.CameraFwdZ u=0 i=0 f=-0.964838 d=-0.964838147 ull=0
+10:26:44.500  [fg-census] DLSSG.CameraMotionIncluded u=1 i=1 f=1 d=1 ull=1
+10:26:44.500  [fg-census] DLSSG.CameraNear u=0 i=0 f=0.1 d=0.100000001 ull=0
+10:26:44.500  [fg-census] DLSSG.CameraPinholeOffsetX u=0 i=0 f=0 d=0 ull=0
+10:26:44.500  [fg-census] DLSSG.CameraPinholeOffsetY u=0 i=0 f=0 d=0 ull=0
+10:26:44.500  [fg-census] DLSSG.CameraPosX u=0 i=0 f=0 d=0 ull=0
+10:26:44.500  [fg-census] DLSSG.CameraPosY u=4294967295 i=-1 f=-1.37852 d=-1.37852454 ull=18446744073709551615
+10:26:44.501  [fg-census] DLSSG.CameraPosZ u=4294967293 i=-3 f=-3.86705 d=-3.8670547 ull=18446744073709551613
+10:26:44.501  [fg-census] DLSSG.CameraRightX u=0 i=0 f=-0.979869 d=-0.979868889 ull=0
+10:26:44.501  [fg-census] DLSSG.CameraRightY u=0 i=0 f=-0.0348338 d=-0.0348338038 ull=0
+10:26:44.501  [fg-census] DLSSG.CameraRightZ u=0 i=0 f=0.19658 d=0.196579754 ull=0
+10:26:44.501  [fg-census] DLSSG.CameraUpX u=0 i=0 f=-1.86265e-09 d=-1.86264515e-09 ull=0
+10:26:44.501  [fg-census] DLSSG.CameraUpY u=0 i=0 f=0.984661 d=0.984660506 ull=0
+10:26:44.501  [fg-census] DLSSG.CameraUpZ u=0 i=0 f=0.174481 d=0.174481183 ull=0
+10:26:44.501  [fg-census] DLSSG.CameraViewToClip ptr=000000012465C8D8 m=[0.7611 0 0 0 | 0 1.804 0 0 | 0 0 9.954e-06 -1 | 0 0 0.1 0]
+10:26:44.501  [fg-census] DLSSG.ClipToCameraView ptr=000000012465C918 m=[1.314 -0 -0 0 | 0 -0.5543 -0 0 | 0 -0 -0 10 | 0 -0 -1 9.954e-05]
+10:26:44.501  [fg-census] DLSSG.ClipToLensClip ptr=000000012465C958 m=[1 0 0 0 | 0 1 0 0 | 0 0 1 0 | 0 0 0 1]
+10:26:44.501  [fg-census] DLSSG.ClipToPrevClip ptr=000000012465C998 m=[1 -7.451e-09 0 0 | 0 1 -1.136e-13 7.446e-09 | 0 1.907e-06 1 0 | 0 3.702e-08 -9.095e-13 1]
+10:26:44.501  [fg-census] DLSSG.CmdAlloc ptr=0000000042BE19D0
+10:26:44.501  [fg-census] DLSSG.CmdQueue ptr=000000002E803CD0
+10:26:44.501  [fg-census] DLSSG.ColorBuffersHDR u=0 i=0 f=0 d=0 ull=0
+10:26:44.501  [fg-census] DLSSG.Depth ptr=000000012465C568
+10:26:44.501  [fg-census] DLSSG.DepthInverted u=1 i=1 f=1 d=1 ull=1
+10:26:44.502  [fg-census] DLSSG.DepthSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.502  [fg-census] DLSSG.DepthSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.502  [fg-census] DLSSG.DepthSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.502  [fg-census] DLSSG.DepthSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.502  [fg-census] DLSSG.Dynamic.ReflexDriven u=0 i=0 f=0 d=0 ull=0
+10:26:44.502  [fg-census] DLSSG.DynamicMaxFrameCount u=5 i=5 f=5 d=5 ull=5
+10:26:44.502  [fg-census] DLSSG.DynamicResolution u=0 i=0 f=0 d=0 ull=0
+10:26:44.502  [fg-census] DLSSG.EnableInterp u=1 i=1 f=1 d=1 ull=1
+10:26:44.502  [fg-census] DLSSG.EstimateVRAMCallback ptr=00007FF94BFD7A70
+10:26:44.502  [fg-census] DLSSG.EvalFlags u=0 i=0 f=0 d=0 ull=0
+10:26:44.502  [fg-census] DLSSG.FenceEvent ptr=0000000000000000
+10:26:44.502  [fg-census] DLSSG.FlipMetering u=0 i=0 f=0 d=0 ull=0
+10:26:44.502  [fg-census] DLSSG.HUDLess ptr=000000012465C6E8
+10:26:44.502  [fg-census] DLSSG.HUDLessSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.502  [fg-census] DLSSG.HUDLessSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.503  [fg-census] DLSSG.HUDLessSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.503  [fg-census] DLSSG.HUDLessSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.503  [fg-census] DLSSG.Height u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.503  [fg-census] DLSSG.InternalHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.503  [fg-census] DLSSG.InternalWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.503  [fg-census] DLSSG.IsRecording u=1 i=1 f=1 d=1 ull=1
+10:26:44.503  [fg-census] DLSSG.JitterOffsetX u=0 i=0 f=-0.125 d=-0.125 ull=0
+10:26:44.503  [fg-census] DLSSG.JitterOffsetY u=0 i=0 f=-0.277778 d=-0.277777791 ull=0
+10:26:44.503  [fg-census] DLSSG.MVecs ptr=000000012465C5C8
+10:26:44.503  [fg-census] DLSSG.MVecsSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.503  [fg-census] DLSSG.MVecsSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.503  [fg-census] DLSSG.MVecsSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.503  [fg-census] DLSSG.MVecsSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.503  [fg-census] DLSSG.MenuDetectionEnabled u=0 i=0 f=0 d=0 ull=0
+10:26:44.503  [fg-census] DLSSG.MinRelativeLinearDepthObjectSeparation u=40 i=40 f=40 d=40 ull=40
+10:26:44.503  [fg-census] DLSSG.ModelVersion u=512 i=512 f=512 d=512 ull=512
+10:26:44.503  [fg-census] DLSSG.MultiFrameCount u=5 i=5 f=5 d=5 ull=5
+10:26:44.504  [fg-census] DLSSG.MultiFrameCountMax u=5 i=5 f=5 d=5 ull=5
+10:26:44.504  [fg-census] DLSSG.MultiFrameIndex u=3 i=3 f=3 d=3 ull=3
+10:26:44.504  [fg-census] DLSSG.MvecDilated u=0 i=0 f=0 d=0 ull=0
+10:26:44.504  [fg-census] DLSSG.MvecInvalidValue u=0 i=-2147483648 f=3.40282e+38 d=3.40282347e+38 ull=9223372036854775808
+10:26:44.504  [fg-census] DLSSG.MvecJittered u=0 i=0 f=0 d=0 ull=0
+10:26:44.504  [fg-census] DLSSG.MvecScaleX u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.504  [fg-census] DLSSG.MvecScaleY u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.504  [fg-census] DLSSG.NoWarp ptr=0000000000000000
+10:26:44.504  [fg-census] DLSSG.NoWarpSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.504  [fg-census] DLSSG.NoWarpSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.504  [fg-census] DLSSG.NoWarpSubrectHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.504  [fg-census] DLSSG.NoWarpSubrectWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.504  [fg-census] DLSSG.NotRenderingGameFrames u=0 i=0 f=0 d=0 ull=0
+10:26:44.504  [fg-census] DLSSG.NvAppOvrAppliedVal.MultiFrameCount u=5 i=5 f=5 d=5 ull=5
+10:26:44.504  [fg-census] DLSSG.NvAppOvrAppliedVal.StreamlineMode u=1 i=1 f=1 d=1 ull=1
+10:26:44.504  [fg-census] DLSSG.OrthoProjection u=0 i=0 f=0 d=0 ull=0
+10:26:44.505  [fg-census] DLSSG.OutputDisableInterpolation ptr=000000012465C868
+10:26:44.505  [fg-census] DLSSG.OutputInterpolated ptr=000000272EF51DE8
+10:26:44.505  [fg-census] DLSSG.OutputReal ptr=0000000000000000
+10:26:44.505  [fg-census] DLSSG.PrevClipToClip ptr=000000012465C9D8 m=[1 7.451e-09 8.467e-22 -5.548e-17 | 0 1 1.136e-13 -7.446e-09 | 0 -1.907e-06 1 1.42e-14 | 0 -3.702e-08 9.095e-13 1]
+10:26:44.505  [fg-census] DLSSG.QueueSubmitCallback ptr=0000000000000000
+10:26:44.505  [fg-census] DLSSG.QueueSubmitCallbackData ptr=0000000000000000
+10:26:44.505  [fg-census] DLSSG.RefreshRate u=119 i=119 f=119.996 d=119.996002 ull=119
+10:26:44.505  [fg-census] DLSSG.Reset u=1 i=1 f=1 d=1 ull=1
+10:26:44.505  [fg-census] DLSSG.StreamlineMode u=1 i=1 f=1 d=1 ull=1
+10:26:44.505  [fg-census] DLSSG.StreamlineVersionTag ptr=00007FFA3F91CB50
+10:26:44.505  [fg-census] DLSSG.SyncFlushCallback ptr=0000000000000000
+10:26:44.505  [fg-census] DLSSG.SyncFlushCallbackData ptr=0000000000000000
+10:26:44.505  [fg-census] DLSSG.SyncSignalCallback ptr=0000000000000000
+10:26:44.505  [fg-census] DLSSG.SyncSignalCallbackData ptr=0000000000000000
+10:26:44.505  [fg-census] DLSSG.SyncSignalOnlyCallback ptr=0000000000000000
+10:26:44.506  [fg-census] DLSSG.SyncSignalOnlyCallbackData ptr=0000000000000000
+10:26:44.506  [fg-census] DLSSG.SyncWaitCallback ptr=0000000000000000
+10:26:44.506  [fg-census] DLSSG.SyncWaitCallbackData ptr=0000000000000000
+10:26:44.506  [fg-census] DLSSG.SyncWaitOnlyCallback ptr=0000000000000000
+10:26:44.506  [fg-census] DLSSG.SyncWaitOnlyCallbackData ptr=0000000000000000
+10:26:44.506  [fg-census] DLSSG.TargetFrameRate u=119 i=119 f=119.996 d=119.996002 ull=119
+10:26:44.506  [fg-census] DLSSG.UI ptr=0000000000000000
+10:26:44.506  [fg-census] DLSSG.UIAlpha ptr=0000000000000000
+10:26:44.506  [fg-census] DLSSG.UIAlphaSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.506  [fg-census] DLSSG.UIAlphaSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.506  [fg-census] DLSSG.UIAlphaSubrectHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.506  [fg-census] DLSSG.UIAlphaSubrectWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.506  [fg-census] DLSSG.UISubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.506  [fg-census] DLSSG.UISubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.506  [fg-census] DLSSG.UISubrectHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.506  [fg-census] DLSSG.UISubrectWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.506  [fg-census] DLSSG.UserInterfaceRecompositionEnabled u=0 i=0 f=0 d=0 ull=0
+10:26:44.506  [fg-census] DLSSG.VSyncDriverRequested u=1 i=1 f=1 d=1 ull=1
+10:26:44.507  [fg-census] DLSSG.VSyncOn u=0 i=0 f=0 d=0 ull=0
+10:26:44.507  [fg-census] DLSSG.VSyncSupported u=0 i=0 f=0 d=0 ull=0
+10:26:44.507  [fg-census] DLSSG.VkOFAModeRequest u=1 i=1 f=1 d=1 ull=1
+10:26:44.507  [fg-census] DLSSG.Width u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.507  [fg-census] DLSSG.run_lowres_mvec_pass u=1 i=1 f=1 d=1 ull=1
+10:26:44.507  [fg-census] pass 2 ends.
+10:26:44.507  [fg-census] evaluate observed: MultiFrameIndex=4 thread=58628
+10:26:44.507  [fg-census] pass 3 begins: 131 keys, types tried u/i/f/d/ull/ptr.
+10:26:44.507  [fg-census] DLSSG.AutomodeOverrideReset u=0 i=0 f=0 d=0 ull=0
+10:26:44.507  [fg-census] DLSSG.Backbuffer ptr=000000012465C688
+10:26:44.507  [fg-census] DLSSG.BackbufferFormat u=37 i=37 f=37 d=37 ull=37
+10:26:44.507  [fg-census] DLSSG.BackbufferFrameID ptr=0000000000000232
+10:26:44.507  [fg-census] DLSSG.BackbufferSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.507  [fg-census] DLSSG.BackbufferSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.507  [fg-census] DLSSG.BackbufferSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.507  [fg-census] DLSSG.BackbufferSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.507  [fg-census] DLSSG.BidirectionalDistortionField ptr=0000000000000000
+10:26:44.507  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.Bias u=0 i=0 f=0 d=0 ull=0
+10:26:44.507  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.IsLowPrecision u=0 i=0 f=0 d=0 ull=0
+10:26:44.507  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.Scale u=1 i=1 f=1 d=1 ull=1
+10:26:44.507  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.507  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.507  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.508  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.508  [fg-census] DLSSG.CameraAspectRatio u=2 i=2 f=2.37037 d=2.37037039 ull=2
+10:26:44.508  [fg-census] DLSSG.CameraFOV u=1 i=1 f=1.01229 d=1.01229095 ull=1
+10:26:44.508  [fg-census] DLSSG.CameraFar u=10000 i=10000 f=10000 d=10000 ull=10000
+10:26:44.508  [fg-census] DLSSG.CameraFwdX u=0 i=0 f=-0.199642 d=-0.199642152 ull=0
+10:26:44.508  [fg-census] DLSSG.CameraFwdY u=0 i=0 f=0.170969 d=0.170968682 ull=0
+10:26:44.508  [fg-census] DLSSG.CameraFwdZ u=0 i=0 f=-0.964838 d=-0.964838147 ull=0
+10:26:44.508  [fg-census] DLSSG.CameraMotionIncluded u=1 i=1 f=1 d=1 ull=1
+10:26:44.508  [fg-census] DLSSG.CameraNear u=0 i=0 f=0.1 d=0.100000001 ull=0
+10:26:44.508  [fg-census] DLSSG.CameraPinholeOffsetX u=0 i=0 f=0 d=0 ull=0
+10:26:44.509  [fg-census] DLSSG.CameraPinholeOffsetY u=0 i=0 f=0 d=0 ull=0
+10:26:44.509  [fg-census] DLSSG.CameraPosX u=0 i=0 f=0 d=0 ull=0
+10:26:44.509  [fg-census] DLSSG.CameraPosY u=4294967295 i=-1 f=-1.37852 d=-1.37852454 ull=18446744073709551615
+10:26:44.509  [fg-census] DLSSG.CameraPosZ u=4294967293 i=-3 f=-3.86705 d=-3.8670547 ull=18446744073709551613
+10:26:44.509  [fg-census] DLSSG.CameraRightX u=0 i=0 f=-0.979869 d=-0.979868889 ull=0
+10:26:44.509  [fg-census] DLSSG.CameraRightY u=0 i=0 f=-0.0348338 d=-0.0348338038 ull=0
+10:26:44.509  [fg-census] DLSSG.CameraRightZ u=0 i=0 f=0.19658 d=0.196579754 ull=0
+10:26:44.509  [fg-census] DLSSG.CameraUpX u=0 i=0 f=-1.86265e-09 d=-1.86264515e-09 ull=0
+10:26:44.509  [fg-census] DLSSG.CameraUpY u=0 i=0 f=0.984661 d=0.984660506 ull=0
+10:26:44.509  [fg-census] DLSSG.CameraUpZ u=0 i=0 f=0.174481 d=0.174481183 ull=0
+10:26:44.509  [fg-census] DLSSG.CameraViewToClip ptr=000000012465C8D8 m=[0.7611 0 0 0 | 0 1.804 0 0 | 0 0 9.954e-06 -1 | 0 0 0.1 0]
+10:26:44.509  [fg-census] DLSSG.ClipToCameraView ptr=000000012465C918 m=[1.314 -0 -0 0 | 0 -0.5543 -0 0 | 0 -0 -0 10 | 0 -0 -1 9.954e-05]
+10:26:44.509  [fg-census] DLSSG.ClipToLensClip ptr=000000012465C958 m=[1 0 0 0 | 0 1 0 0 | 0 0 1 0 | 0 0 0 1]
+10:26:44.509  [fg-census] DLSSG.ClipToPrevClip ptr=000000012465C998 m=[1 -7.451e-09 0 0 | 0 1 -1.136e-13 7.446e-09 | 0 1.907e-06 1 0 | 0 3.702e-08 -9.095e-13 1]
+10:26:44.509  [fg-census] DLSSG.CmdAlloc ptr=0000000042BE1ED0
+10:26:44.509  [fg-census] DLSSG.CmdQueue ptr=000000002E803CD0
+10:26:44.510  [fg-census] DLSSG.ColorBuffersHDR u=0 i=0 f=0 d=0 ull=0
+10:26:44.510  [fg-census] DLSSG.Depth ptr=000000012465C568
+10:26:44.510  [fg-census] DLSSG.DepthInverted u=1 i=1 f=1 d=1 ull=1
+10:26:44.510  [fg-census] DLSSG.DepthSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.510  [fg-census] DLSSG.DepthSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.510  [fg-census] DLSSG.DepthSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.510  [fg-census] DLSSG.DepthSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.510  [fg-census] DLSSG.Dynamic.ReflexDriven u=0 i=0 f=0 d=0 ull=0
+10:26:44.510  [fg-census] DLSSG.DynamicMaxFrameCount u=5 i=5 f=5 d=5 ull=5
+10:26:44.510  [fg-census] DLSSG.DynamicResolution u=0 i=0 f=0 d=0 ull=0
+10:26:44.510  [fg-census] DLSSG.EnableInterp u=1 i=1 f=1 d=1 ull=1
+10:26:44.510  [fg-census] DLSSG.EstimateVRAMCallback ptr=00007FF94BFD7A70
+10:26:44.510  [fg-census] DLSSG.EvalFlags u=0 i=0 f=0 d=0 ull=0
+10:26:44.510  [fg-census] DLSSG.FenceEvent ptr=0000000000000000
+10:26:44.510  [fg-census] DLSSG.FlipMetering u=0 i=0 f=0 d=0 ull=0
+10:26:44.511  [fg-census] DLSSG.HUDLess ptr=000000012465C6E8
+10:26:44.511  [fg-census] DLSSG.HUDLessSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.511  [fg-census] DLSSG.HUDLessSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.511  [fg-census] DLSSG.HUDLessSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.511  [fg-census] DLSSG.HUDLessSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.511  [fg-census] DLSSG.Height u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.511  [fg-census] DLSSG.InternalHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.511  [fg-census] DLSSG.InternalWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.511  [fg-census] DLSSG.IsRecording u=1 i=1 f=1 d=1 ull=1
+10:26:44.511  [fg-census] DLSSG.JitterOffsetX u=0 i=0 f=-0.125 d=-0.125 ull=0
+10:26:44.511  [fg-census] DLSSG.JitterOffsetY u=0 i=0 f=-0.277778 d=-0.277777791 ull=0
+10:26:44.511  [fg-census] DLSSG.MVecs ptr=000000012465C5C8
+10:26:44.511  [fg-census] DLSSG.MVecsSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.511  [fg-census] DLSSG.MVecsSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.511  [fg-census] DLSSG.MVecsSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.511  [fg-census] DLSSG.MVecsSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.512  [fg-census] DLSSG.MenuDetectionEnabled u=0 i=0 f=0 d=0 ull=0
+10:26:44.512  [fg-census] DLSSG.MinRelativeLinearDepthObjectSeparation u=40 i=40 f=40 d=40 ull=40
+10:26:44.512  [fg-census] DLSSG.ModelVersion u=512 i=512 f=512 d=512 ull=512
+10:26:44.512  [fg-census] DLSSG.MultiFrameCount u=5 i=5 f=5 d=5 ull=5
+10:26:44.512  [fg-census] DLSSG.MultiFrameCountMax u=5 i=5 f=5 d=5 ull=5
+10:26:44.512  [fg-census] DLSSG.MultiFrameIndex u=4 i=4 f=4 d=4 ull=4
+10:26:44.512  [fg-census] DLSSG.MvecDilated u=0 i=0 f=0 d=0 ull=0
+10:26:44.512  [fg-census] DLSSG.MvecInvalidValue u=0 i=-2147483648 f=3.40282e+38 d=3.40282347e+38 ull=9223372036854775808
+10:26:44.512  [fg-census] DLSSG.MvecJittered u=0 i=0 f=0 d=0 ull=0
+10:26:44.512  [fg-census] DLSSG.MvecScaleX u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.512  [fg-census] DLSSG.MvecScaleY u=2160 i=2160 f=2160 d=2160 ull=2160
+10:26:44.512  [fg-census] DLSSG.NoWarp ptr=0000000000000000
+10:26:44.512  [fg-census] DLSSG.NoWarpSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.512  [fg-census] DLSSG.NoWarpSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.512  [fg-census] DLSSG.NoWarpSubrectHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.512  [fg-census] DLSSG.NoWarpSubrectWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.512  [fg-census] DLSSG.NotRenderingGameFrames u=0 i=0 f=0 d=0 ull=0
+10:26:44.512  [fg-census] DLSSG.NvAppOvrAppliedVal.MultiFrameCount u=5 i=5 f=5 d=5 ull=5
+10:26:44.513  [fg-census] DLSSG.NvAppOvrAppliedVal.StreamlineMode u=1 i=1 f=1 d=1 ull=1
+10:26:44.513  [fg-census] DLSSG.OrthoProjection u=0 i=0 f=0 d=0 ull=0
+10:26:44.513  [fg-census] DLSSG.OutputDisableInterpolation ptr=000000012465C868
+10:26:44.513  [fg-census] DLSSG.OutputInterpolated ptr=000000272EF51EA8
+10:26:44.513  [fg-census] DLSSG.OutputReal ptr=0000000000000000
+10:26:44.513  [fg-census] DLSSG.PrevClipToClip ptr=000000012465C9D8 m=[1 7.451e-09 8.467e-22 -5.548e-17 | 0 1 1.136e-13 -7.446e-09 | 0 -1.907e-06 1 1.42e-14 | 0 -3.702e-08 9.095e-13 1]
+10:26:44.513  [fg-census] DLSSG.QueueSubmitCallback ptr=0000000000000000
+10:26:44.513  [fg-census] DLSSG.QueueSubmitCallbackData ptr=0000000000000000
+10:26:44.513  [fg-census] DLSSG.RefreshRate u=119 i=119 f=119.996 d=119.996002 ull=119
+10:26:44.513  [fg-census] DLSSG.Reset u=1 i=1 f=1 d=1 ull=1
+10:26:44.513  [fg-census] DLSSG.StreamlineMode u=1 i=1 f=1 d=1 ull=1
+10:26:44.513  [fg-census] DLSSG.StreamlineVersionTag ptr=00007FFA3F91CB50
+10:26:44.514  [fg-census] DLSSG.SyncFlushCallback ptr=0000000000000000
+10:26:44.514  [fg-census] DLSSG.SyncFlushCallbackData ptr=0000000000000000
+10:26:44.514  [fg-census] DLSSG.SyncSignalCallback ptr=0000000000000000
+10:26:44.514  [fg-census] DLSSG.SyncSignalCallbackData ptr=0000000000000000
+10:26:44.514  [fg-census] DLSSG.SyncSignalOnlyCallback ptr=0000000000000000
+10:26:44.514  [fg-census] DLSSG.SyncSignalOnlyCallbackData ptr=0000000000000000
+10:26:44.514  [fg-census] DLSSG.SyncWaitCallback ptr=0000000000000000
+10:26:44.514  [fg-census] DLSSG.SyncWaitCallbackData ptr=0000000000000000
+10:26:44.514  [fg-census] DLSSG.SyncWaitOnlyCallback ptr=0000000000000000
+10:26:44.514  [fg-census] DLSSG.SyncWaitOnlyCallbackData ptr=0000000000000000
+10:26:44.514  [fg-census] DLSSG.TargetFrameRate u=119 i=119 f=119.996 d=119.996002 ull=119
+10:26:44.514  [fg-census] DLSSG.UI ptr=0000000000000000
+10:26:44.514  [fg-census] DLSSG.UIAlpha ptr=0000000000000000
+10:26:44.514  [fg-census] DLSSG.UIAlphaSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.514  [fg-census] DLSSG.UIAlphaSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.514  [fg-census] DLSSG.UIAlphaSubrectHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.514  [fg-census] DLSSG.UIAlphaSubrectWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.515  [fg-census] DLSSG.UISubrectBaseX u=0 i=0 f=0 d=0 ull=0
+10:26:44.515  [fg-census] DLSSG.UISubrectBaseY u=0 i=0 f=0 d=0 ull=0
+10:26:44.515  [fg-census] DLSSG.UISubrectHeight u=0 i=0 f=0 d=0 ull=0
+10:26:44.515  [fg-census] DLSSG.UISubrectWidth u=0 i=0 f=0 d=0 ull=0
+10:26:44.515  [fg-census] DLSSG.UserInterfaceRecompositionEnabled u=0 i=0 f=0 d=0 ull=0
+10:26:44.515  [fg-census] DLSSG.VSyncDriverRequested u=1 i=1 f=1 d=1 ull=1
+10:26:44.515  [fg-census] DLSSG.VSyncOn u=0 i=0 f=0 d=0 ull=0
+10:26:44.515  [fg-census] DLSSG.VSyncSupported u=0 i=0 f=0 d=0 ull=0
+10:26:44.515  [fg-census] DLSSG.VkOFAModeRequest u=1 i=1 f=1 d=1 ull=1
+10:26:44.515  [fg-census] DLSSG.Width u=5120 i=5120 f=5120 d=5120 ull=5120
+10:26:44.515  [fg-census] DLSSG.run_lowres_mvec_pass u=1 i=1 f=1 d=1 ull=1
+10:26:44.515  [fg-census] pass 3 ends.
+10:26:44.516  [fg-relay] open. Copy completion is signalled to the private queue on the GPU (exported timeline semaphore); the park release is set on the GPU (imported D3D12 fence). Pipeline=2 Import=1.
+10:26:44.517  [fg-relay] command pool for queue 000000002E803CD0: family=2.
+10:26:44.517  [fg-relay] armed by evaluate: hud=44563cd0 back=3dd5aed0 depth=445636d0 mv=445630d0 5120x2160 copy=1 nr=1 import=1 slot=1 arm=1 gpu-wait-nr=0 pending=0.
+10:26:44.517  [fg-relay] evaluate: slot=1 nr=1 import=1 stage=3.
+10:26:44.727  [fg-relay] frame=1 slot=1 nr=1 ok=1 wrote=1 nr_entries=0 import=1 armed=1 skipped=0 busy=0 mismatch=0 conflicts=0.
+10:26:44.732  NGX layer 4 retirement finalized.
+10:26:46.451  [fg-relay] armed by evaluate: hud=44563cd0 back=3dd542d0 depth=445636d0 mv=445630d0 5120x2160 copy=2 nr=2 import=1 slot=2 arm=2 gpu-wait-nr=1 pending=0.
+10:26:46.451  [fg-relay] evaluate: slot=2 nr=2 import=1 stage=3.
+10:26:46.557  [fg-relay] frame=2 slot=2 nr=2 ok=1 wrote=1 nr_entries=1 import=1 armed=2 skipped=0 busy=0 mismatch=0 conflicts=0.
+10:26:46.561  [fg-relay] armed by evaluate: hud=44563cd0 back=3dd50cd0 depth=445636d0 mv=445630d0 5120x2160 copy=3 nr=3 import=1 slot=3 arm=3 gpu-wait-nr=2 pending=1.
+10:26:46.561  [fg-relay] evaluate: slot=3 nr=3 import=1 stage=3.
+10:26:46.572  [fg-relay] frame=3 slot=3 nr=3 ok=1 wrote=1 nr_entries=2 import=1 armed=3 skipped=0 busy=0 mismatch=0 conflicts=0.
+10:26:59.489  [fg-relay] rate/15.0s p2 import_opt=1: presents=37.6/s present-gate[point=37.6 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=12.6/s armed=12.6/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=11.7/s flips=0.0/s
+10:26:59.489  [fg-relay] rate2: fginput eval=63.2/s index!=1=50.7/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=12.6/s consume=0.0/s inplace=12.6/s(ok 12.6/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=12.6/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=12.6/s ok=12.6/s fail=0.0/s nr_absent=0.1/s copyfail=0.0/s
+10:26:59.490  [fg-relay] rate3: arm->arm avg=56.49ms max=1934.04ms n=188 | arm->work avg=0.01ms max=0.02ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.006ms max=0.021ms | copy-land<= avg=56.77ms max=1933.52ms | work avg=6.09ms max=209.99ms | totals armed=189 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=189 conflicts=0
+10:26:59.490  [fg-relay] rate4: throttle depth=1 off=0 | sleep calls=37.5/s waits=12.2/s clear=25.3/s timeouts=0.1/s avg=33.91ms | present calls=37.6/s waits=0.0/s clear=0.0/s timeouts=0.0/s avg=0.00ms | max=106.73ms (process)
+10:27:00.150  === Vulkan CreateFeature1 #11  feature_id=18  VkDevice=000000002F8F00D0  thread 69676 ===
+10:27:00.150  === Vulkan CreateFeature1 #11 returned -1160773630, handle=0000000000000000 ===
+10:27:01.361  [fg-relay] command pool for queue 000000002E8028D0: family=0.
+10:27:14.529  [fg-relay] rate/15.0s p2 import_opt=1: presents=29.2/s present-gate[point=29.2 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=17.9/s armed=17.9/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=17.5/s flips=0.0/s
+10:27:14.530  [fg-relay] rate2: fginput eval=89.5/s index!=1=71.5/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=17.9/s consume=0.0/s inplace=17.9/s(ok 17.9/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=17.9/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=17.9/s ok=17.9/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+10:27:14.530  [fg-relay] rate3: arm->arm avg=65.49ms max=6224.84ms n=458 | arm->work avg=0.01ms max=0.02ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.032ms | copy-land<= avg=65.94ms max=6224.52ms | work avg=5.77ms max=209.99ms | totals armed=459 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=459 conflicts=0
+10:27:14.530  [fg-relay] rate4: throttle depth=1 off=0 | sleep calls=29.2/s waits=17.9/s clear=11.3/s timeouts=0.0/s avg=39.18ms | present calls=29.2/s waits=0.0/s clear=0.0/s timeouts=0.0/s avg=0.00ms | max=106.73ms (process)
+10:27:21.273  [bridge] 600 frames delivered so far.
+10:27:29.533  [fg-relay] rate/15.0s p2 import_opt=1: presents=20.8/s present-gate[point=20.8 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=20.8/s armed=20.8/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=20.8/s flips=0.0/s
+10:27:29.533  [fg-relay] rate2: fginput eval=104.0/s index!=1=83.2/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=20.8/s consume=0.0/s inplace=20.8/s(ok 20.8/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=20.8/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=20.8/s ok=20.8/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+10:27:29.533  [fg-relay] rate3: arm->arm avg=58.44ms max=6224.84ms n=770 | arm->work avg=0.01ms max=0.02ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.008ms max=0.032ms | copy-land<= avg=58.68ms max=6224.52ms | work avg=5.32ms max=209.99ms | totals armed=771 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=771 conflicts=0
+10:27:29.533  [fg-relay] rate4: throttle depth=1 off=0 | sleep calls=20.8/s waits=20.8/s clear=0.0/s timeouts=0.0/s avg=37.91ms | present calls=20.8/s waits=0.0/s clear=0.0/s timeouts=0.0/s avg=0.00ms | max=106.73ms (process)
+10:27:44.555  [fg-relay] rate/15.0s p2 import_opt=1: presents=20.8/s present-gate[point=20.8 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=20.8/s armed=20.8/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=20.7/s flips=0.0/s
+10:27:44.556  [fg-relay] rate2: fginput eval=103.9/s index!=1=83.1/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=20.8/s consume=0.0/s inplace=20.8/s(ok 20.8/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=20.8/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=20.8/s ok=20.8/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+10:27:44.556  [fg-relay] rate3: arm->arm avg=55.47ms max=6224.84ms n=1082 | arm->work avg=0.01ms max=0.02ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.008ms max=0.032ms | copy-land<= avg=55.63ms max=6224.52ms | work avg=5.14ms max=209.99ms | totals armed=1083 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=1083 conflicts=0
+10:27:44.556  [fg-relay] rate4: throttle depth=1 off=0 | sleep calls=20.8/s waits=20.8/s clear=0.0/s timeouts=0.0/s avg=38.75ms | present calls=20.8/s waits=0.0/s clear=0.0/s timeouts=0.0/s avg=0.00ms | max=106.73ms (process)
+10:27:50.044  [bridge] 1200 frames delivered so far.

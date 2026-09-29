@@ -1,0 +1,155 @@
+{
+  "trim_s": 3.0,
+  "captures": {
+    "serial_feed_pr51": {
+      "file": "evidence/raw/presentmon/serial-feed-2026-09-28.csv",
+      "process_id": "70480",
+      "span_s": 36.92,
+      "presents_per_s": 106.75,
+      "displayed_per_s": 59.49,
+      "real_frames_per_s": 21.72,
+      "MsBetweenPresents": {
+        "p50": 7.39,
+        "p95": 28.84,
+        "max": 41.85
+      },
+      "MsBetweenDisplayChange": {
+        "p50": 16.66,
+        "p95": 33.33,
+        "p99": 33.35,
+        "max": 50.03,
+        "ge25ms": 491,
+        "ge25ms_share": 22.36
+      },
+      "MsUntilDisplayed": {
+        "p50": 15.85,
+        "p95": 33.03
+      },
+      "MsPCLatency": {
+        "p50": 120.84,
+        "p95": 201.99,
+        "p99": 225.96
+      }
+    },
+    "relay_no_throttle_fgrelay9": {
+      "file": "evidence/raw/presentmon/relay-no-throttle-fgrelay9.csv",
+      "process_id": "22648",
+      "span_s": 36.92,
+      "presents_per_s": 119.26,
+      "displayed_per_s": 111.43,
+      "real_frames_per_s": 19.85,
+      "MsBetweenPresents": {
+        "p50": 8.36,
+        "p95": 9.05,
+        "max": 13.67
+      },
+      "MsBetweenDisplayChange": {
+        "p50": 8.34,
+        "p95": 16.66,
+        "p99": 16.69,
+        "max": 24.99,
+        "ge25ms": 0,
+        "ge25ms_share": 0.0
+      },
+      "MsUntilDisplayed": {
+        "p50": 17.47,
+        "p95": 19.37
+      },
+      "MsPCLatency": {
+        "p50": 245.78,
+        "p95": 268.5,
+        "p99": 273.84
+      }
+    },
+    "relay_throttle_fgrelay12": {
+      "file": "evidence/raw/presentmon/relay-throttle-fgrelay12.csv",
+      "process_id": "71264",
+      "span_s": 36.93,
+      "presents_per_s": 125.03,
+      "displayed_per_s": 112.68,
+      "real_frames_per_s": 20.85,
+      "MsBetweenPresents": {
+        "p50": 7.99,
+        "p95": 8.74,
+        "max": 32.57
+      },
+      "MsBetweenDisplayChange": {
+        "p50": 8.33,
+        "p95": 16.66,
+        "p99": 16.69,
+        "max": 33.31,
+        "ge25ms": 1,
+        "ge25ms_share": 0.02
+      },
+      "MsUntilDisplayed": {
+        "p50": 14.47,
+        "p95": 19.14
+      },
+      "MsPCLatency": {
+        "p50": 157.91,
+        "p95": 181.38,
+        "p99": 187.42
+      }
+    },
+    "nr_off": {
+      "file": "evidence/raw/presentmon/nr-off.csv",
+      "process_id": "22648",
+      "span_s": 36.96,
+      "presents_per_s": 269.04,
+      "displayed_per_s": 114.85,
+      "real_frames_per_s": 44.83,
+      "MsBetweenPresents": {
+        "p50": 3.7,
+        "p95": 4.39,
+        "max": 22.91
+      },
+      "MsBetweenDisplayChange": {
+        "p50": 8.33,
+        "p95": 16.65,
+        "p99": 16.69,
+        "max": 33.32,
+        "ge25ms": 1,
+        "ge25ms_share": 0.02
+      },
+      "MsUntilDisplayed": {
+        "p50": 13.12,
+        "p95": 20.12
+      },
+      "MsPCLatency": {
+        "p50": 81.12,
+        "p95": 101.88,
+        "p99": 109.19
+      }
+    },
+    "relay_no_throttle_driver_cap_100": {
+      "file": "evidence/raw/presentmon/relay-no-throttle-driver-cap-100.csv",
+      "process_id": "43760",
+      "span_s": 36.91,
+      "presents_per_s": 99.73,
+      "displayed_per_s": 93.82,
+      "real_frames_per_s": 16.69,
+      "MsBetweenPresents": {
+        "p50": 9.95,
+        "p95": 12.72,
+        "max": 50.24
+      },
+      "MsBetweenDisplayChange": {
+        "p50": 8.34,
+        "p95": 16.69,
+        "p99": 16.84,
+        "max": 58.31,
+        "ge25ms": 11,
+        "ge25ms_share": 0.32
+      },
+      "MsUntilDisplayed": {
+        "p50": 14.32,
+        "p95": 18.74
+      },
+      "MsPCLatency": {
+        "p50": 132.31,
+        "p95": 160.13,
+        "p99": 166.65
+      }
+    }
+  }
+}

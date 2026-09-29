@@ -1,0 +1,2 @@
+test-composite.cpp
+COMPOSITE scene_pixels=2868 opaque_ui_kept=192 translucent_blended=12 mismatches=0

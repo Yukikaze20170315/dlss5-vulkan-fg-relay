@@ -1,0 +1,29 @@
+{
+  "started_at": "2026-09-29T12:37:07.469758+08:00",
+  "finished_at": "2026-09-29T12:37:09.275308+08:00",
+  "command": [
+    "C:\\Users\\Administrator\\Documents\\ChatGPT\\DLSS 5 \u6cc4\u9732\u7248 \u76f8\u5173\u5f00\u53d1\\evidence\\pr-fg-relay-20260929\\tests\\lifetime-race-pr51\\host.exe",
+    "race"
+  ],
+  "exit_code": 0,
+  "expected_exit_code": 0,
+  "files": {
+    "host.exe": {
+      "source": "C:\\Users\\Administrator\\Documents\\ChatGPT\\DLSS 5 \u6cc4\u9732\u7248 \u76f8\u5173\u5f00\u53d1\\worktrees\\dlss5-bridge-vram-fix\\tests\\vulkan-fg-relay\\lifetime\\build\\host.exe",
+      "sha256": "aea5324513f20cb6f4ae5d59481d362ef9fe588ff471daed5305172e395e6fc2"
+    },
+    "renodx-dlss5.addon64": {
+      "source": "C:\\Users\\Administrator\\Documents\\ChatGPT\\DLSS 5 \u6cc4\u9732\u7248 \u76f8\u5173\u5f00\u53d1\\evidence\\pr-fg-relay-20260929\\assets\\renodx-dlss5.addon64",
+      "sha256": "dcd93881e976ad033d83c2bb01f4bc3e4ddc59c15fe0dd4ca165bc5fc7d1ac68"
+    },
+    "dlss5-bridge.addon64": {
+      "source": "C:\\Users\\Administrator\\Documents\\ChatGPT\\DLSS 5 \u6cc4\u9732\u7248 \u76f8\u5173\u5f00\u53d1\\dist\\pr-vulkan-fg-input-nr\\dlss5-bridge-1.4.13-pre8-vk-fginput.addon64",
+      "sha256": "01a835d5f7b3db494be8e2f1b948b7d56267f9fc3a2f2b8f08698a2aa33370d8"
+    },
+    "ReShade64.dll (loaded in place)": {
+      "source": "C:\\ProgramData\\ReShade\\ReShade64.dll",
+      "sha256": "0cee63f9c9f13f3ac909c5b4903f4dbb4b719a7ab3b4f13b0deaf83c814b94f7"
+    }
+  },
+  "scope": "Two Vulkan instances only; no device, swapchain, GPU workload or game."
+}

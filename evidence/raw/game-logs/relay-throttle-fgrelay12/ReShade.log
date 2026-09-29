@@ -1,0 +1,767 @@
+10:26:05:681 [39080] | INFO  | Initializing crosire's ReShade version '6.8.0.2155' (64-bit) loaded from 'C:\ProgramData\ReShade\ReShade64.dll' into 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\Endfield.exe' (0xC33449FE) ...
+10:26:05:681 [39080] | INFO  | Registering hooks for 'user32.dll' ...
+10:26:05:682 [39080] | INFO  | > Libraries loaded.
+10:26:05:683 [39080] | INFO  | > Found 21 match(es). Installing ...
+10:26:05:777 [39080] | INFO  | Registering hooks for 'C:\WINDOWS\system32\dinput.dll' ...
+10:26:05:778 [39080] | INFO  | > Delayed.
+10:26:05:778 [39080] | INFO  | Registering hooks for 'C:\WINDOWS\system32\dinput8.dll' ...
+10:26:05:778 [39080] | INFO  | > Delayed.
+10:26:05:778 [39080] | INFO  | Registering hooks for 'C:\WINDOWS\system32\d2d1.dll' ...
+10:26:05:779 [39080] | INFO  | > Delayed.
+10:26:05:779 [39080] | INFO  | Registering hooks for 'C:\WINDOWS\system32\d3d9.dll' ...
+10:26:05:779 [39080] | INFO  | > Libraries loaded.
+10:26:05:779 [39080] | INFO  | > Found 11 match(es). Installing ...
+10:26:05:871 [39080] | INFO  | Registering hooks for 'C:\WINDOWS\system32\d3d10.dll' ...
+10:26:05:871 [39080] | INFO  | > Delayed.
+10:26:05:872 [39080] | INFO  | Registering hooks for 'C:\WINDOWS\system32\d3d10_1.dll' ...
+10:26:05:872 [39080] | INFO  | > Delayed.
+10:26:05:872 [39080] | INFO  | Registering hooks for 'C:\WINDOWS\system32\d3d11.dll' ...
+10:26:05:872 [39080] | INFO  | > Delayed.
+10:26:05:872 [39080] | INFO  | Registering hooks for 'C:\WINDOWS\system32\d3d12.dll' ...
+10:26:05:872 [39080] | INFO  | > Delayed.
+10:26:05:872 [39080] | INFO  | Registering hooks for 'C:\WINDOWS\system32\dxgi.dll' ...
+10:26:05:872 [39080] | INFO  | > Libraries loaded.
+10:26:05:872 [39080] | INFO  | > Found 5 match(es). Installing ...
+10:26:05:970 [39080] | INFO  | Registering hooks for 'C:\WINDOWS\system32\opengl32.dll' ...
+10:26:05:970 [39080] | INFO  | > Delayed.
+10:26:05:970 [39080] | INFO  | Registering hooks for 'openvr_api.dll' ...
+10:26:05:970 [39080] | INFO  | > Delayed.
+10:26:05:970 [39080] | INFO  | Initialized.
+10:26:05:994 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014B9E0) ...
+10:26:05:996 [39080] | INFO  | Redirecting vkCreateInstance(pCreateInfo = 000000000014B820, pAllocator = 0000000000000000, pInstance = 000000000014BE18) ...
+10:26:05:996 [39080] | INFO  | > Dumping enabled instance extensions:
+10:26:05:996 [39080] | INFO  | Searching for add-ons (*.addon, *.addon64) in 'C:\Program Files\Hypergryph Launcher\games\Endfield Game' ...
+10:26:05:996 [39080] | INFO  | Loading add-on from 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\dlss5-bridge.addon64' ...
+10:26:06:009 [39080] | INFO  | Registered add-on "DLSS 5 Bridge 1.4.13-pre8-endfield1-vk-fgrelay12" v1.4.13.8119 using ReShade API version 18.
+10:26:06:060 [39080] | INFO  | Loading add-on from 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\renodx-dlss5.addon64' ...
+10:26:06:090 [39080] | INFO  | Registered add-on "DLSS 5 Neural Rendering" v0.2026.926.210 using ReShade API version 18.
+10:26:06:094 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NRGlobalTone=2.000000 is stored but has no effect: NR runtime 310.8 reads no global tone key, and the setting was removed in rc5
+10:26:06:096 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: DX11Source=auto (default): in a process that presents through Direct3D 11 the game's own Direct3D 11 DLSS is served through the Direct3D 11 bridge, unless a DX11 bridge add-on of another project is loaded, which keeps the foreign route
+10:26:06:097 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: DLSS5 active settings: intensity=2.000000 color_strength=1.000000 transfer=1.000000 paper_white=2.537500 preset=2 style=2 enabled=ON
+10:26:06:097 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: RenoDX DLSS5 Generic v8.5.0-rc10 (build Sep 26 2026 16:19:46) loaded (hotkeys: NR toggle Num *, screenshot F5) | ListStateMode=1 DedupeMode=1
+10:26:06:097 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: For support, share this ReShade.log and a screenshot of the addon's overlay status text. If the game itself crashes, also share RenoDX-DLSS5-crash.log next to the game's exe: it names the module that faulted.
+10:26:06:097 [39080] | DEBUG | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX D3D12 module copy [0]: Export not present: NVSDK_NGX_D3D12_EvaluateFeature_C
+10:26:06:097 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: detoured NGX module copy [0] C:\WINDOWS\System32\DriverStore\FileRepository\nv_dispsi.inf_amd64_b8459fc8f905f657\_nvngx.dll (core)
+10:26:06:097 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: D3D12 NGX hooks installed across 1 module copy(ies); inline DLSS contract capture armed
+10:26:06:098 [39080] | INFO  | Requesting new Vulkan instance for API version 1.1.
+10:26:06:099 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 00000000001412D8) ...
+10:26:06:101 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000141308) ...
+10:26:06:104 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000141308) ...
+10:26:06:159 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000140DB8) ...
+10:26:06:164 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000140DB8) ...
+10:26:06:166 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000010002570) ...
+10:26:06:167 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014E788) ...
+10:26:06:170 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014E788) ...
+10:26:06:173 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014E788) ...
+10:26:06:177 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014E788) ...
+10:26:06:209 [39080] | INFO  | Redirecting vkDestroyInstance(instance = 000000000441D9E0, pAllocator = 0000000000000000) ...
+10:26:06:209 [39080] | INFO  | Unloading add-on "DLSS 5 Bridge 1.4.13-pre8-endfield1-vk-fgrelay12" ...
+10:26:06:209 [39080] | WARN  | Add-on "DLSS 5 Bridge 1.4.13-pre8-endfield1-vk-fgrelay12" was not unregistered!
+10:26:06:209 [39080] | INFO  | Unloading add-on "DLSS 5 Neural Rendering" ...
+10:26:06:209 [39080] | INFO  | Unregistered add-on "DLSS 5 Neural Rendering".
+10:26:06:855 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 00000000001459D8) ...
+10:26:06:857 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000145A08) ...
+10:26:06:859 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000145A08) ...
+10:26:06:864 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000148E28) ...
+10:26:06:879 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014B7D0) ...
+10:26:06:881 [39080] | INFO  | Redirecting vkCreateInstance(pCreateInfo = 000000000014B610, pAllocator = 0000000000000000, pInstance = 000000000014BC08) ...
+10:26:06:881 [39080] | INFO  | > Dumping enabled instance extensions:
+10:26:06:881 [39080] | INFO  |   VK_KHR_get_physical_device_properties2
+10:26:06:881 [39080] | INFO  | Loading externally registered add-on "DLSS 5 Bridge 1.4.13-pre8-endfield1-vk-fgrelay12" ...
+10:26:06:881 [39080] | INFO  | Searching for add-ons (*.addon, *.addon64) in 'C:\Program Files\Hypergryph Launcher\games\Endfield Game' ...
+10:26:06:882 [39080] | INFO  | Loading add-on from 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\renodx-dlss5.addon64' ...
+10:26:06:909 [39080] | INFO  | Registered add-on "DLSS 5 Neural Rendering" v0.2026.926.210 using ReShade API version 18.
+10:26:06:909 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NRGlobalTone=2.000000 is stored but has no effect: NR runtime 310.8 reads no global tone key, and the setting was removed in rc5
+10:26:06:909 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: DX11Source=auto (default): in a process that presents through Direct3D 11 the game's own Direct3D 11 DLSS is served through the Direct3D 11 bridge, unless a DX11 bridge add-on of another project is loaded, which keeps the foreign route
+10:26:06:909 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: DLSS5 active settings: intensity=2.000000 color_strength=1.000000 transfer=1.000000 paper_white=2.537500 preset=2 style=2 enabled=ON
+10:26:06:909 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: RenoDX DLSS5 Generic v8.5.0-rc10 (build Sep 26 2026 16:19:46) loaded (hotkeys: NR toggle Num *, screenshot F5) | ListStateMode=1 DedupeMode=1
+10:26:06:910 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: For support, share this ReShade.log and a screenshot of the addon's overlay status text. If the game itself crashes, also share RenoDX-DLSS5-crash.log next to the game's exe: it names the module that faulted.
+10:26:06:910 [39080] | DEBUG | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX D3D12 module copy [0]: Export not present: NVSDK_NGX_D3D12_EvaluateFeature_C
+10:26:06:910 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: detoured NGX module copy [0] C:\WINDOWS\System32\DriverStore\FileRepository\nv_dispsi.inf_amd64_b8459fc8f905f657\_nvngx.dll (core)
+10:26:06:910 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: D3D12 NGX hooks installed across 1 module copy(ies); inline DLSS contract capture armed
+10:26:06:910 [39080] | INFO  | Requesting new Vulkan instance for API version 1.1.
+10:26:06:911 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 00000000001410F8) ...
+10:26:06:915 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 00000000001410F8) ...
+10:26:06:934 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000140BA8) ...
+10:26:06:936 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000140BA8) ...
+10:26:06:938 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014E5E8) ...
+10:26:06:941 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014E5E8) ...
+10:26:06:944 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014E5E8) ...
+10:26:06:949 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014E5E8) ...
+10:26:06:951 [39080] | INFO  | Redirecting vkDestroyInstance(instance = 000000007E7A50A0, pAllocator = 0000000000000000) ...
+10:26:06:951 [39080] | INFO  | Unloading add-on "DLSS 5 Bridge 1.4.13-pre8-endfield1-vk-fgrelay12" ...
+10:26:06:951 [39080] | INFO  | Unloading add-on "DLSS 5 Neural Rendering" ...
+10:26:06:952 [39080] | INFO  | Unregistered add-on "DLSS 5 Neural Rendering".
+10:26:06:995 [39080] | INFO  | Installing delayed hooks for 'C:\WINDOWS\system32\d3d12.dll' (Just loaded via LoadLibrary('C:\WINDOWS\SYSTEM32\d3d12.dll')) ...
+10:26:06:996 [39080] | INFO  | > Found 8 match(es). Installing ...
+10:26:07:125 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000000014EA00) ...
+10:26:07:161 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 00000000001480B8) ...
+10:26:07:186 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014AA60) ...
+10:26:07:188 [39080] | INFO  | Redirecting vkCreateInstance(pCreateInfo = 000000000014A8A0, pAllocator = 0000000000000000, pInstance = 000000000014AE98) ...
+10:26:07:188 [39080] | INFO  | > Dumping enabled instance extensions:
+10:26:07:188 [39080] | INFO  |   VK_KHR_surface
+10:26:07:188 [39080] | INFO  |   VK_KHR_win32_surface
+10:26:07:188 [39080] | INFO  | Loading externally registered add-on "DLSS 5 Bridge 1.4.13-pre8-endfield1-vk-fgrelay12" ...
+10:26:07:188 [39080] | INFO  | Searching for add-ons (*.addon, *.addon64) in 'C:\Program Files\Hypergryph Launcher\games\Endfield Game' ...
+10:26:07:189 [39080] | INFO  | Loading add-on from 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\renodx-dlss5.addon64' ...
+10:26:07:217 [39080] | INFO  | Registered add-on "DLSS 5 Neural Rendering" v0.2026.926.210 using ReShade API version 18.
+10:26:07:218 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NRGlobalTone=2.000000 is stored but has no effect: NR runtime 310.8 reads no global tone key, and the setting was removed in rc5
+10:26:07:218 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: DX11Source=auto (default): in a process that presents through Direct3D 11 the game's own Direct3D 11 DLSS is served through the Direct3D 11 bridge, unless a DX11 bridge add-on of another project is loaded, which keeps the foreign route
+10:26:07:218 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: DLSS5 active settings: intensity=2.000000 color_strength=1.000000 transfer=1.000000 paper_white=2.537500 preset=2 style=2 enabled=ON
+10:26:07:218 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: RenoDX DLSS5 Generic v8.5.0-rc10 (build Sep 26 2026 16:19:46) loaded (hotkeys: NR toggle Num *, screenshot F5) | ListStateMode=1 DedupeMode=1
+10:26:07:218 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: For support, share this ReShade.log and a screenshot of the addon's overlay status text. If the game itself crashes, also share RenoDX-DLSS5-crash.log next to the game's exe: it names the module that faulted.
+10:26:07:219 [39080] | DEBUG | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX D3D12 module copy [0]: Export not present: NVSDK_NGX_D3D12_EvaluateFeature_C
+10:26:07:219 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: detoured NGX module copy [0] C:\WINDOWS\System32\DriverStore\FileRepository\nv_dispsi.inf_amd64_b8459fc8f905f657\_nvngx.dll (core)
+10:26:07:219 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: D3D12 NGX hooks installed across 1 module copy(ies); inline DLSS contract capture armed
+10:26:07:219 [39080] | INFO  | Requesting new Vulkan instance for API version 1.1.
+10:26:07:220 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000140358) ...
+10:26:07:222 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000140388) ...
+10:26:07:226 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000140388) ...
+10:26:07:279 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 000000000013FE38) ...
+10:26:07:281 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 000000000013FE38) ...
+10:26:07:284 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014D878) ...
+10:26:07:287 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014D878) ...
+10:26:07:289 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014D878) ...
+10:26:07:292 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014D878) ...
+10:26:07:320 [13060] | INFO  | Redirecting Direct3DCreate9(SDKVersion = 0x20) ...
+10:26:08:562 [39080] | INFO  | Redirecting vkDestroyInstance(instance = 000000007FBBD840, pAllocator = 0000000000000000) ...
+10:26:08:562 [39080] | INFO  | Unloading add-on "DLSS 5 Bridge 1.4.13-pre8-endfield1-vk-fgrelay12" ...
+10:26:08:562 [39080] | INFO  | Unloading add-on "DLSS 5 Neural Rendering" ...
+10:26:08:563 [39080] | INFO  | Unregistered add-on "DLSS 5 Neural Rendering".
+10:26:08:586 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000148108) ...
+10:26:08:605 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014AAB0) ...
+10:26:08:607 [39080] | INFO  | Redirecting vkCreateInstance(pCreateInfo = 000000000014A8F0, pAllocator = 0000000000000000, pInstance = 000000000014AEE8) ...
+10:26:08:607 [39080] | INFO  | > Dumping enabled instance extensions:
+10:26:08:607 [39080] | INFO  |   VK_KHR_surface
+10:26:08:607 [39080] | INFO  |   VK_KHR_win32_surface
+10:26:08:607 [39080] | INFO  | Loading externally registered add-on "DLSS 5 Bridge 1.4.13-pre8-endfield1-vk-fgrelay12" ...
+10:26:08:608 [39080] | INFO  | Searching for add-ons (*.addon, *.addon64) in 'C:\Program Files\Hypergryph Launcher\games\Endfield Game' ...
+10:26:08:608 [39080] | INFO  | Loading add-on from 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\renodx-dlss5.addon64' ...
+10:26:08:637 [39080] | INFO  | Registered add-on "DLSS 5 Neural Rendering" v0.2026.926.210 using ReShade API version 18.
+10:26:08:637 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NRGlobalTone=2.000000 is stored but has no effect: NR runtime 310.8 reads no global tone key, and the setting was removed in rc5
+10:26:08:637 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: DX11Source=auto (default): in a process that presents through Direct3D 11 the game's own Direct3D 11 DLSS is served through the Direct3D 11 bridge, unless a DX11 bridge add-on of another project is loaded, which keeps the foreign route
+10:26:08:637 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: DLSS5 active settings: intensity=2.000000 color_strength=1.000000 transfer=1.000000 paper_white=2.537500 preset=2 style=2 enabled=ON
+10:26:08:638 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: RenoDX DLSS5 Generic v8.5.0-rc10 (build Sep 26 2026 16:19:46) loaded (hotkeys: NR toggle Num *, screenshot F5) | ListStateMode=1 DedupeMode=1
+10:26:08:638 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: For support, share this ReShade.log and a screenshot of the addon's overlay status text. If the game itself crashes, also share RenoDX-DLSS5-crash.log next to the game's exe: it names the module that faulted.
+10:26:08:638 [39080] | DEBUG | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX D3D12 module copy [0]: Export not present: NVSDK_NGX_D3D12_EvaluateFeature_C
+10:26:08:638 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: detoured NGX module copy [0] C:\WINDOWS\System32\DriverStore\FileRepository\nv_dispsi.inf_amd64_b8459fc8f905f657\_nvngx.dll (core)
+10:26:08:638 [39080] | DEBUG | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX D3D12 module copy [1]: Export not present: NVSDK_NGX_D3D12_EvaluateFeature_C
+10:26:08:638 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: detoured NGX module copy [1] C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlssd.dll
+10:26:08:638 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: D3D12 NGX hooks installed across 2 module copy(ies); inline DLSS contract capture armed
+10:26:08:639 [39080] | INFO  | Requesting new Vulkan instance for API version 1.1.
+10:26:08:640 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 00000000001403A8) ...
+10:26:08:642 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 00000000001403D8) ...
+10:26:08:645 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 00000000001403D8) ...
+10:26:08:671 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 000000000013FE88) ...
+10:26:08:675 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 000000000013FE88) ...
+10:26:08:678 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014D8C8) ...
+10:26:08:682 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014D8C8) ...
+10:26:08:685 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014D8C8) ...
+10:26:08:689 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014D8C8) ...
+10:26:08:702 [39080] | INFO  | Redirecting vkDestroyInstance(instance = 000000007FBBD840, pAllocator = 0000000000000000) ...
+10:26:08:702 [39080] | INFO  | Unloading add-on "DLSS 5 Bridge 1.4.13-pre8-endfield1-vk-fgrelay12" ...
+10:26:08:703 [39080] | INFO  | Unloading add-on "DLSS 5 Neural Rendering" ...
+10:26:08:703 [39080] | INFO  | Unregistered add-on "DLSS 5 Neural Rendering".
+10:26:08:723 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000148068) ...
+10:26:08:738 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014AA10) ...
+10:26:08:741 [39080] | INFO  | Redirecting vkCreateInstance(pCreateInfo = 000000000014A850, pAllocator = 0000000000000000, pInstance = 000000000014AE48) ...
+10:26:08:741 [39080] | INFO  | > Dumping enabled instance extensions:
+10:26:08:741 [39080] | INFO  |   VK_KHR_surface
+10:26:08:741 [39080] | INFO  |   VK_KHR_win32_surface
+10:26:08:741 [39080] | INFO  | Loading externally registered add-on "DLSS 5 Bridge 1.4.13-pre8-endfield1-vk-fgrelay12" ...
+10:26:08:741 [39080] | INFO  | Searching for add-ons (*.addon, *.addon64) in 'C:\Program Files\Hypergryph Launcher\games\Endfield Game' ...
+10:26:08:742 [39080] | INFO  | Loading add-on from 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\renodx-dlss5.addon64' ...
+10:26:08:774 [39080] | INFO  | Registered add-on "DLSS 5 Neural Rendering" v0.2026.926.210 using ReShade API version 18.
+10:26:08:775 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NRGlobalTone=2.000000 is stored but has no effect: NR runtime 310.8 reads no global tone key, and the setting was removed in rc5
+10:26:08:775 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: DX11Source=auto (default): in a process that presents through Direct3D 11 the game's own Direct3D 11 DLSS is served through the Direct3D 11 bridge, unless a DX11 bridge add-on of another project is loaded, which keeps the foreign route
+10:26:08:775 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: DLSS5 active settings: intensity=2.000000 color_strength=1.000000 transfer=1.000000 paper_white=2.537500 preset=2 style=2 enabled=ON
+10:26:08:775 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: RenoDX DLSS5 Generic v8.5.0-rc10 (build Sep 26 2026 16:19:46) loaded (hotkeys: NR toggle Num *, screenshot F5) | ListStateMode=1 DedupeMode=1
+10:26:08:775 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: For support, share this ReShade.log and a screenshot of the addon's overlay status text. If the game itself crashes, also share RenoDX-DLSS5-crash.log next to the game's exe: it names the module that faulted.
+10:26:08:776 [39080] | DEBUG | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX D3D12 module copy [0]: Export not present: NVSDK_NGX_D3D12_EvaluateFeature_C
+10:26:08:776 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: detoured NGX module copy [0] C:\WINDOWS\System32\DriverStore\FileRepository\nv_dispsi.inf_amd64_b8459fc8f905f657\_nvngx.dll (core)
+10:26:08:776 [39080] | DEBUG | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX D3D12 module copy [1]: Export not present: NVSDK_NGX_D3D12_EvaluateFeature_C
+10:26:08:776 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: detoured NGX module copy [1] C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlssd.dll
+10:26:08:776 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: D3D12 NGX hooks installed across 2 module copy(ies); inline DLSS contract capture armed
+10:26:08:776 [39080] | INFO  | Requesting new Vulkan instance for API version 1.1.
+10:26:08:777 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000140308) ...
+10:26:08:780 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000140338) ...
+10:26:08:784 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000140338) ...
+10:26:08:811 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 000000000013FDE8) ...
+10:26:08:815 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 000000000013FDE8) ...
+10:26:08:819 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014D828) ...
+10:26:08:824 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014D828) ...
+10:26:08:829 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014D828) ...
+10:26:08:833 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014D828) ...
+10:26:08:850 [39080] | INFO  | Redirecting vkDestroyInstance(instance = 000000007FBBD840, pAllocator = 0000000000000000) ...
+10:26:08:851 [39080] | INFO  | Unloading add-on "DLSS 5 Bridge 1.4.13-pre8-endfield1-vk-fgrelay12" ...
+10:26:08:851 [39080] | INFO  | Unloading add-on "DLSS 5 Neural Rendering" ...
+10:26:08:851 [39080] | INFO  | Unregistered add-on "DLSS 5 Neural Rendering".
+10:26:08:882 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000145668) ...
+10:26:08:885 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000145698) ...
+10:26:08:888 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000145698) ...
+10:26:08:891 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000145408) ...
+10:26:08:894 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000145408) ...
+10:26:08:898 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 00000000001487D8) ...
+10:26:08:918 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014B1C0) ...
+10:26:08:921 [39080] | INFO  | Redirecting vkCreateInstance(pCreateInfo = 000000000014B030, pAllocator = 0000000000000000, pInstance = 000000000014B5B8) ...
+10:26:08:921 [39080] | INFO  | > Dumping enabled instance extensions:
+10:26:08:921 [39080] | INFO  |   VK_KHR_get_physical_device_properties2
+10:26:08:921 [39080] | INFO  |   VK_KHR_external_semaphore_capabilities
+10:26:08:921 [39080] | INFO  |   VK_EXT_surface_maintenance1
+10:26:08:921 [39080] | INFO  |   VK_KHR_external_memory_capabilities
+10:26:08:922 [39080] | INFO  |   VK_KHR_win32_surface
+10:26:08:922 [39080] | INFO  |   VK_KHR_surface
+10:26:08:922 [39080] | INFO  |   VK_KHR_get_surface_capabilities2
+10:26:08:922 [39080] | INFO  | Loading externally registered add-on "DLSS 5 Bridge 1.4.13-pre8-endfield1-vk-fgrelay12" ...
+10:26:08:922 [39080] | INFO  | Searching for add-ons (*.addon, *.addon64) in 'C:\Program Files\Hypergryph Launcher\games\Endfield Game' ...
+10:26:08:922 [39080] | INFO  | Loading add-on from 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\renodx-dlss5.addon64' ...
+10:26:08:952 [39080] | INFO  | Registered add-on "DLSS 5 Neural Rendering" v0.2026.926.210 using ReShade API version 18.
+10:26:08:953 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NRGlobalTone=2.000000 is stored but has no effect: NR runtime 310.8 reads no global tone key, and the setting was removed in rc5
+10:26:08:953 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: DX11Source=auto (default): in a process that presents through Direct3D 11 the game's own Direct3D 11 DLSS is served through the Direct3D 11 bridge, unless a DX11 bridge add-on of another project is loaded, which keeps the foreign route
+10:26:08:953 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: DLSS5 active settings: intensity=2.000000 color_strength=1.000000 transfer=1.000000 paper_white=2.537500 preset=2 style=2 enabled=ON
+10:26:08:953 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: RenoDX DLSS5 Generic v8.5.0-rc10 (build Sep 26 2026 16:19:46) loaded (hotkeys: NR toggle Num *, screenshot F5) | ListStateMode=1 DedupeMode=1
+10:26:08:953 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: For support, share this ReShade.log and a screenshot of the addon's overlay status text. If the game itself crashes, also share RenoDX-DLSS5-crash.log next to the game's exe: it names the module that faulted.
+10:26:08:953 [39080] | DEBUG | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX D3D12 module copy [0]: Export not present: NVSDK_NGX_D3D12_EvaluateFeature_C
+10:26:08:954 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: detoured NGX module copy [0] C:\WINDOWS\System32\DriverStore\FileRepository\nv_dispsi.inf_amd64_b8459fc8f905f657\_nvngx.dll (core)
+10:26:08:954 [39080] | DEBUG | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX D3D12 module copy [1]: Export not present: NVSDK_NGX_D3D12_EvaluateFeature_C
+10:26:08:954 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: detoured NGX module copy [1] C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlssd.dll
+10:26:08:954 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: D3D12 NGX hooks installed across 2 module copy(ies); inline DLSS contract capture armed
+10:26:08:954 [39080] | INFO  | Requesting new Vulkan instance for API version 1.3.
+10:26:08:955 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000140B18) ...
+10:26:08:958 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000140B18) ...
+10:26:08:981 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 00000000001405C8) ...
+10:26:08:985 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 00000000001405C8) ...
+10:26:08:989 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014E698) ...
+10:26:08:993 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {C1B6694F-FF09-44A9-B03C-77900A0A1D17}, ppFactory = 000000000014E698) ...
+10:26:10:118 [39080] | INFO  | Redirecting vkCreateDevice(physicalDevice = 0000000124520F90, pCreateInfo = 000000000014E210, pAllocator = 0000000000000000, pDevice = 000000000014E1E8) ...
+10:26:10:118 [39080] | INFO  | > Dumping enabled device extensions:
+10:26:10:118 [39080] | INFO  |   VK_KHR_swapchain
+10:26:10:118 [39080] | INFO  |   VK_KHR_timeline_semaphore
+10:26:10:118 [39080] | INFO  |   VK_KHR_push_descriptor
+10:26:10:118 [39080] | INFO  |   VK_NVX_binary_import
+10:26:10:118 [39080] | INFO  |   VK_NVX_image_view_handle
+10:26:10:119 [39080] | INFO  |   VK_KHR_buffer_device_address
+10:26:10:119 [39080] | INFO  |   VK_NV_low_latency
+10:26:10:119 [39080] | INFO  |   VK_NV_low_latency2
+10:26:10:119 [39080] | INFO  |   VK_NV_optical_flow
+10:26:10:119 [39080] | INFO  |   VK_KHR_external_semaphore
+10:26:10:119 [39080] | INFO  |   VK_KHR_maintenance4
+10:26:10:119 [39080] | INFO  |   VK_KHR_external_memory_win32
+10:26:10:119 [39080] | INFO  |   VK_KHR_external_memory
+10:26:10:119 [39080] | INFO  |   VK_KHR_external_semaphore_win32
+10:26:10:119 [39080] | INFO  |   VK_EXT_swapchain_maintenance1
+10:26:10:119 [39080] | INFO  |   VK_KHR_present_wait
+10:26:10:119 [39080] | INFO  |   VK_KHR_present_id
+10:26:10:119 [39080] | INFO  |   VK_KHR_fragment_shading_rate
+10:26:10:119 [39080] | INFO  |   VK_NV_shader_subgroup_partitioned
+10:26:10:119 [39080] | INFO  |   VK_EXT_memory_budget
+10:26:10:320 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000142258) ...
+10:26:10:324 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 0000000000142258) ...
+10:26:10:328 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX module scan (loaded copies):
+  _nvngx.dll
+  nvngx_dlssg.dll
+  nvngx_deepdvc.dll
+  nvngx_dlssd.dll
+
+10:26:10:329 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: detoured NGX Vulkan module copy [0] C:\WINDOWS\System32\DriverStore\FileRepository\nv_dispsi.inf_amd64_b8459fc8f905f657\_nvngx.dll (core)
+10:26:10:329 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: detoured NGX Vulkan module copy [1] C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlssd.dll
+10:26:10:329 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: Vulkan NGX hooks installed across 2 module(s); the game's Vulkan DLSS evaluates are observed
+10:26:10:330 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: Vulkan instance and physical device captured for NR's own Vulkan Init
+10:26:10:330 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: Vulkan device creation supplied NR context independently of NGX Init
+10:26:10:336 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: Vulkan NGX hook entered: Init
+10:26:11:930 [39080] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: Vulkan native barrier observers: resolved=4 attached=4 failed=0; exact input layouts are observed
+10:26:12:051 [39080] | INFO  | Installing delayed hooks for 'C:\WINDOWS\system32\d3d11.dll' (Just loaded via LoadLibrary('C:\WINDOWS\SYSTEM32\d3d11.dll')) ...
+10:26:12:051 [39080] | INFO  | > Found 3 match(es). Installing ...
+10:26:12:208 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000000014F668) ...
+10:26:12:216 [39080] | INFO  | Redirecting vkCreateWin32SurfaceKHR(instance = 000000012449E850, pCreateInfo = 000000000014F600, pAllocator = 0000000000000000, pSurface = 0000000290138710) ...
+10:26:12:227 [39080] | INFO  | Redirecting vkCreateSwapchainKHR(device = 000000002F8F00D0, pCreateInfo = 000000000014F2C0, pAllocator = 0000000000000000, pSwapchain = 0000000290733530) ...
+10:26:12:227 [39080] | INFO  | > Dumping swap chain description:
+10:26:12:227 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:12:227 [39080] | INFO  |   | Parameter                               | Value                                   |
+10:26:12:227 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:12:227 [39080] | INFO  |   | flags                                   | 0x4                                     |
+10:26:12:227 [39080] | INFO  |   | surface                                 | 0000000134E07C90                        |
+10:26:12:228 [39080] | INFO  |   | minImageCount                           | 3                                       |
+10:26:12:228 [39080] | INFO  |   | imageFormat                             | VK_FORMAT_R8G8B8A8_UNORM                |
+10:26:12:228 [39080] | INFO  |   | imageColorSpace                         | VK_COLOR_SPACE_SRGB_NONLINEAR_KHR       |
+10:26:12:228 [39080] | INFO  |   | imageExtent                             | 5120                2160                |
+10:26:12:228 [39080] | INFO  |   | imageArrayLayers                        | 1                                       |
+10:26:12:228 [39080] | INFO  |   | imageUsage                              | 0x1b                                    |
+10:26:12:228 [39080] | INFO  |   | imageSharingMode                        | 0                                       |
+10:26:12:228 [39080] | INFO  |   | queueFamilyIndexCount                   | 0                                       |
+10:26:12:228 [39080] | INFO  |   | preTransform                            | 0x1                                     |
+10:26:12:229 [39080] | INFO  |   | compositeAlpha                          | 0x1                                     |
+10:26:12:229 [39080] | INFO  |   | presentMode                             | 2                                       |
+10:26:12:229 [39080] | INFO  |   | clipped                                 | true                                    |
+10:26:12:229 [39080] | INFO  |   | oldSwapchain                            | 0000000000000000                        |
+10:26:12:229 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:12:229 [39080] | INFO  | Redirecting CreateDXGIFactory2(Flags = 0, riid = {A4966EED-76DB-44DA-84C1-EE9A7AFB20A8}, ppFactory = 000000002E8D1178) ...
+10:26:12:235 [39080] | INFO  | Redirecting CreateDXGIFactory2(Flags = 0x80000000, riid = {1BC6EA02-EF36-464F-BF0C-21CA39E5168A}, ppFactory = 000000000014E3E8) ...
+10:26:12:509 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000000014E7F0) ...
+10:26:12:512 [39080] | INFO  | Installing delayed hooks for 'C:\WINDOWS\system32\opengl32.dll' (Just loaded via LoadLibrary('C:\WINDOWS\SYSTEM32\opengl32.dll')) ...
+10:26:12:513 [39080] | INFO  | > Found 360 match(es). Installing ...
+10:26:12:663 [39080] | INFO  | Running on NVIDIA GeForce RTX 5090 Driver 616.92.
+10:26:13:055 [39080] | INFO  | Recreated runtime environment on runtime 000000013E291BE0 ('C:\Program Files\Hypergryph Launcher\games\Endfield Game\ReShade.ini').
+10:26:13:323 [39080] | INFO  | Redirecting vkCreateSwapchainKHR(device = 000000002F8F00D0, pCreateInfo = 000000000014F4B0, pAllocator = 0000000000000000, pSwapchain = 000000029073AFD0) ...
+10:26:13:323 [39080] | INFO  | > Dumping swap chain description:
+10:26:13:323 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:13:323 [39080] | INFO  |   | Parameter                               | Value                                   |
+10:26:13:323 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:13:323 [39080] | INFO  |   | flags                                   | 0x4                                     |
+10:26:13:324 [39080] | INFO  |   | surface                                 | 0000000134E07C90                        |
+10:26:13:324 [39080] | INFO  |   | minImageCount                           | 3                                       |
+10:26:13:324 [39080] | INFO  |   | imageFormat                             | VK_FORMAT_R8G8B8A8_UNORM                |
+10:26:13:324 [39080] | INFO  |   | imageColorSpace                         | VK_COLOR_SPACE_SRGB_NONLINEAR_KHR       |
+10:26:13:324 [39080] | INFO  |   | imageExtent                             | 5120                2160                |
+10:26:13:324 [39080] | INFO  |   | imageArrayLayers                        | 1                                       |
+10:26:13:324 [39080] | INFO  |   | imageUsage                              | 0x1b                                    |
+10:26:13:324 [39080] | INFO  |   | imageSharingMode                        | 0                                       |
+10:26:13:324 [39080] | INFO  |   | queueFamilyIndexCount                   | 0                                       |
+10:26:13:324 [39080] | INFO  |   | preTransform                            | 0x1                                     |
+10:26:13:324 [39080] | INFO  |   | compositeAlpha                          | 0x1                                     |
+10:26:13:325 [39080] | INFO  |   | presentMode                             | 2                                       |
+10:26:13:325 [39080] | INFO  |   | clipped                                 | true                                    |
+10:26:13:325 [39080] | INFO  |   | oldSwapchain                            | 000000003A0350D0                        |
+10:26:13:325 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:13:330 [39080] | INFO  | Destroyed runtime environment on runtime 000000013E291BE0 ('C:\Program Files\Hypergryph Launcher\games\Endfield Game\ReShade.ini').
+10:26:13:338 [39080] | INFO  | Recreated runtime environment on runtime 000000013E291BE0 ('C:\Program Files\Hypergryph Launcher\games\Endfield Game\ReShade.ini').
+10:26:13:338 [39080] | INFO  | Redirecting vkDestroySwapchainKHR(device = 000000002F8F00D0, swapchain = 000000003A0350D0, pAllocator = 0000000000000000) ...
+10:26:13:439 [69676] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-VERDICT v3 state=NOT_ENGAGED stage=dlss_feature_seen reason=- missing=- seen=0 eligible=0 evals=0 ratio=0.0000 unaccounted=0 submitted=0 presents=1 build=v8.5.0-rc10 trigger=change api=vulkan path=inline
+10:26:13:440 [69676] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-CARD v1 card=starting tone=idle trigger=change
+10:26:13:463 [66988] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\Daltonize.fx' in 0.018000 s.
+10:26:13:466 [33184] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\LUT.fx' in 0.020000 s.
+10:26:13:466 [ 9776] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\DisplayDepth.fx' in 0.021000 s.
+10:26:13:467 [62748] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\DPX.fx' in 0.020000 s.
+10:26:13:467 [62400] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Border.fx' in 0.020000 s.
+10:26:13:468 [38580] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Curves.fx' in 0.021000 s.
+10:26:13:468 [64156] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\CAS.fx' in 0.021000 s.
+10:26:13:469 [72600] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ASCII.fx' in 0.023000 s.
+10:26:13:469 [71836] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ColorMatrix.fx' in 0.021000 s.
+10:26:13:469 [71888] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Cartoon.fx' in 0.022000 s.
+10:26:13:469 [71164] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FakeHDR.fx' in 0.022000 s.
+10:26:13:470 [59436] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FilmGrain.fx' in 0.022000 s.
+10:26:13:470 [67940] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Levels.fx' in 0.022000 s.
+10:26:13:470 [ 2356] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ChromaticAberration.fx' in 0.023000 s.
+10:26:13:470 [69284] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\CRT.fx' in 0.024000 s.
+10:26:13:471 [39080] | INFO  | Redirecting vkCreateSwapchainKHR(device = 000000002F8F00D0, pCreateInfo = 000000000014F1D0, pAllocator = 0000000000000000, pSwapchain = 0000000290733530) ...
+10:26:13:471 [39080] | INFO  | > Dumping swap chain description:
+10:26:13:471 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:13:471 [39080] | INFO  |   | Parameter                               | Value                                   |
+10:26:13:472 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:13:472 [39080] | INFO  |   | flags                                   | 0x4                                     |
+10:26:13:472 [39080] | INFO  |   | surface                                 | 0000000134E07C90                        |
+10:26:13:472 [39080] | INFO  |   | minImageCount                           | 3                                       |
+10:26:13:472 [39080] | INFO  |   | imageFormat                             | VK_FORMAT_R8G8B8A8_UNORM                |
+10:26:13:472 [39080] | INFO  |   | imageColorSpace                         | VK_COLOR_SPACE_SRGB_NONLINEAR_KHR       |
+10:26:13:472 [39080] | INFO  |   | imageExtent                             | 5120                2160                |
+10:26:13:472 [51936] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\LiftGammaGain.fx' in 0.023000 s.
+10:26:13:472 [65204] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\LumaSharpen.fx' in 0.023000 s.
+10:26:13:472 [39080] | INFO  |   | imageArrayLayers                        | 1                                       |
+10:26:13:473 [24892] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Monochrome.fx' in 0.023000 s.
+10:26:13:473 [39080] | INFO  |   | imageUsage                              | 0x1b                                    |
+10:26:13:473 [39080] | INFO  |   | imageSharingMode                        | 0                                       |
+10:26:13:473 [39080] | INFO  |   | queueFamilyIndexCount                   | 0                                       |
+10:26:13:473 [68132] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Sepia.fx' in 0.023000 s.
+10:26:13:473 [39080] | INFO  |   | preTransform                            | 0x1                                     |
+10:26:13:473 [39080] | INFO  |   | compositeAlpha                          | 0x1                                     |
+10:26:13:473 [68152] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Technicolor.fx' in 0.022000 s.
+10:26:13:473 [39080] | INFO  |   | presentMode                             | 2                                       |
+10:26:13:474 [39080] | INFO  |   | clipped                                 | true                                    |
+10:26:13:474 [39080] | INFO  |   | oldSwapchain                            | 000000003A035AD0                        |
+10:26:13:474 [65012] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Technicolor2.fx' in 0.022000 s.
+10:26:13:474 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:13:474 [28028] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\vk-present-adapter-effects\AdapterEvents.fx' in 0.020000 s.
+10:26:13:474 [53732] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Tonemap.fx' in 0.022000 s.
+10:26:13:474 [50144] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Vibrance.fx' in 0.022000 s.
+10:26:13:474 [68480] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Nostalgia.fx' in 0.024000 s.
+10:26:13:474 [39604] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Vignette.fx' in 0.021000 s.
+10:26:13:476 [67436] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Compare.fx' in 0.030000 s.
+10:26:13:476 [42724] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Splitscreen.fx' in 0.025000 s.
+10:26:13:476 [70688] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FXAA.fx' in 0.028000 s.
+10:26:13:476 [ 3496] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\UIMask.fx' in 0.023000 s.
+10:26:13:476 [66988] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\Deband.fx' in 0.013000 s.
+10:26:13:479 [37628] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\SMAA.fx' in 0.028000 s.
+10:26:13:486 [39080] | INFO  | Destroyed runtime environment on runtime 000000013E291BE0 ('C:\Program Files\Hypergryph Launcher\games\Endfield Game\ReShade.ini').
+10:26:13:493 [39080] | INFO  | Recreated runtime environment on runtime 000000013E291BE0 ('C:\Program Files\Hypergryph Launcher\games\Endfield Game\ReShade.ini').
+10:26:13:494 [39080] | INFO  | Redirecting vkDestroySwapchainKHR(device = 000000002F8F00D0, swapchain = 000000003A035AD0, pAllocator = 0000000000000000) ...
+10:26:13:633 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000000014E998) ...
+10:26:13:635 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000000014E998) ...
+10:26:13:636 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000000014E998) ...
+10:26:13:637 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000000014E998) ...
+10:26:13:639 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000000014E998) ...
+10:26:13:640 [39080] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000000014E998) ...
+10:26:13:993 [63448] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F347E898) ...
+10:26:13:996 [63448] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F347E898) ...
+10:26:13:998 [63448] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F347E898) ...
+10:26:14:001 [63448] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F347E898) ...
+10:26:14:003 [63448] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F347E898) ...
+10:26:14:006 [63448] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F347E898) ...
+10:26:14:934 [37784] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000017FE8FA78) ...
+10:26:14:936 [37784] | INFO  | Redirecting D3D12CreateDevice(pAdapter = 0000000000000000, MinimumFeatureLevel = c000, riid = {189819F1-1DB6-4B57-BE54-1821339B85F7}, ppDevice = 000000017FE8FAE8) ...
+10:26:14:936 [37784] | INFO  | Redirecting CreateDXGIFactory2(Flags = 0x80000000, riid = {1BC6EA02-EF36-464F-BF0C-21CA39E5168A}, ppFactory = 000000017FE8F478) ...
+10:26:14:940 [60304] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\Daltonize.fx' in 0.001000 s.
+10:26:14:941 [65296] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\LUT.fx' in 0.001000 s.
+10:26:14:941 [59336] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\DisplayDepth.fx' in 0.001000 s.
+10:26:14:941 [72204] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Border.fx' in 0.001000 s.
+10:26:14:942 [69616] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Cartoon.fx' in 0.001000 s.
+10:26:14:942 [60304] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\Deband.fx' in 0.001000 s.
+10:26:14:942 [56728] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ASCII.fx' in 0.002000 s.
+10:26:14:942 [66852] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ChromaticAberration.fx' in 0.000000 s.
+10:26:14:942 [64936] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\CAS.fx' in 0.001000 s.
+10:26:14:943 [39652] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ColorMatrix.fx' in 0.000000 s.
+10:26:14:944 [64920] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Compare.fx' in 0.001000 s.
+10:26:14:944 [13300] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Curves.fx' in 0.000000 s.
+10:26:14:944 [46600] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\CRT.fx' in 0.001000 s.
+10:26:14:944 [37784] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: birth-time observation installed on the D3D12 device vtable: ID3D12Device::CreateCommandList verified detoured - lists created from here on carry a KNOWN compute-state baseline from their first instruction
+10:26:14:946 [67180] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\DPX.fx' in 0.001000 s.
+10:26:14:946 [60836] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FakeHDR.fx' in 0.001000 s.
+10:26:14:946 [21752] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FilmGrain.fx' in 0.001000 s.
+10:26:14:947 [18828] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Levels.fx' in 0.001000 s.
+10:26:14:947 [71000] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Monochrome.fx' in 0.001000 s.
+10:26:14:947 [68184] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\LiftGammaGain.fx' in 0.000000 s.
+10:26:14:947 [46268] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\LumaSharpen.fx' in 0.001000 s.
+10:26:14:948 [66076] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Sepia.fx' in 0.000000 s.
+10:26:14:948 [14544] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FXAA.fx' in 0.003000 s.
+10:26:14:948 [68344] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Nostalgia.fx' in 0.001000 s.
+10:26:14:948 [70756] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Splitscreen.fx' in 0.000000 s.
+10:26:14:948 [58296] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Technicolor.fx' in 0.000000 s.
+10:26:14:949 [64448] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Technicolor2.fx' in 0.000000 s.
+10:26:14:949 [53092] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Tonemap.fx' in 0.001000 s.
+10:26:14:950 [ 5576] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Vibrance.fx' in 0.000000 s.
+10:26:14:950 [41180] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Vignette.fx' in 0.000000 s.
+10:26:14:950 [42748] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\SMAA.fx' in 0.003000 s.
+10:26:14:950 [69604] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\UIMask.fx' in 0.000000 s.
+10:26:14:950 [14544] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Layer.fx' in 0.002000 s.
+10:26:14:950 [71588] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\vk-present-adapter-effects\AdapterEvents.fx' in 0.000000 s.
+10:26:15:252 [37784] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR runtime declares file version 310.8.0.0, GPU architecture NVSDK_NGX_GPU_Arch_Blackwell2, minimum driver 615.00; NVIDIA driver 616.92; NVIDIA GPU device 0x2B85 (Blackwell or newer); declarations only - the runtime's start line says whether NR started
+10:26:15:252 [37784] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: signed runtime sha256 E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E (reference match), file version 310.8.0.0
+10:26:15:253 [37784] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: signed NR runtime (nvngx_dlssnr.dll) pre-loaded at device init
+10:26:15:253 [37784] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: first destroy_device observed: api=d3d12 native=0x13dcdaab0 tracked=0x0
+10:26:15:253 [37784] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: telemetry t=1.81s win=1.81s presents=1 ticks=2 fps=0.55 frame_ms[avg=1497.38 p50=100.25 p99=100.25 max=1497.38] nr[evals=0 cpu_us_avg=0.00 cpu_us_max=0.00] own_mib[live=0 retired=0 unproven=0 hist=0 present=0 bridge=0 vk=0 live_max=0] worksets[live=0 orphan=0 evicted=0 recycled=0 idle_retired=0 ] retired[ws=0 nr=0 oldest_ticks=0 unproven_ws=0 unproven_nr=0 oldest_unproven_ticks=0] lifetime[ws +0 -0 ~0 nr +0 -0 ~0] features=0 slots=0 queues=0[idle2s=0 faulted=0] lease_probe=none tracker[lists=0 gens=0 open=0 uses=0 unprovable=0 fallbacks=0 inert=0 late_leases=0] shadow[mode=1 cmd_hooks=0/13 cmd_hooks_missing=reset,clearstate,pso,bundle,heaps,rootsig,table,const1,consts,cbv,srv,uav,indirect attached=0 attach_failed=0 lists=0 stripe_max=0 parks=0 waits=0 evicted=0 bundles=0 bundles_merged=0 bundles_opaque=0 indirect=0 indirect_applied=0 indirect_inert=0 indirect_unknown_sig=0 sigs=0 heap_table_drops=0 heap_sets_illegal=0] ngx[copies=2 entered=0 create=0 eval=0 evalc=0 release=0 over_live=0 overlap=0 serial_timeouts=0 absent=evalc] entries[create_list=0 submit=0] vk[creates=0 evals=0 releases=0 inits=1 dlss=0 owner_mismatch=0 nr_evals=0 nr_passes=0 present_fallback=0 restores=0 restore_partial=0 layout_hooks=4/4 sampled_layout_restores=0 divisor=0 divisor_reads=0 divisor_lost=0 context=1] seen=0 bypassed=0 hook_exceptions=0 native_seh_faults=0 detour_contended=0 declines[] epochs{game:0,setting:0,recreate:0} modules[presents=5 scans=4] devices[destroys=1 d3d12=1 matched=0 swapchains=2 swapchains_ours=0] locks[loader_under=0 loader_total=17 site=- prime_inversions=0 blocked=0 wait_max_us=0 dllmain=1 dllmain_unsafe=0 dllmain_site=- present_deferred=0 submit_blocked=0 submit_wait_max_us=0] snaps=0{prime:0,epoch:0,reset:0} timers[published=0 dropped=0 unexecuted=0 lease_starved=0]
+10:26:15:253 [37784] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR effective settings: enabled=1 disable_release=0 intensity=2 passes=2 chained_history=1 path=after resolution_scale=1 follow_input=0 output_rect=0 look=1 stabilize=0 upsample=auto codec=0 display_pedestal=1 sdr_black_restore=0 feed=2 governor=0 present_guides=0 present_encoding=0 present_white=0 present_white_source=0 present_ui_correction=1 present_frames=0 present_pre_fg=1 present_pre_fg_contract=0 present_fg_source=1
+10:26:15:253 [37784] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-VERDICT v3 state=NOT_ENGAGED stage=dlss_feature_seen reason=- missing=- seen=0 eligible=0 evals=0 ratio=0.0000 unaccounted=0 submitted=0 presents=2 build=v8.5.0-rc10 trigger=interval api=vulkan path=inline
+10:26:15:253 [37784] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-WARN summary active=0 slugs=- entered=0
+10:26:15:253 [37784] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-VERDICT v3 state=NOT_ENGAGED stage=dlss_feature_seen reason=- missing=- seen=0 eligible=0 evals=0 ratio=0.0000 unaccounted=0 submitted=0 presents=2 build=v8.5.0-rc10 trigger=teardown api=vulkan path=inline
+10:26:15:254 [37784] | WARN  | Reference count for ID3D12Device0 object 00000004F4F30620 (000000013DCDAAB0) is inconsistent (21).
+10:26:18:976 [62796] | INFO  | Redirecting RegisterClassExW(lpWndClassEx = 000000263EB0F3E0 { "Qt5158PowerDummyWindow", style = 0 }) ...
+10:26:18:978 [62796] | INFO  | Redirecting RegisterClassExW(lpWndClassEx = 000000263EB0F3E0 { "Qt5158ClipboardView", style = 0 }) ...
+10:26:18:984 [62796] | INFO  | Redirecting RegisterClassW(lpWndClass = 000000263EB0F8F0 { "QEventDispatcherWin32_Internal_Widget140708545481520", style = 0 }) ...
+10:26:18:989 [62796] | INFO  | Redirecting D3D11CreateDevice(pAdapter = 0000000000000000, DriverType = 1, Software = 0000000000000000, Flags = 0, pFeatureLevels = 00000004F49C01E0, FeatureLevels = 4, SDKVersion = 7, ppDevice = 00000004ED98AC18, pFeatureLevel = 00000004ED98AC20, ppImmediateContext = 00000004ED98AC58) ...
+10:26:18:989 [62796] | INFO  | > Passing on to D3D11CreateDeviceAndSwapChain:
+10:26:18:989 [62796] | INFO  | Redirecting D3D11CreateDeviceAndSwapChain(pAdapter = 0000000000000000, DriverType = 1, Software = 0000000000000000, Flags = 0, pFeatureLevels = 00000004F49C01E0, FeatureLevels = 4, SDKVersion = 7, pSwapChainDesc = 0000000000000000, ppSwapChain = 0000000000000000, ppDevice = 00000004ED98AC18, pFeatureLevel = 00000004ED98AC20, ppImmediateContext = 00000004ED98AC58) ...
+10:26:18:989 [62796] | INFO  | Redirecting CreateDXGIFactory2(Flags = 0x80000000, riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000263EB0E498) ...
+10:26:19:024 [62796] | INFO  | Using feature level b100.
+10:26:19:139 [41756] | INFO  | Installing delayed hooks for 'C:\WINDOWS\system32\d2d1.dll' (Just loaded via LoadLibrary('C:\WINDOWS\SYSTEM32\d2d1.dll')) ...
+10:26:19:139 [41756] | INFO  | > Found 2 match(es). Installing ...
+10:26:19:238 [41756] | INFO  | Redirecting D2D1CreateFactory(factoryType = 1, riid = {06152247-6F50-465A-9245-118BFD3B6007}, pFactoryOptions = 0000000000000000, ppIFactory = 00007FFA29CA75C0) ...
+10:26:19:674 [62796] | INFO  | Redirecting RegisterClassExW(lpWndClassEx = 000000263EB0B890 { "Qt5158QWindowIcon", style = 0x8 }) ...
+10:26:19:674 [62796] | INFO  | > Adding 'CS_OWNDC' window class style flag to "Qt5158QWindowIcon".
+10:26:19:675 [62796] | INFO  | Redirecting Direct3DCreate9(SDKVersion = 0x20) ...
+10:26:19:734 [62796] | INFO  | Redirecting RegisterClassW(lpWndClass = 000000263EB0C5B0 { "SDLHelperWindowInputCatcher", style = 0 }) ...
+10:26:19:737 [62796] | INFO  | Redirecting RegisterClassExA(lpWndClassEx = 0000000130EA25C8 { "SDL_HIDAPI_DEVICE_DETECTION", style = 0 }) ...
+10:26:19:741 [62796] | INFO  | Installing delayed hooks for 'C:\WINDOWS\system32\dinput8.dll' (Just loaded via LoadLibrary('C:\Windows\System32\dinput8.dll')) ...
+10:26:19:741 [62796] | INFO  | > Found 2 match(es). Installing ...
+10:26:19:944 [62796] | INFO  | Redirecting RegisterClassExW(lpWndClassEx = 0000000130EA28F8 { "Message", style = 0 }) ...
+10:26:19:947 [62796] | INFO  | Redirecting CreateDXGIFactory1(riid = {770AAE78-F26F-4DBA-A829-253C83D1B387}, ppFactory = 000000263EB0B4F0) ...
+10:26:28:882 [39080] | INFO  | Redirecting vkCreateSwapchainKHR(device = 000000002F8F00D0, pCreateInfo = 000000000013C7D0, pAllocator = 0000000000000000, pSwapchain = 0000000292289580) ...
+10:26:28:882 [39080] | INFO  | > Dumping swap chain description:
+10:26:28:882 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:28:883 [39080] | INFO  |   | Parameter                               | Value                                   |
+10:26:28:883 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:28:883 [39080] | INFO  |   | flags                                   | 0x4                                     |
+10:26:28:883 [39080] | INFO  |   | surface                                 | 0000000134E07C90                        |
+10:26:28:883 [39080] | INFO  |   | minImageCount                           | 6                                       |
+10:26:28:883 [39080] | INFO  |   | imageFormat                             | VK_FORMAT_R8G8B8A8_UNORM                |
+10:26:28:883 [39080] | INFO  |   | imageColorSpace                         | VK_COLOR_SPACE_SRGB_NONLINEAR_KHR       |
+10:26:28:883 [39080] | INFO  |   | imageExtent                             | 5120                2160                |
+10:26:28:883 [39080] | INFO  |   | imageArrayLayers                        | 1                                       |
+10:26:28:883 [39080] | INFO  |   | imageUsage                              | 0x1b                                    |
+10:26:28:883 [39080] | INFO  |   | imageSharingMode                        | 0                                       |
+10:26:28:884 [39080] | INFO  |   | queueFamilyIndexCount                   | 0                                       |
+10:26:28:885 [39080] | INFO  |   | preTransform                            | 0x1                                     |
+10:26:28:885 [39080] | INFO  |   | compositeAlpha                          | 0x1                                     |
+10:26:28:886 [39080] | INFO  |   | presentMode                             | 2                                       |
+10:26:28:886 [39080] | INFO  |   | clipped                                 | true                                    |
+10:26:28:886 [39080] | INFO  |   | oldSwapchain                            | 000000003A036ED0                        |
+10:26:28:886 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:28:895 [39080] | INFO  | Destroyed runtime environment on runtime 000000013E291BE0 ('C:\Program Files\Hypergryph Launcher\games\Endfield Game\ReShade.ini').
+10:26:28:903 [39080] | INFO  | Recreated runtime environment on runtime 000000013E291BE0 ('C:\Program Files\Hypergryph Launcher\games\Endfield Game\ReShade.ini').
+10:26:28:904 [39080] | INFO  | Redirecting vkDestroySwapchainKHR(device = 000000002F8F00D0, swapchain = 000000003A036ED0, pAllocator = 0000000000000000) ...
+10:26:28:908 [69676] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: Vulkan NGX hook entered: CreateFeature1
+10:26:28:932 [69676] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX feature create (Vulkan CreateFeature1): feature=1 (DLSS/DLAA), result=0x1
+10:26:28:933 [69676] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: Vulkan NGX hook entered: EvaluateFeature
+10:26:28:934 [69676] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: first Vulkan DLSS evaluate intercepted (slot=0)
+10:26:28:934 [69676] | WARN  | [DLSS 5 Neural Rendering] DLSS5 Generic: NRHookPoint=Present is not served on Vulkan; NR runs at the Upscaled hook point (vk[present_fallback=] counts these evaluates)
+10:26:28:934 [69676] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR (feature 18) on Vulkan names 4 device extension(s): VK_NVX_binary_import, VK_NVX_image_view_handle, VK_KHR_buffer_device_address, VK_KHR_push_descriptor; core or not checkable: VK_KHR_buffer_device_address
+10:26:29:052 [69676] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR runtime initialized on the game's Vulkan device (Init_Ext with the matching instance and physical device)
+10:26:29:053 [69676] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: Vulkan NR workset 5120x2160 (output format 10, codec v6: encoding 1, relative units) on the game's DLSS feature
+10:26:29:054 [69676] | ERROR | [DLSS 5 Neural Rendering] DLSS5 Generic: NR feature 18 create on Vulkan (5120x2160, stack pass 1): 0xbad00002; this stream keeps the game's image (failure_backoff)
+10:26:29:060 [69676] | WARN  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-VERDICT v3 state=NOT_ENGAGED stage=nr_feature_ready reason=backoff missing=- seen=1 eligible=1 evals=0 ratio=0.0000 unaccounted=0 submitted=0 presents=429 build=v8.5.0-rc10 trigger=change api=vulkan path=inline
+10:26:29:063 [61436] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\Daltonize.fx' in 0.000000 s.
+10:26:29:063 [48460] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\DisplayDepth.fx' in 0.001000 s.
+10:26:29:064 [66364] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\LUT.fx' in 0.000000 s.
+10:26:29:064 [61436] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\Deband.fx' in 0.001000 s.
+10:26:29:064 [27796] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Border.fx' in 0.000000 s.
+10:26:29:065 [41400] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ASCII.fx' in 0.001000 s.
+10:26:29:066 [61344] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Cartoon.fx' in 0.001000 s.
+10:26:29:066 [70736] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\CAS.fx' in 0.001000 s.
+10:26:29:066 [57408] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ChromaticAberration.fx' in 0.000000 s.
+10:26:29:066 [36172] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ColorMatrix.fx' in 0.000000 s.
+10:26:29:068 [67008] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Compare.fx' in 0.001000 s.
+10:26:29:068 [51732] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\CRT.fx' in 0.001000 s.
+10:26:29:068 [70780] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Curves.fx' in 0.000000 s.
+10:26:29:069 [58112] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\DPX.fx' in 0.000000 s.
+10:26:29:069 [40072] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FakeHDR.fx' in 0.001000 s.
+10:26:29:070 [63656] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FilmGrain.fx' in 0.000000 s.
+10:26:29:070 [66800] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Levels.fx' in 0.000000 s.
+10:26:29:071 [61008] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\LiftGammaGain.fx' in 0.000000 s.
+10:26:29:072 [70116] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FXAA.fx' in 0.002000 s.
+10:26:29:072 [43884] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\LumaSharpen.fx' in 0.000000 s.
+10:26:29:072 [68552] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Monochrome.fx' in 0.000000 s.
+10:26:29:073 [70116] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Layer.fx' in 0.000000 s.
+10:26:29:073 [15684] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Sepia.fx' in 0.000000 s.
+10:26:29:073 [20596] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Nostalgia.fx' in 0.001000 s.
+10:26:29:074 [52156] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Splitscreen.fx' in 0.000000 s.
+10:26:29:075 [48276] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Technicolor.fx' in 0.000000 s.
+10:26:29:075 [69392] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Technicolor2.fx' in 0.001000 s.
+10:26:29:075 [68912] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Tonemap.fx' in 0.000000 s.
+10:26:29:076 [72504] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\SMAA.fx' in 0.003000 s.
+10:26:29:076 [68376] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Vibrance.fx' in 0.000000 s.
+10:26:29:077 [24376] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Vignette.fx' in 0.000000 s.
+10:26:29:078 [71744] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\UIMask.fx' in 0.000000 s.
+10:26:29:078 [60852] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\vk-present-adapter-effects\AdapterEvents.fx' in 0.000000 s.
+10:26:29:089 [39080] | INFO  | Redirecting vkCreateSwapchainKHR(device = 000000002F8F00D0, pCreateInfo = 000000000014F1A0, pAllocator = 0000000000000000, pSwapchain = 0000000290733890) ...
+10:26:29:089 [39080] | INFO  | > Dumping swap chain description:
+10:26:29:089 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:29:089 [39080] | INFO  |   | Parameter                               | Value                                   |
+10:26:29:089 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:29:089 [39080] | INFO  |   | flags                                   | 0x4                                     |
+10:26:29:089 [39080] | INFO  |   | surface                                 | 0000000134E07C90                        |
+10:26:29:089 [39080] | INFO  |   | minImageCount                           | 6                                       |
+10:26:29:089 [39080] | INFO  |   | imageFormat                             | VK_FORMAT_R8G8B8A8_UNORM                |
+10:26:29:089 [39080] | INFO  |   | imageColorSpace                         | VK_COLOR_SPACE_SRGB_NONLINEAR_KHR       |
+10:26:29:090 [39080] | INFO  |   | imageExtent                             | 5120                2160                |
+10:26:29:090 [39080] | INFO  |   | imageArrayLayers                        | 1                                       |
+10:26:29:090 [39080] | INFO  |   | imageUsage                              | 0x1b                                    |
+10:26:29:090 [39080] | INFO  |   | imageSharingMode                        | 0                                       |
+10:26:29:090 [39080] | INFO  |   | queueFamilyIndexCount                   | 0                                       |
+10:26:29:090 [39080] | INFO  |   | preTransform                            | 0x1                                     |
+10:26:29:090 [39080] | INFO  |   | compositeAlpha                          | 0x1                                     |
+10:26:29:090 [39080] | INFO  |   | presentMode                             | 0                                       |
+10:26:29:090 [39080] | INFO  |   | clipped                                 | true                                    |
+10:26:29:090 [39080] | INFO  |   | oldSwapchain                            | 000000003A03F0D0                        |
+10:26:29:090 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:29:098 [39080] | INFO  | Destroyed runtime environment on runtime 000000013E291BE0 ('C:\Program Files\Hypergryph Launcher\games\Endfield Game\ReShade.ini').
+10:26:29:110 [39080] | INFO  | Recreated runtime environment on runtime 000000013E291BE0 ('C:\Program Files\Hypergryph Launcher\games\Endfield Game\ReShade.ini').
+10:26:29:111 [39080] | INFO  | Redirecting vkDestroySwapchainKHR(device = 000000002F8F00D0, swapchain = 000000003A03F0D0, pAllocator = 0000000000000000) ...
+10:26:29:123 [39080] | INFO  | Redirecting vkCreateSwapchainKHR(device = 000000002F8F00D0, pCreateInfo = 000000000014F160, pAllocator = 0000000000000000, pSwapchain = 0000000290790E80) ...
+10:26:29:123 [39080] | INFO  | > Dumping swap chain description:
+10:26:29:123 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:29:123 [39080] | INFO  |   | Parameter                               | Value                                   |
+10:26:29:123 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:29:123 [39080] | INFO  |   | flags                                   | 0x4                                     |
+10:26:29:123 [39080] | INFO  |   | surface                                 | 0000000134E07C90                        |
+10:26:29:123 [39080] | INFO  |   | minImageCount                           | 6                                       |
+10:26:29:123 [39080] | INFO  |   | imageFormat                             | VK_FORMAT_R8G8B8A8_UNORM                |
+10:26:29:124 [39080] | INFO  |   | imageColorSpace                         | VK_COLOR_SPACE_SRGB_NONLINEAR_KHR       |
+10:26:29:124 [39080] | INFO  |   | imageExtent                             | 5120                2160                |
+10:26:29:124 [39080] | INFO  |   | imageArrayLayers                        | 1                                       |
+10:26:29:124 [39080] | INFO  |   | imageUsage                              | 0x1b                                    |
+10:26:29:124 [39080] | INFO  |   | imageSharingMode                        | 0                                       |
+10:26:29:124 [39080] | INFO  |   | queueFamilyIndexCount                   | 0                                       |
+10:26:29:124 [39080] | INFO  |   | preTransform                            | 0x1                                     |
+10:26:29:124 [39080] | INFO  |   | compositeAlpha                          | 0x1                                     |
+10:26:29:124 [39080] | INFO  |   | presentMode                             | 0                                       |
+10:26:29:124 [39080] | INFO  |   | clipped                                 | true                                    |
+10:26:29:124 [39080] | INFO  |   | oldSwapchain                            | 000000003DEE00D0                        |
+10:26:29:124 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:29:132 [39080] | INFO  | Destroyed runtime environment on runtime 000000013E291BE0 ('C:\Program Files\Hypergryph Launcher\games\Endfield Game\ReShade.ini').
+10:26:29:141 [39080] | INFO  | Recreated runtime environment on runtime 000000013E291BE0 ('C:\Program Files\Hypergryph Launcher\games\Endfield Game\ReShade.ini').
+10:26:29:141 [39080] | INFO  | Redirecting vkDestroySwapchainKHR(device = 000000002F8F00D0, swapchain = 000000003DEE00D0, pAllocator = 0000000000000000) ...
+10:26:29:197 [69676] | ERROR | [DLSS 5 Neural Rendering] DLSS5 Generic: NR feature 18 create on Vulkan (5120x2160, stack pass 1): 0xbad00002; this stream keeps the game's image (failure_backoff)
+10:26:29:206 [20196] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\Daltonize.fx' in 0.000000 s.
+10:26:29:207 [62980] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\DisplayDepth.fx' in 0.001000 s.
+10:26:29:207 [67340] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\LUT.fx' in 0.001000 s.
+10:26:29:208 [20196] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\Deband.fx' in 0.001000 s.
+10:26:29:208 [48448] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Border.fx' in 0.000000 s.
+10:26:29:209 [56176] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Cartoon.fx' in 0.000000 s.
+10:26:29:209 [54048] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ASCII.fx' in 0.002000 s.
+10:26:29:209 [53396] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\CAS.fx' in 0.000000 s.
+10:26:29:209 [39268] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ChromaticAberration.fx' in 0.000000 s.
+10:26:29:210 [54536] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ColorMatrix.fx' in 0.000000 s.
+10:26:29:211 [70996] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Compare.fx' in 0.000000 s.
+10:26:29:212 [32896] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\CRT.fx' in 0.001000 s.
+10:26:29:212 [72000] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Curves.fx' in 0.000000 s.
+10:26:29:212 [59560] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\DPX.fx' in 0.000000 s.
+10:26:29:213 [32528] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FakeHDR.fx' in 0.000000 s.
+10:26:29:213 [70168] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FilmGrain.fx' in 0.000000 s.
+10:26:29:214 [62212] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Levels.fx' in 0.000000 s.
+10:26:29:215 [69276] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\LiftGammaGain.fx' in 0.000000 s.
+10:26:29:215 [26644] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FXAA.fx' in 0.001000 s.
+10:26:29:216 [55460] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\LumaSharpen.fx' in 0.000000 s.
+10:26:29:216 [43840] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Monochrome.fx' in 0.000000 s.
+10:26:29:216 [26644] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Layer.fx' in 0.000000 s.
+10:26:29:217 [64224] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Sepia.fx' in 0.000000 s.
+10:26:29:217 [68396] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Nostalgia.fx' in 0.001000 s.
+10:26:29:218 [68044] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Splitscreen.fx' in 0.000000 s.
+10:26:29:218 [63124] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Technicolor.fx' in 0.000000 s.
+10:26:29:219 [40344] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Technicolor2.fx' in 0.000000 s.
+10:26:29:219 [23788] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Tonemap.fx' in 0.000000 s.
+10:26:29:219 [ 6520] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\SMAA.fx' in 0.002000 s.
+10:26:29:220 [46216] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Vibrance.fx' in 0.000000 s.
+10:26:29:221 [56732] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Vignette.fx' in 0.000000 s.
+10:26:29:221 [10112] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\UIMask.fx' in 0.000000 s.
+10:26:29:221 [47640] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\vk-present-adapter-effects\AdapterEvents.fx' in 0.000000 s.
+10:26:29:231 [39080] | INFO  | Redirecting vkCreateSwapchainKHR(device = 000000002F8F00D0, pCreateInfo = 000000000014F190, pAllocator = 0000000000000000, pSwapchain = 0000000290733890) ...
+10:26:29:231 [39080] | INFO  | > Dumping swap chain description:
+10:26:29:231 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:29:231 [39080] | INFO  |   | Parameter                               | Value                                   |
+10:26:29:231 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:29:231 [39080] | INFO  |   | flags                                   | 0x4                                     |
+10:26:29:231 [39080] | INFO  |   | surface                                 | 0000000134E07C90                        |
+10:26:29:231 [39080] | INFO  |   | minImageCount                           | 6                                       |
+10:26:29:231 [39080] | INFO  |   | imageFormat                             | VK_FORMAT_R8G8B8A8_UNORM                |
+10:26:29:231 [39080] | INFO  |   | imageColorSpace                         | VK_COLOR_SPACE_SRGB_NONLINEAR_KHR       |
+10:26:29:231 [39080] | INFO  |   | imageExtent                             | 5120                2160                |
+10:26:29:231 [39080] | INFO  |   | imageArrayLayers                        | 1                                       |
+10:26:29:231 [39080] | INFO  |   | imageUsage                              | 0x1b                                    |
+10:26:29:231 [39080] | INFO  |   | imageSharingMode                        | 0                                       |
+10:26:29:231 [39080] | INFO  |   | queueFamilyIndexCount                   | 0                                       |
+10:26:29:231 [39080] | INFO  |   | preTransform                            | 0x1                                     |
+10:26:29:231 [39080] | INFO  |   | compositeAlpha                          | 0x1                                     |
+10:26:29:231 [39080] | INFO  |   | presentMode                             | 0                                       |
+10:26:29:231 [39080] | INFO  |   | clipped                                 | true                                    |
+10:26:29:231 [39080] | INFO  |   | oldSwapchain                            | 000000003DEE0AD0                        |
+10:26:29:231 [39080] | INFO  |   +-----------------------------------------+-----------------------------------------+
+10:26:29:240 [39080] | INFO  | Destroyed runtime environment on runtime 000000013E291BE0 ('C:\Program Files\Hypergryph Launcher\games\Endfield Game\ReShade.ini').
+10:26:29:250 [39080] | INFO  | Recreated runtime environment on runtime 000000013E291BE0 ('C:\Program Files\Hypergryph Launcher\games\Endfield Game\ReShade.ini').
+10:26:29:251 [39080] | INFO  | Redirecting vkDestroySwapchainKHR(device = 000000002F8F00D0, swapchain = 000000003DEE0AD0, pAllocator = 0000000000000000) ...
+10:26:29:300 [31592] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\Daltonize.fx' in 0.000000 s.
+10:26:29:300 [58412] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\DisplayDepth.fx' in 0.001000 s.
+10:26:29:301 [49100] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\LUT.fx' in 0.000000 s.
+10:26:29:301 [31592] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\Deband.fx' in 0.001000 s.
+10:26:29:302 [29864] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ASCII.fx' in 0.001000 s.
+10:26:29:302 [69380] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Border.fx' in 0.000000 s.
+10:26:29:303 [71772] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Cartoon.fx' in 0.001000 s.
+10:26:29:303 [70528] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\CAS.fx' in 0.000000 s.
+10:26:29:303 [36288] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ChromaticAberration.fx' in 0.000000 s.
+10:26:29:304 [39480] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\ColorMatrix.fx' in 0.001000 s.
+10:26:29:305 [53340] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\CRT.fx' in 0.001000 s.
+10:26:29:305 [62884] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Compare.fx' in 0.001000 s.
+10:26:29:306 [30212] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Curves.fx' in 0.000000 s.
+10:26:29:306 [40116] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\DPX.fx' in 0.001000 s.
+10:26:29:307 [71552] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FakeHDR.fx' in 0.000000 s.
+10:26:29:307 [66692] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FilmGrain.fx' in 0.000000 s.
+10:26:29:308 [ 3880] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Levels.fx' in 0.000000 s.
+10:26:29:309 [69400] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\LiftGammaGain.fx' in 0.000000 s.
+10:26:29:309 [ 9480] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\FXAA.fx' in 0.002000 s.
+10:26:29:310 [66216] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\LumaSharpen.fx' in 0.000000 s.
+10:26:29:310 [45208] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Monochrome.fx' in 0.000000 s.
+10:26:29:310 [ 9480] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Layer.fx' in 0.000000 s.
+10:26:29:311 [69504] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Sepia.fx' in 0.000000 s.
+10:26:29:312 [68156] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Nostalgia.fx' in 0.002000 s.
+10:26:29:312 [56940] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Splitscreen.fx' in 0.000000 s.
+10:26:29:313 [19916] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Technicolor.fx' in 0.000000 s.
+10:26:29:313 [48120] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Technicolor2.fx' in 0.000000 s.
+10:26:29:314 [71156] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Tonemap.fx' in 0.000000 s.
+10:26:29:314 [16808] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\SMAA.fx' in 0.003000 s.
+10:26:29:315 [62940] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Vibrance.fx' in 0.000000 s.
+10:26:29:315 [68084] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\SweetFX\Vignette.fx' in 0.000000 s.
+10:26:29:316 [68260] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\reshade-shaders\Shaders\UIMask.fx' in 0.000000 s.
+10:26:29:316 [41680] | INFO  | Successfully compiled 'C:\Program Files\Hypergryph Launcher\games\Endfield Game\vk-present-adapter-effects\AdapterEvents.fx' in 0.000000 s.
+10:26:29:457 [40992] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F327E408) ...
+10:26:29:459 [40992] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F327E408) ...
+10:26:29:460 [40992] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F327E408) ...
+10:26:29:461 [40992] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F327E408) ...
+10:26:29:461 [40992] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F327E408) ...
+10:26:29:462 [40992] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F327E408) ...
+10:26:29:463 [55500] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000017FF8E498) ...
+10:26:29:464 [55500] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000017FF8E498) ...
+10:26:29:465 [55500] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000017FF8E498) ...
+10:26:29:466 [55500] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000017FF8E498) ...
+10:26:29:467 [55500] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000017FF8E498) ...
+10:26:29:469 [55500] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000017FF8E498) ...
+10:26:29:481 [55500] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000017FF8E498) ...
+10:26:29:483 [55500] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000017FF8E498) ...
+10:26:29:485 [55500] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000017FF8E498) ...
+10:26:29:486 [55500] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000017FF8E498) ...
+10:26:29:487 [55500] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000017FF8E498) ...
+10:26:29:488 [55500] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 000000017FF8E498) ...
+10:26:29:637 [40992] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F327E408) ...
+10:26:29:639 [40992] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F327E408) ...
+10:26:29:639 [40992] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F327E408) ...
+10:26:29:640 [40992] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F327E408) ...
+10:26:29:641 [40992] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F327E408) ...
+10:26:29:642 [40992] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000004F327E408) ...
+10:26:30:203 [69676] | ERROR | [DLSS 5 Neural Rendering] DLSS5 Generic: NR feature 18 create on Vulkan (5120x2160, stack pass 1): 0xbad00002; this stream keeps the game's image (failure_backoff)
+10:26:32:205 [69676] | ERROR | [DLSS 5 Neural Rendering] DLSS5 Generic: NR feature 18 create on Vulkan (5120x2160, stack pass 1): 0xbad00002; this stream keeps the game's image (failure_backoff)
+10:26:35:596 [69676] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: Vulkan NGX hook entered: ReleaseFeature
+10:26:35:978 [65704] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000027109BB540) ...
+10:26:43:121 [69676] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX feature create (Vulkan CreateFeature1): feature=1 (DLSS/DLAA), result=0x1
+10:26:43:122 [69676] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: Vulkan NR workset 5120x2160 (output format 10, codec v6: encoding 1, relative units) on the game's DLSS feature
+10:26:43:123 [69676] | ERROR | [DLSS 5 Neural Rendering] DLSS5 Generic: NR feature 18 create on Vulkan (5120x2160, stack pass 1): 0xbad00002; this stream keeps the game's image (failure_backoff)
+10:26:43:151 [69676] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX feature create (Vulkan CreateFeature1): feature=11 (DLSSG/FrameGeneration), result=0x1
+10:26:43:189 [69676] | ERROR | [DLSS 5 Neural Rendering] DLSS5 Generic: NR feature 18 create on Vulkan (5120x2160, stack pass 1): 0xbad00002; this stream keeps the game's image (failure_backoff)
+10:26:43:231 [58628] | INFO  | Redirecting D3D12CreateDevice(pAdapter = 0000000000000000, MinimumFeatureLevel = c100, riid = {189819F1-1DB6-4B57-BE54-1821339B85F7}, ppDevice = 00007FFA8D2E63E8) ...
+10:26:43:232 [58628] | INFO  | Redirecting CreateDXGIFactory2(Flags = 0x80000000, riid = {1BC6EA02-EF36-464F-BF0C-21CA39E5168A}, ppFactory = 00000004F608E398) ...
+10:26:43:333 [65704] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000027109BB540) ...
+10:26:44:244 [58628] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: queue completion tracker installed on the D3D12 command queue (post-submit signal fences drive resource retirement)
+10:26:44:244 [58628] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: foreign D3D12 NGX source: queue completion tracker installed from a throwaway native queue on the entry's device (D3D11- or Vulkan-presenting process; retired NR resources gain GPU completion proofs - observe-only, PLAN_DX11_V68.md 4.5 A1)
+10:26:44:262 [58628] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX feature create intercepted: feature=1 (DLSS/DLAA), slot=0
+10:26:44:312 [58628] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX feature create returned: feature=1 (DLSS/DLAA), result=1 (success), handle=0x28fd3ed990
+10:26:44:313 [58628] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX create contract: handle=0x28fd3ed990 feature=1 (DLSS/DLAA) source=create flags=0x8 [DepthInverted] render=5120x2160 out=5120x2160
+10:26:44:489 [69676] | ERROR | [DLSS 5 Neural Rendering] DLSS5 Generic: NR feature 18 create on Vulkan (5120x2160, stack pass 1): 0xbad00002; this stream keeps the game's image (failure_backoff)
+10:26:44:491 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: first NGX evaluate intercepted (slot=0)
+10:26:44:491 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: compute-state shadow installed on the D3D12 command list vtable: 13 of 13 hooks verified detoured (Reset, ClearState, SetPipelineState, ExecuteBundle, SetDescriptorHeaps, SetComputeRootSignature, root descriptor tables, root constants plural, root CBV/SRV/UAV, ExecuteIndirect; no Release detour and no list-destruction
+10:26:44:491 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: compute-state shadow world: the native D3D12 command list - ReShade's proxies forward into it, so the shadow records native descriptor heaps
+10:26:44:491 [67940] | WARN  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR skipped (after-upscale): compute-state restore target incomplete (hooks=1 heaps=0 root_signature=0 root_arguments=0 pso=0); injecting would leave our bindings bound for the game. Retried every evaluate - the list's next observed Reset completes it
+10:26:44:517 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: compute-state restore target complete (after-upscale: hooks=1 heaps=1 root_signature=1 root_arguments=1 pso=1); injection admitted after 1 incomplete-target decline(s)
+10:26:44:519 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: signed DLSSNR 310.8.0 D3D12 runtime initialized
+10:26:44:519 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: float DLSS surface (format 10) without the IsHDR create flag: DLSS reads it as display-referred, NR as scene-linear; NRSourceEncoding=1 declares it display-referred SDR
+10:26:44:523 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: created v6 NR codec from build-validated shader bytecode
+10:26:44:526 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: created the NR look stage from build-validated shader bytecode
+10:26:44:536 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: created inline NR resources ws1 5120x2160 -> 5120x2160 (native 1:1) format=10 hdr=v6/linear relative (workset 1/4, 595 MiB)
+10:26:44:536 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR look surfaces ws1: output
+10:26:44:574 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR feed: v2-fixed (NRFeedMode=2; exposure texture=none fmt=0 auto_exposure=0 pre_exposure=1 exposure_scale=1 hdr=1 units=relative)
+10:26:44:576 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR guide contract: path=after flags=0x8 (IsHDR=0 MVLowRes=0 MVJittered=0 DepthInverted=1 AutoExposure=0) mvec=display base=0,0 window=5120x2160 of 5120x2160 scale=5120,2160 (game) depth_base=0,0 out=0,0 5120x2160 of 5120x2160 subrects=0 exposure=none
+10:26:44:576 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: frame contract path=inline in=5120x2160 out=5120x2160 hdr=1 flags=0x8 encoding=linear units=relative unit_nits=0 normalization=gpu-frame divisor=0 transfer=consistent guard=0 governor=n/a slew=0 attack_release=0/0 snaps=0{prime:0,epoch:0,reset:0} ws=1 curve=0 exposure=explicit_scale feed=v2-fixed stack=2 pedestal=on
+10:26:44:576 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: feature 18 create starting: NR input 5120x2160 -> output 5120x2160, flags 0x8, HDR
+10:26:44:576 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NGX feature create intercepted: feature=18 (DLSSNR/reserved-18), slot=0
+10:26:44:720 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: feature 18 created via the signed snippet after DLSS/DLAA for NR input 5120x2160 -> output 5120x2160, game DLSS created at 5120x2160
+10:26:44:731 [65704] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000027109BF5E8) ...
+10:26:44:769 [41820] | WARN  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-VERDICT v3 state=NOT_ENGAGED stage=injected reason=backoff missing=heaps seen=358 eligible=348 evals=0 ratio=0.0000 unaccounted=0 submitted=1 presents=992 build=v8.5.0-rc10 trigger=change api=vulkan path=inline
+10:26:44:886 [65704] | INFO  | Redirecting CreateDXGIFactory1(riid = {7B7166EC-21C7-44AE-B21A-C9AE321AE369}, ppFactory = 00000027109BEB30) ...
+10:26:46:452 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR pass 1 model: style=2 local_tone=2 structure=1 skin=0 auto_mask=1 ui_correction=1 skin_independent=1 sent_structure=1 sent_skin=0
+10:26:46:452 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR style note: Natural and Cinematic ask the model for a filmic tone look that can darken bright highlights (measured ~0.44 st on a near-white field area and read as 'no neural rendering there'); the Style Highlight Guard setting bounds it and Neural transfer = Consistent reshapes brightness edits on the shoulder
+10:26:46:465 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: Detail stability engaged: NR's edit is filtered over frames along the game's motion vectors (Auto)
+10:26:46:466 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR look stage shaped its first pass: ws1 pass 1 5120x2160 flags=0xae
+10:26:46:466 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: feature 18 create starting: NR input 5120x2160 -> output 5120x2160, flags 0x8, HDR (stack pass)
+10:26:46:550 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: feature 18 created via the signed snippet after DLSS/DLAA for NR input 5120x2160 -> output 5120x2160, game DLSS created at 5120x2160 (stack pass 2)
+10:26:46:555 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: inline feature 18 evaluation succeeded (count=1, NR input 5120x2160 (guides 5120x2160), output 5120x2160, 2 stack pass(es) [native])
+10:26:46:558 [58628] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: Vulkan DLSS evaluates pass through: a DX11 bridge add-on of another project re-issues them as Direct3D 12 DLSS evaluates, where NR runs (source_other)
+10:26:46:558 [58628] | WARN  | [DLSS 5 Neural Rendering] DLSS5 Generic: present events starved while NGX evaluates continue; driving the per-frame lifecycle (hotkeys, captures, retirement) from NGX evaluate ticks
+10:26:46:558 [58628] | INFO  | Redirecting CreateDXGIFactory1(riid = {1BC6EA02-EF36-464F-BF0C-21CA39E5168A}, ppFactory = 00000004F608E288) ...
+10:26:46:560 [58628] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: telemetry t=33.12s win=31.31s presents=990 ticks=991 fps=31.62 frame_ms[avg=30.13 p50=16.75 p99=100.25 max=2330.49] nr[evals=1 cpu_us_avg=152950.95 cpu_us_max=202075.90] vram_mib[local=13681/31419 nonlocal=261] own_mib[live=595 retired=0 unproven=0 hist=253 present=0 bridge=0 vk=0 live_max=595] worksets[live=1 orphan=0 evicted=0 recycled=0 idle_retired=0 ws1:5120x2160:s2:idle1:snaps1] retired[ws=0 nr=0 oldest_ticks=0 unproven_ws=0 unproven_nr=0 oldest_unproven_ticks=0] lifetime[ws +1 -0 ~0 nr +2 -0 ~0] features=1 slots=2 queues=2[idle2s=0 faulted=0] lease_probe=unproven tracker[lists=1 gens=1 open=1 uses=17 unprovable=0 fallbacks=0 inert=9 late_leases=0] shadow[mode=1 cmd_hooks=8/13 cmd_hooks_missing=clearstate,bundle,cbv,srv,indirect attached=5 attach_failed=0 lists=0 stripe_max=0 parks=0 waits=0 evicted=0 bundles=0 bundles_merged=0 bundles_opaque=0 indirect=0 indirect_applied=0 indirect_inert=0 indirect_unknown_sig=0 sigs=0 heap_table_drops=0 heap_sets_illegal=0] ngx[copies=2 entered=1 create=3 eval=3 evalc=0 release=0 over_live=0 overlap=6 serial_timeouts=0 absent=evalc] entries[create_list=15 submit=17] foreign[src=1 entries=1 qinst=1 qinst_fail=0] vk[creates=3 evals=363 releases=1 inits=1 dlss=347 owner_mismatch=0 nr_evals=0 nr_passes=0 present_fallback=347 restores=0 restore_partial=0 layout_hooks=4/4 sampled_layout_restores=0 divisor=0 divisor_reads=0 divisor_lost=0 context=1] seen=366 bypassed=0 hook_exceptions=0 native_seh_faults=0 detour_contended=0 declines[not_dlss=10 state_target=1 warmup=1 backoff=347 source_other=5] epochs{game:0,setting:0,recreate:0} modules[presents=997 scans=37] devices[destroys=1 d3d12=1 matched=0 swapchains=6 swapchains_ours=0] locks[loader_under=0 loader_total=2024 site=- prime_inversions=0 blocked=0 wait_max_us=0 dllmain=1 dllmain_unsafe=0 dllmain_site=- present_deferred=0 submit_blocked=0 submit_wait_max_us=0] snaps=1{prime:1,epoch:0,reset:0} look[shaped=1 stability=1 transport=0 restarts=0 recycled=0 ring_full=0 traced=0 published=0 dropped=0 unexecuted=0 lease_starved=0] timers[published=1 dropped=0 unexecuted=0 lease_starved=0] feed[texture=0 fixed=2 recycled=0 ring_full=0 guard_sampled=0 guard_v1=0 guard_engaged=0 guard_lost=0] guide[mv_display=2 mv_contradiction=0 mv_scale_absent=0 mv_scale_invalid=0 out_rect=0 out_rect_clamped=0 out_declared_disagree=0 exposure_unreadable=0 mv_jittered=0 mv_window_outside=0 depth_window_outside=0] game[pe=1.00(1.00..1.00) es=1.00(1.00..1.00) resets=0 bursts=0 alternations=0]
+10:26:46:560 [58628] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-VERDICT v3 state=ENGAGED stage=- reason=backoff missing=heaps seen=366 eligible=351 evals=1 ratio=0.0028 unaccounted=0 submitted=2 presents=992 build=v8.5.0-rc10 trigger=interval api=vulkan path=inline
+10:26:46:560 [58628] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-WARN summary active=0 slugs=- entered=0
+10:26:46:560 [58628] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-VERDICT v3 state=ENGAGED stage=- reason=backoff missing=heaps seen=366 eligible=351 evals=1 ratio=0.0028 unaccounted=0 submitted=2 presents=992 build=v8.5.0-rc10 trigger=settled api=vulkan path=inline
+10:26:46:560 [58628] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-CARD v1 card=partly_active tone=warn trigger=change
+10:26:46:562 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR pass 2 model: style=2 local_tone=1.5 structure=1.25 skin=0 auto_mask=1 ui_correction=1 skin_independent=1 sent_structure=1 sent_skin=0
+10:26:46:572 [41820] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: present events resumed; NGX-driven lifecycle ticks retired
+10:26:49:426 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: inline feature 18 evaluation succeeded (count=60, NR input 5120x2160 (guides 5120x2160), output 5120x2160, 2 stack pass(es) [native])
+10:27:00:149 [69676] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: Vulkan DLSS evaluates are served again: the DX11 bridge's Direct3D 12 path ran no NR for 5 s
+10:27:00:150 [69676] | ERROR | [DLSS 5 Neural Rendering] DLSS5 Generic: NR feature 18 create on Vulkan (5120x2160, stack pass 1): 0xbad00002; this stream keeps the game's image (failure_backoff)
+10:27:01:362 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: frame contract path=inline in=5120x2160 out=5120x2160 hdr=1 flags=0x8 encoding=linear units=relative unit_nits=0 normalization=gpu-frame divisor=0 transfer=consistent guard=0 governor=n/a slew=0 attack_release=0/0 snaps=1{prime:1,epoch:0,reset:0} ws=1 curve=0 exposure=explicit_scale feed=v2-fixed stack=2 pedestal=on
+10:27:01:380 [58628] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: Vulkan DLSS evaluates pass through: a DX11 bridge add-on of another project re-issues them as Direct3D 12 DLSS evaluates, where NR runs (source_other)
+10:27:16:392 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: frame contract path=inline in=5120x2160 out=5120x2160 hdr=1 flags=0x8 encoding=linear units=relative unit_nits=0 normalization=gpu-frame divisor=0 transfer=consistent guard=0 governor=n/a slew=0 attack_release=0/0 snaps=1{prime:1,epoch:0,reset:0} ws=1 curve=0 exposure=explicit_scale feed=v2-fixed stack=2 pedestal=on
+10:27:16:565 [41820] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: telemetry t=63.13s win=30.01s presents=3502 ticks=3506 fps=116.71 frame_ms[avg=9.07 p50=8.25 p99=16.75 max=1802.95] nr[evals=499 cpu_us_avg=811.66 cpu_us_max=17573.10] vram_mib[local=15397/31419 nonlocal=210] own_mib[live=595 retired=0 unproven=0 hist=506 present=0 bridge=0 vk=0 live_max=595] worksets[live=1 orphan=0 evicted=0 recycled=0 idle_retired=0 ws1:5120x2160:s2:idle4:snaps1] retired[ws=0 nr=0 oldest_ticks=0 unproven_ws=0 unproven_nr=0 oldest_unproven_ticks=0] lifetime[ws +1 -0 ~0 nr +2 -0 ~0] features=1 slots=2 queues=2[idle2s=0 faulted=0] lease_probe=done tracker[lists=1 gens=1 open=1 uses=18 unprovable=0 fallbacks=0 inert=9 late_leases=0] shadow[mode=1 cmd_hooks=8/13 cmd_hooks_missing=clearstate,bundle,cbv,srv,indirect attached=8 attach_failed=0 lists=0 stripe_max=0 parks=0 waits=0 evicted=0 bundles=0 bundles_merged=0 bundles_opaque=0 indirect=0 indirect_applied=0 indirect_inert=0 indirect_unknown_sig=0 sigs=0 heap_table_drops=0 heap_sets_illegal=0] ngx[copies=2 entered=1 create=3 eval=502 evalc=0 release=0 over_live=0 overlap=507 serial_timeouts=0 absent=evalc] entries[create_list=15 submit=9027] foreign[src=1 entries=1 qinst=1 qinst_fail=0] vk[creates=3 evals=3897 releases=1 inits=1 dlss=451 owner_mismatch=0 nr_evals=0 nr_passes=0 present_fallback=451 restores=0 restore_partial=0 layout_hooks=4/4 sampled_layout_restores=0 divisor=0 divisor_reads=0 divisor_lost=0 context=1] seen=4399 bypassed=0 hook_exceptions=0 native_seh_faults=0 detour_contended=0 declines[not_dlss=10 state_target=1 warmup=1 backoff=451 source_other=3436] epochs{game:0,setting:0,recreate:0} modules[presents=4504 scans=76] devices[destroys=1 d3d12=1 matched=0 swapchains=6 swapchains_ours=0] locks[loader_under=0 loader_total=9038 site=- prime_inversions=0 blocked=0 wait_max_us=0 dllmain=1 dllmain_unsafe=0 dllmain_site=- present_deferred=3 submit_blocked=0 submit_wait_max_us=0] snaps=1{prime:1,epoch:0,reset:0} look[shaped=999 stability=999 transport=0 restarts=0 recycled=0 ring_full=0 traced=0 published=0 dropped=0 unexecuted=0 lease_starved=0] timers[published=87 dropped=0 unexecuted=0 lease_starved=3] feed[texture=0 fixed=501 recycled=0 ring_full=0 guard_sampled=0 guard_v1=0 guard_engaged=0 guard_lost=0] guide[mv_display=501 mv_contradiction=0 mv_scale_absent=0 mv_scale_invalid=0 out_rect=0 out_rect_clamped=0 out_declared_disagree=0 exposure_unreadable=0 mv_jittered=0 mv_window_outside=0 depth_window_outside=0] game[pe=1.00(1.00..1.00) es=1.00(1.00..1.00) resets=0 bursts=0 alternations=0]
+10:27:16:566 [41820] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR cost: gpu_ms=27.93 frame_ms=8.05 share=0.555 present_ms=4.47 | NR: 27.9 ms of GPU time per frame (estimate: 279 fps without NR, 124 fps with it)
+10:27:16:566 [41820] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-VERDICT v3 state=ENGAGED stage=- reason=backoff missing=heaps seen=4399 eligible=953 evals=500 ratio=0.5247 unaccounted=0 submitted=501 presents=4500 build=v8.5.0-rc10 trigger=interval api=vulkan path=inline
+10:27:16:566 [41820] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-WARN summary active=0 slugs=- entered=0
+10:27:21:365 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: inline feature 18 evaluation succeeded (count=600, NR input 5120x2160 (guides 5120x2160), output 5120x2160, 2 stack pass(es) [native])
+10:27:31:434 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: frame contract path=inline in=5120x2160 out=5120x2160 hdr=1 flags=0x8 encoding=linear units=relative unit_nits=0 normalization=gpu-frame divisor=0 transfer=consistent guard=0 governor=n/a slew=0 attack_release=0/0 snaps=1{prime:1,epoch:0,reset:0} ws=1 curve=0 exposure=explicit_scale feed=v2-fixed stack=2 pedestal=on
+10:27:46:434 [67940] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: frame contract path=inline in=5120x2160 out=5120x2160 hdr=1 flags=0x8 encoding=linear units=relative unit_nits=0 normalization=gpu-frame divisor=0 transfer=consistent guard=0 governor=n/a slew=0 attack_release=0/0 snaps=1{prime:1,epoch:0,reset:0} ws=1 curve=0 exposure=explicit_scale feed=v2-fixed stack=2 pedestal=on
+10:27:46:568 [41820] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: telemetry t=93.13s win=30.00s presents=3745 ticks=3745 fps=124.83 frame_ms[avg=8.01 p50=8.25 p99=9.50 max=32.55] nr[evals=624 cpu_us_avg=784.93 cpu_us_max=1523.60] vram_mib[local=16003/31419 nonlocal=212] own_mib[live=595 retired=0 unproven=0 hist=506 present=0 bridge=0 vk=0 live_max=595] worksets[live=1 orphan=0 evicted=0 recycled=0 idle_retired=0 ws1:5120x2160:s2:idle5:snaps1] retired[ws=0 nr=0 oldest_ticks=0 unproven_ws=0 unproven_nr=0 oldest_unproven_ticks=0] lifetime[ws +1 -0 ~0 nr +2 -0 ~0] features=1 slots=2 queues=2[idle2s=0 faulted=0] lease_probe=done tracker[lists=1 gens=1 open=1 uses=18 unprovable=0 fallbacks=0 inert=9 late_leases=0] shadow[mode=1 cmd_hooks=8/13 cmd_hooks_missing=clearstate,bundle,cbv,srv,indirect attached=8 attach_failed=0 lists=0 stripe_max=0 parks=0 waits=0 evicted=0 bundles=0 bundles_merged=0 bundles_opaque=0 indirect=0 indirect_applied=0 indirect_inert=0 indirect_unknown_sig=0 sigs=0 heap_table_drops=0 heap_sets_illegal=0] ngx[copies=2 entered=1 create=3 eval=1126 evalc=0 release=0 over_live=0 overlap=1127 serial_timeouts=0 absent=evalc] entries[create_list=15 submit=19013] foreign[src=1 entries=1 qinst=1 qinst_fail=0] vk[creates=3 evals=7641 releases=1 inits=1 dlss=451 owner_mismatch=0 nr_evals=0 nr_passes=0 present_fallback=451 restores=0 restore_partial=0 layout_hooks=4/4 sampled_layout_restores=0 divisor=0 divisor_reads=0 divisor_lost=0 context=1] seen=8767 bypassed=0 hook_exceptions=0 native_seh_faults=0 detour_contended=0 declines[not_dlss=10 state_target=1 warmup=1 backoff=451 source_other=7180] epochs{game:0,setting:0,recreate:0} modules[presents=8249 scans=117] devices[destroys=1 d3d12=1 matched=0 swapchains=6 swapchains_ours=0] locks[loader_under=0 loader_total=16528 site=- prime_inversions=0 blocked=0 wait_max_us=0 dllmain=1 dllmain_unsafe=0 dllmain_site=- present_deferred=3 submit_blocked=0 submit_wait_max_us=0] snaps=1{prime:1,epoch:0,reset:0} look[shaped=2247 stability=2247 transport=0 restarts=0 recycled=0 ring_full=0 traced=0 published=0 dropped=0 unexecuted=0 lease_starved=0] timers[published=191 dropped=0 unexecuted=0 lease_starved=3] feed[texture=0 fixed=1125 recycled=0 ring_full=0 guard_sampled=0 guard_v1=0 guard_engaged=0 guard_lost=0] guide[mv_display=1125 mv_contradiction=0 mv_scale_absent=0 mv_scale_invalid=0 out_rect=0 out_rect_clamped=0 out_declared_disagree=0 exposure_unreadable=0 mv_jittered=0 mv_window_outside=0 depth_window_outside=0] game[pe=1.00(1.00..1.00) es=1.00(1.00..1.00) resets=0 bursts=0 alternations=0]
+10:27:46:568 [41820] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR cost: gpu_ms=26.53 frame_ms=7.90 share=0.582 present_ms=4.60 | NR: 26.5 ms of GPU time per frame (estimate: 303 fps without NR, 127 fps with it)
+10:27:46:569 [41820] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-VERDICT v3 state=ENGAGED stage=- reason=backoff missing=heaps seen=8767 eligible=1577 evals=1124 ratio=0.7127 unaccounted=0 submitted=1125 presents=8245 build=v8.5.0-rc10 trigger=interval api=vulkan path=inline
+10:27:46:569 [41820] | INFO  | [DLSS 5 Neural Rendering] DLSS5 Generic: NR-WARN summary active=0 slugs=- entered=0

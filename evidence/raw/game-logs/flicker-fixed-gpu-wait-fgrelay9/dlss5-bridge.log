@@ -1,0 +1,893 @@
+09:00:40.824  dlss5-bridge 1.4.13-pre8-endfield1-vk-fgrelay9 (built Sep 29 2026 08:57:47) attached.
+09:00:40.824    host: C:\Program Files\Hypergryph Launcher\games\Endfield Game\Endfield.exe
+09:00:40.824    d3d11.dll: C:\Program Files\Hypergryph Launcher\games\Endfield Game\Endfield.exe
+09:00:40.824    reshade: C:\ProgramData\ReShade\ReShade64.dll
+09:00:40.825    windows: Windows 11, 10.0 build 26200
+09:00:40.825    files next to this add-on:
+09:00:40.873      nvngx_dlssnr.dll           present  version 310.8.0.0, 165840496 bytes, 2026-09-11 22:41
+09:00:40.926      nvngx_dlss.dll             present  version 310.5.2.0, 54779504 bytes, 2026-07-11 10:59
+09:00:40.926    add-ons present:
+09:00:40.926      dlss5-bridge.addon64         version 1.4.13.8116, 644096 bytes, 2026-09-29 00:57
+09:00:40.927          loaded at 00007FFA3F070000
+09:00:40.928      nr-parameter-probe.addon64.disabled-20260926   version no version resource, 371200 bytes, 2026-09-20 15:08
+09:00:40.929      renodx-dlss5.addon64         version 0.2026.926.210, 3141632 bytes, 2026-09-27 13:21
+09:00:40.931          sha256 DCD93881E976AD033D83C2BB01F4BC3E4DDC59C15FE0DD4CA165BC5FC7D1AC68 -- not on this add-on's measured list, which is one machine's experience and not a compatibility statement. If its panel says active while the picture does not change, unwrap=0 in dlss5-bridge.cfg is the first thing to try.
+09:00:40.931    DLSS 5 add-on settings, read from ReShade.ini [RenoDX.DLSS5]:
+09:00:40.931      ConfigVersion=7
+09:00:40.931      EnableHooks=1
+09:00:40.932      NeuralUplift=1
+09:00:40.932      NRAdaptiveExposure=1
+09:00:40.932      NRAutoMask=1
+09:00:40.932      NRChainedHistory=1
+09:00:40.932      NRChromaClamp=1
+09:00:40.932      NRCodecMode=0
+09:00:40.932      NRColorStrength=1
+09:00:40.932      NRCostMeter=1
+09:00:40.932      NRDepthMode=0
+09:00:40.932      NRDetailStability=0
+09:00:40.932      NRDiffuseWhiteNits=203
+09:00:40.932      NRDisableRelease=0
+09:00:40.932      NRDisplayPedestal=1
+09:00:40.932      NREditTrace=0
+09:00:40.933      NREnableUpscaling=0
+09:00:40.933      NRFeedMode=2
+09:00:40.933      NRFollowInputRes=0
+09:00:40.933      NRGlobalTone=2
+09:00:40.933      NRGpuTimers=0
+09:00:40.933      NRHookPoint=2
+09:00:40.933      NRIntensity=2
+09:00:40.933      NRLinearUnitNits=0
+09:00:40.934      NRLocalStructure=1
+09:00:40.934      NRLocalTone=2
+09:00:40.934      NRLookBrighten=1
+09:00:40.934      NRLookColour=1
+09:00:40.934      NRLookDarken=1
+09:00:40.934      NRLookDetail=1
+09:00:40.934      NRLookDetailRadius=1
+09:00:40.935      NRLookHalo=0
+09:00:40.935      NRLookHaloBrightSide=0
+09:00:40.935      NRLookHighlights=1
+09:00:40.935      NRLookHue=1
+09:00:40.935      NRLookMaxBrighten=0
+09:00:40.935      NRLookMaxColour=0
+09:00:40.935      NRLookMaxDarken=0
+09:00:40.935      NRLookMidtones=1
+09:00:40.935      NRLookMode=1
+09:00:40.935      NRLookShadows=1
+09:00:40.935      NRLookStabilize=0
+09:00:40.935      NRLookStabilizeDetail=0
+09:00:40.935      NRLookStabilizeMs=60
+09:00:40.936      NRLookStrength=1
+09:00:40.936      NRLookTone=1
+09:00:40.936      NRLookUpsample=0
+09:00:40.936      NRMaxWorksets=4
+09:00:40.936      NRMVecScaleX=1
+09:00:40.936      NRMVecScaleY=1
+09:00:40.936      NRNeuralFloorGuard=1
+09:00:40.936      NRNormAttackStops=4
+09:00:40.936      NRNormCutAware=1
+09:00:40.936      NRNormGovernor=0
+09:00:40.936      NRNormReleaseStops=0.5
+09:00:40.936      NRNormSlewStops=0.02
+09:00:40.936      NRPaperWhiteScale=2.5375
+09:00:40.936      NRPass2AutoMask=1
+09:00:40.936      NRPass2Color=1
+09:00:40.936      NRPass2FollowPass1=0
+09:00:40.936      NRPass2Intensity=2
+09:00:40.937      NRPass2LocalTone=1.5
+09:00:40.937      NRPass2Skin=0
+09:00:40.937      NRPass2Structure=1.25
+09:00:40.937      NRPass2Style=2
+09:00:40.937      NRPass2Transfer=1
+09:00:40.937      NRPass2UICorrection=1
+09:00:40.937      NRPass3AutoMask=0
+09:00:40.937      NRPass3Color=1
+09:00:40.937      NRPass3FollowPass1=0
+09:00:40.937      NRPass3Intensity=2
+09:00:40.937      NRPass3LocalTone=1
+09:00:40.938      NRPass3Skin=-1
+09:00:40.938      NRPass3Structure=1
+09:00:40.938      NRPass3Style=0
+09:00:40.938      NRPass3Transfer=1
+09:00:40.938      NRPass3UICorrection=0
+09:00:40.938      NRPass4AutoMask=0
+09:00:40.938      NRPass4Color=1
+09:00:40.938      NRPass4FollowPass1=0
+09:00:40.938      NRPass4Intensity=2
+09:00:40.938      NRPass4LocalTone=1
+09:00:40.938      NRPass4Skin=-1
+09:00:40.938      NRPass4Structure=1
+09:00:40.938      NRPass4Style=0
+09:00:40.939      NRPass4Transfer=0
+09:00:40.939      NRPass4UICorrection=0
+09:00:40.939      NRPasses=2
+09:00:40.939      NRPQCalibration=1
+09:00:40.939      NRPresentEncoding=0
+09:00:40.939      NRPresentFgSource=1
+09:00:40.939      NRPresentFrames=0
+09:00:40.939      NRPresentGuides=0
+09:00:40.939      NRPresentUICorrection=1
+09:00:40.939      NRPresentWhiteNits=0
+09:00:40.939      NRPreset=2
+09:00:40.939      NRPreUpscale=0
+09:00:40.940      NRProxyAnchor=4
+09:00:40.940      NRResolutionScale=1
+09:00:40.940      NRScreenshotFormat=0
+09:00:40.940      NRScreenshotJpegQuality=95
+09:00:40.940      NRScreenshotKey=116
+09:00:40.940      NRScreenshotLayout=0
+09:00:40.940      NRScreenshotMaxMB=10
+09:00:40.940      NRScreenshotSource=0
+09:00:40.940      NRShutdownQuiesce=1
+09:00:40.940      NRSkinIndependent=1
+09:00:40.940      NRSkinStructure=0
+09:00:40.940      NRSourceEncoding=0
+09:00:40.940      NRSourcePrimaries=0
+09:00:40.940      NRStyle=2
+09:00:40.940      NRStyleHighlightGuard=0
+09:00:40.941      NRToggleKey=106
+09:00:40.941      NRTransferMode=1
+09:00:40.941      NRTransferStrength=1
+09:00:40.941      NRUICorrection=1
+09:00:40.941      NRWorksetFreePolicy=0
+09:00:40.941      UiIssueNotice=1
+09:00:40.941      UiLanguage=zh-Hans
+09:00:40.941      UiMode=modern
+09:00:40.941      UiWelcomed=1
+09:00:40.942  [bridge] config: stage=3 mode=2 flags=-1 subrects=1 reset_every=0 pixels=0 skip_game=1 dred=1 skip_exe=1 unwrap=1 source=auto synth=0 hash_out=1 synth_after=0 mv_sign_x=0 mv_sign_y=0 ofa_grid=2 ofa_perf=20 vk_present=1 vk_sync=0
+09:00:40.942  [bridge] settings read from C:\Program Files\Hypergryph Launcher\games\Endfield Game\dlss5-bridge.cfg
+09:00:40.951  [bridge] the driver's route to neural rendering is closed for this process: entry 18 of the loader's feature table at 00007FF9B10B43E0 named "dlssnr" and now names nothing, which is what the previous driver had there. The DLSS 5 add-on drives that feature itself, as it did before the driver update. Nothing on disk is changed and no other feature is touched. Set ngx_loader=1 in dlss5-bridge.cfg to leave the driver's route alone.
+09:00:40.951  [synth] registered for ReShade effect events at add-on API 18 (synth floor 10).
+09:00:40.951  [vkmirror] colour format tables agree on 7 of 7 entries.
+09:00:40.954  [vkmirror] vk_mirror=1: the Vulkan NGX entry points will be hooked and a Vulkan game's own DLSS contract mirrored onto the private D3D12 session.
+09:00:40.954  [panel] status panel registered in ReShade's overlay. Asked for the ImGui 19000 function table; ReShade reports its own ImGui as 1.92.5.
+09:00:40.955  NGX layer 0: C:\WINDOWS\System32\DriverStore\FileRepository\nv_dispsi.inf_amd64_b8459fc8f905f657\_nvngx.dll (base=00007FF9B0FE0000)
+09:00:40.955    version 32.0.16.1692
+09:00:40.955    NVSDK_NGX_D3D11_CreateFeature     = 00007FF9B1045C60
+09:00:40.955    NVSDK_NGX_D3D11_EvaluateFeature   = 00007FF9B1045E30
+09:00:40.955    NVSDK_NGX_D3D11_EvaluateFeature_C = 0000000000000000
+09:00:40.955    CreateFeature    prologue: 48 89 6C 24 18 56 57 41 56 48 83 EC 40 48 
+09:00:40.955    EvaluateFeature  prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+09:00:41.148    hooked: CreateFeature=yes EvaluateFeature=yes EvaluateFeature_C=absent
+09:00:41.148    NVSDK_NGX_VULKAN_CreateFeature     = 00007FF9B0FED230
+09:00:41.148    NVSDK_NGX_VULKAN_CreateFeature1    = 00007FF9B0FED340
+09:00:41.148    NVSDK_NGX_VULKAN_EvaluateFeature   = 00007FF9B0FED4E0
+09:00:41.148    NVSDK_NGX_VULKAN_EvaluateFeature_C = 0000000000000000
+09:00:41.148    VK CreateFeature prologue: 48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 
+09:00:41.148    VK CreateFeature1 prologue: 48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 
+09:00:41.148    VK EvaluateFeature prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+09:00:41.475    hooked: VULKAN CreateFeature=yes CreateFeature1=yes EvaluateFeature=yes EvaluateFeature_C=absent
+09:00:41.563  [fg-relay] Import=1: the ReShade layer's vkCreateDevice at 00007FF9518B07A0 is hooked. Every device created from here on gets VK_KHR_external_semaphore_win32 appended to its extension list, and a driver that refuses the name gets the caller's own list retried unchanged.
+09:00:42.260  qpc=2175386650854 [fg-relay] interposer hook: present=hooked
+09:00:42.260  qpc=2175389075538 [fg-trace] queue discovery exports: get_queue=hooked get_queue2=hooked
+09:00:42.703  NGX layer 1: C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlss.dll (base=00007FF9310E0000)
+09:00:42.703    version 310.5.2.0
+09:00:42.703    NVSDK_NGX_D3D11_CreateFeature     = 00007FF931125160
+09:00:42.703    NVSDK_NGX_D3D11_EvaluateFeature   = 00007FF9311252C0
+09:00:42.703    NVSDK_NGX_D3D11_EvaluateFeature_C = 0000000000000000
+09:00:42.703    CreateFeature    prologue: 48 89 5C 24 08 48 89 6C 24 10 56 57 41 56 
+09:00:42.704    EvaluateFeature  prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+09:00:42.930    hooked: CreateFeature=yes EvaluateFeature=yes EvaluateFeature_C=absent
+09:00:42.930    NVSDK_NGX_VULKAN_CreateFeature     = 00007FF9311A79C0
+09:00:42.930    NVSDK_NGX_VULKAN_CreateFeature1    = 00007FF9311A79E0
+09:00:42.930    NVSDK_NGX_VULKAN_EvaluateFeature   = 00007FF9311A79F0
+09:00:42.931    NVSDK_NGX_VULKAN_EvaluateFeature_C = 0000000000000000
+09:00:42.931    VK CreateFeature prologue: 48 83 EC 38 4C 89 4C 24 20 4D 8B C8 44 8B 
+09:00:42.931    VK CreateFeature1 prologue: E9 4B F1 FF FF CC CC CC CC CC CC CC CC CC  <== a thunk into its own module, not a hook
+09:00:42.931        the hook jumps into C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlss.dll +0xC6B30
+09:00:42.931    VK EvaluateFeature prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+09:00:43.032      00007FF9311A79E0 is a thunk table entry; the hook goes to its destination 00007FF9311A6B30 so the patch does not overwrite the entries beside it.
+09:00:43.251    hooked: VULKAN CreateFeature=yes CreateFeature1=yes EvaluateFeature=yes EvaluateFeature_C=absent
+09:00:43.274  NGX layer 1 retirement finalized.
+09:00:43.275    leaving nvngx_dlssg.dll untouched: Frame Generation is not an SR entry point.
+09:00:43.367  NGX layer 1: C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_deepdvc.dll (base=00007FF956870000)
+09:00:43.368    version 310.5.2.0
+09:00:43.368    NVSDK_NGX_D3D11_CreateFeature     = 00007FF956890140
+09:00:43.368    NVSDK_NGX_D3D11_EvaluateFeature   = 00007FF956890260
+09:00:43.368    NVSDK_NGX_D3D11_EvaluateFeature_C = 0000000000000000
+09:00:43.368    CreateFeature    prologue: 48 89 5C 24 10 48 89 6C 24 18 57 48 83 EC 
+09:00:43.368    EvaluateFeature  prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+09:00:43.588    hooked: CreateFeature=yes EvaluateFeature=yes EvaluateFeature_C=absent
+09:00:43.588    NVSDK_NGX_VULKAN_CreateFeature     = 00007FF9568944E0
+09:00:43.588    NVSDK_NGX_VULKAN_CreateFeature1    = 00007FF956894500
+09:00:43.588    NVSDK_NGX_VULKAN_EvaluateFeature   = 00007FF956894510
+09:00:43.588    NVSDK_NGX_VULKAN_EvaluateFeature_C = 0000000000000000
+09:00:43.588    VK CreateFeature prologue: 48 83 EC 38 4C 89 4C 24 20 4D 8B C8 44 8B 
+09:00:43.588    VK CreateFeature1 prologue: E9 8B F2 FF FF CC CC CC CC CC CC CC CC CC  <== a thunk into its own module, not a hook
+09:00:43.589        the hook jumps into C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_deepdvc.dll +0x23790
+09:00:43.589    VK EvaluateFeature prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+09:00:43.702      00007FF956894500 is a thunk table entry; the hook goes to its destination 00007FF956893790 so the patch does not overwrite the entries beside it.
+09:00:43.934    hooked: VULKAN CreateFeature=yes CreateFeature1=yes EvaluateFeature=yes EvaluateFeature_C=absent
+09:00:43.972  NGX layer 2: C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlssd.dll (base=00007FF935E50000)
+09:00:43.972    version 310.5.2.0
+09:00:43.972    NVSDK_NGX_D3D11_CreateFeature     = 00007FF935E8A930
+09:00:43.972    NVSDK_NGX_D3D11_EvaluateFeature   = 00007FF935E8AA90
+09:00:43.972    NVSDK_NGX_D3D11_EvaluateFeature_C = 0000000000000000
+09:00:43.972    CreateFeature    prologue: 48 89 5C 24 08 48 89 6C 24 10 56 57 41 56 
+09:00:43.973    EvaluateFeature  prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+09:00:44.203    hooked: CreateFeature=yes EvaluateFeature=yes EvaluateFeature_C=absent
+09:00:44.204    NVSDK_NGX_VULKAN_CreateFeature     = 00007FF935F0B4C0
+09:00:44.204    NVSDK_NGX_VULKAN_CreateFeature1    = 00007FF935F0B4E0
+09:00:44.204    NVSDK_NGX_VULKAN_EvaluateFeature   = 00007FF935F0B4F0
+09:00:44.204    NVSDK_NGX_VULKAN_EvaluateFeature_C = 0000000000000000
+09:00:44.204    VK CreateFeature prologue: 48 83 EC 38 4C 89 4C 24 20 4D 8B C8 44 8B 
+09:00:44.204    VK CreateFeature1 prologue: E9 4B F1 FF FF CC CC CC CC CC CC CC CC CC  <== a thunk into its own module, not a hook
+09:00:44.204        the hook jumps into C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlssd.dll +0xBA630
+09:00:44.204    VK EvaluateFeature prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+09:00:44.312      00007FF935F0B4E0 is a thunk table entry; the hook goes to its destination 00007FF935F0A630 so the patch does not overwrite the entries beside it.
+09:00:44.529    hooked: VULKAN CreateFeature=yes CreateFeature1=yes EvaluateFeature=yes EvaluateFeature_C=absent
+09:00:45.915  [fg-relay] Import=1: the device created at 000000002F4400D0 already carried VK_KHR_external_semaphore_win32; it is recorded for the import.
+09:00:46.138  NGX layer 3: C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlss.dll (base=00007FF9310E0000)
+09:00:46.138    version 310.5.2.0
+09:00:46.139    NVSDK_NGX_D3D11_CreateFeature     = 00007FF931125160
+09:00:46.139    NVSDK_NGX_D3D11_EvaluateFeature   = 00007FF9311252C0
+09:00:46.139    NVSDK_NGX_D3D11_EvaluateFeature_C = 0000000000000000
+09:00:46.139    CreateFeature    prologue: 48 89 5C 24 08 48 89 6C 24 10 56 57 41 56 
+09:00:46.139    EvaluateFeature  prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+09:00:46.339    hooked: CreateFeature=yes EvaluateFeature=yes EvaluateFeature_C=absent
+09:00:46.339    NVSDK_NGX_VULKAN_CreateFeature     = 00007FF9311A79C0
+09:00:46.339    NVSDK_NGX_VULKAN_CreateFeature1    = 00007FF9311A79E0
+09:00:46.339    NVSDK_NGX_VULKAN_EvaluateFeature   = 00007FF9311A79F0
+09:00:46.339    NVSDK_NGX_VULKAN_EvaluateFeature_C = 0000000000000000
+09:00:46.339    VK CreateFeature prologue: 48 83 EC 38 4C 89 4C 24 20 4D 8B C8 44 8B 
+09:00:46.339    VK CreateFeature1 prologue: E9 4B F1 FF FF CC CC CC CC CC CC CC CC CC  <== a thunk into its own module, not a hook
+09:00:46.339        the hook jumps into C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlss.dll +0xC6B30
+09:00:46.340    VK EvaluateFeature prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+09:00:46.432      00007FF9311A79E0 is a thunk table entry; the hook goes to its destination 00007FF9311A6B30 so the patch does not overwrite the entries beside it.
+09:00:46.625    hooked: VULKAN CreateFeature=yes CreateFeature1=yes EvaluateFeature=yes EvaluateFeature_C=absent
+09:00:46.639  NGX layer 3 retirement finalized.
+09:00:48.748  [vkmirror] ReShade created an effect runtime on Vulkan. The mirror takes it.
+09:00:48.839  qpc=2175454867580 [fg-trace] layer queue discovery: 00007FF9D9316D70 hooked
+09:00:49.034  [vkmirror] ReShade created an effect runtime on Vulkan. The mirror takes it.
+09:00:49.187  [vkmirror] ReShade created an effect runtime on Vulkan. The mirror takes it.
+09:00:50.493  NGX layer 3: C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlssnr.dll (base=00007FF8F6A70000)
+09:00:50.493    version 310.8.0.0
+09:00:50.494    NVSDK_NGX_D3D11_CreateFeature     = 00007FF8F6A838B0
+09:00:50.494    NVSDK_NGX_D3D11_EvaluateFeature   = 00007FF8F6A83B20
+09:00:50.494    NVSDK_NGX_D3D11_EvaluateFeature_C = 0000000000000000
+09:00:50.494    CreateFeature    prologue: 40 53 55 56 48 81 EC 80 02 00 00 48 8B 05 
+09:00:50.494    EvaluateFeature  prologue: 40 53 55 56 57 41 56 48 81 EC 60 02 00 00 
+09:00:50.676    hooked: CreateFeature=yes EvaluateFeature=yes EvaluateFeature_C=absent
+09:00:50.676    NVSDK_NGX_VULKAN_CreateFeature     = 00007FF8F6A94A20
+09:00:50.676    NVSDK_NGX_VULKAN_CreateFeature1    = 00007FF8F6A94B70
+09:00:50.676    NVSDK_NGX_VULKAN_EvaluateFeature   = 00007FF8F6A94C80
+09:00:50.676    NVSDK_NGX_VULKAN_EvaluateFeature_C = 0000000000000000
+09:00:50.676    VK CreateFeature prologue: 40 53 55 56 57 41 56 48 81 EC 60 02 00 00 
+09:00:50.677    VK CreateFeature1 prologue: 40 53 55 56 57 41 56 48 81 EC 60 02 00 00 
+09:00:50.677    VK EvaluateFeature prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+09:00:50.941    hooked: VULKAN CreateFeature=yes CreateFeature1=yes EvaluateFeature=yes EvaluateFeature_C=absent
+09:01:04.536  qpc=2175611823063 [fg-trace] vkGetDeviceQueue(layer) family=0 index=1 -> queue=000000002E3928D0 thread=65632
+09:01:04.536  qpc=2175611825818 [fg-trace] vkGetDeviceQueue(layer) family=2 index=1 -> queue=000000002E3950D0 thread=65632
+09:01:04.555  [vkmirror] ReShade created an effect runtime on Vulkan. The mirror takes it.
+09:01:04.561  === Vulkan CreateFeature1 #1  feature_id=1  VkDevice=000000002F4400D0  thread 11608 ===
+09:01:04.598  === Vulkan CreateFeature1 #1 returned 1, handle=00000004ED57FFB0 ===
+09:01:04.598  [vkmirror] the game's create states 5120x2160 -> 5120x2160. That is the shape the mirror will use, in preference to the four scalars its evaluates carry.
+09:01:04.599  [fg-input] native Vulkan DLSS is forwarded without a mirror; the real frame is processed once at the frame-generation input.
+09:01:04.710  === Vulkan CreateFeature1 #2  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:01:04.710  === Vulkan CreateFeature1 #2 returned -1160773630, handle=0000000000000000 ===
+09:01:04.711  qpc=2175613582470 [fg-trace] vkGetDeviceQueue(layer) family=0 index=0 -> queue=000000002E3914D0 thread=11608
+09:01:04.711  qpc=2175613583372 [fg-trace] vkGetDeviceQueue(layer) family=2 index=0 -> queue=000000002E393CD0 thread=11608
+09:01:04.768  [vkmirror] ReShade created an effect runtime on Vulkan. The mirror takes it.
+09:01:04.795  [vkmirror] ReShade created an effect runtime on Vulkan. The mirror takes it.
+09:01:04.848  === Vulkan CreateFeature1 #3  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:01:04.849  === Vulkan CreateFeature1 #3 returned -1160773630, handle=0000000000000000 ===
+09:01:04.900  [vkmirror] ReShade created an effect runtime on Vulkan. The mirror takes it.
+09:01:05.855  === Vulkan CreateFeature1 #4  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:01:05.855  === Vulkan CreateFeature1 #4 returned -1160773630, handle=0000000000000000 ===
+09:01:07.863  === Vulkan CreateFeature1 #5  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:01:07.864  === Vulkan CreateFeature1 #5 returned -1160773630, handle=0000000000000000 ===
+09:01:19.710  [fg-relay] rate/15.0s p2 import_opt=1: presents=44.9/s present-gate[point=44.9 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:01:19.710  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:01:19.710  [fg-relay] rate3: arm->arm avg=0.00ms max=0.00ms n=0 | arm->work avg=0.00ms max=0.00ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.000ms max=0.000ms | copy-land<= avg=0.00ms max=0.00ms | work avg=0.00ms max=0.00ms | totals armed=0 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=0 conflicts=0
+09:01:21.208  === Vulkan CreateFeature1 #6  feature_id=1  VkDevice=000000002F4400D0  thread 11608 ===
+09:01:21.225  === Vulkan CreateFeature1 #6 returned 1, handle=00000026F1F88ED0 ===
+09:01:21.227  === Vulkan CreateFeature1 #7  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:01:21.227  === Vulkan CreateFeature1 #7 returned -1160773630, handle=0000000000000000 ===
+09:01:21.228  === Vulkan CreateFeature1 #8  feature_id=11  VkDevice=000000002F4400D0  thread 11608 ===
+09:01:21.341  === Vulkan CreateFeature1 #8 returned 1, handle=0000000134AC6230 ===
+09:01:21.342    feature 11 is not super resolution; evaluates on this handle will be forwarded and otherwise ignored.
+09:01:21.354  === Vulkan CreateFeature1 #9  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:01:21.354  === Vulkan CreateFeature1 #9 returned -1160773630, handle=0000000000000000 ===
+09:01:21.464  [present-adapter] enabled, idle. Awaiting a new request token; existing requests are ignored.
+09:01:21.467  [fg-input] AutoRun: continuous NR at the frame-generation input; a request with frames=0 stops it. pipeline=serial park
+09:01:21.467  
+09:01:21.467  ################ synth: opening on this add-on's own D3D12 device ################
+09:01:21.472  [bridge] D3D12 device created at feature level 12_1.
+09:01:21.472  [bridge] the D3D12 device came back wrapped by ReShade: 000000264FDA98C0 over 000000013D83C170. NGX is given the unwrapped one, so no other add-on is handed D3D12 objects it never asked for.
+09:01:21.473  [bridge] add-ons loaded at this point, with their bases:
+09:01:21.473  [bridge]   dlss5-bridge.addon64 at 00007FFA3F070000
+09:01:21.473  [bridge]   renodx-dlss5.addon64 at 00007FF98FF90000
+09:01:21.505  [synth] this add-on's own D3D12 device is 000000013D83C170 and its graphics queue is 00000028D4E8EE50
+09:01:21.505  [bridge] NGX D3D12 entry points taken from C:\WINDOWS\System32\DriverStore\FileRepository\nv_dispsi.inf_amd64_b8459fc8f905f657\_nvngx.dll
+09:01:21.505  [synth] NGX data path: C:\Program Files\Hypergryph Launcher\games\Endfield Game\
+09:01:21.700  NGX layer 4: C:\Program Files\Hypergryph Launcher\games\Endfield Game\nvngx_dlss.dll (base=00007FF8CD170000)
+09:01:21.701    version 310.5.2.0
+09:01:21.701    NVSDK_NGX_D3D11_CreateFeature     = 00007FF8CD1B5160
+09:01:21.702    NVSDK_NGX_D3D11_EvaluateFeature   = 00007FF8CD1B52C0
+09:01:21.702    NVSDK_NGX_D3D11_EvaluateFeature_C = 0000000000000000
+09:01:21.702    CreateFeature    prologue: 48 89 5C 24 08 48 89 6C 24 10 56 57 41 56 
+09:01:21.702    EvaluateFeature  prologue: 48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 
+09:01:21.897    hooked: CreateFeature=yes EvaluateFeature=yes EvaluateFeature_C=absent
+09:01:21.897    NVSDK_NGX_VULKAN_CreateFeature     = 00007FF8CD2379C0
+09:01:21.897    NVSDK_NGX_VULKAN_CreateFeature1    = 00007FF8CD2379E0
+09:01:21.897    NVSDK_NGX_VULKAN_EvaluateFeature   = 00007FF8CD2379F0
+09:01:21.897    NVSDK_NGX_VULKAN_EvaluateFeature_C = 0000000000000000
+09:01:21.897    VK CreateFeature prologue: 48 83 EC 38 4C 89 4C 24 20 4D 8B C8 44 8B 
+09:01:21.994      00007FF8CD2379E0 is a thunk table entry; the hook goes to its destination 00007FF8CD236B30 so the patch does not overwrite the entries beside it.
+09:01:22.189    hooked: VULKAN CreateFeature=yes CreateFeature1=yes EvaluateFeature=yes EvaluateFeature_C=absent
+09:01:22.444  [synth] Init_Ext(version=0x13) -> ok
+09:01:22.445  [synth] D3D12 session ready on this add-on's own D3D12 device. The frame does not start on this device, so every texture NGX reads is created shareable here and imported by the API the game renders with.
+09:01:22.445  [synth] Vulkan side ready: VkDevice 000000002F4400D0, VK_KHR_external_memory_win32 enabled, VK_KHR_push_descriptor enabled, 22 entry points resolved out of vulkan-1.dll with no import of it.
+09:01:22.445  [fg-input] building the private feature and its Vulkan import for 5120x2160 R8G8B8A8_UNORM
+09:01:22.452  [bridge] shader compiler: C:\Program Files\Hypergryph Launcher\games\Endfield Game\d3dcompiler_47.dll
+09:01:22.459  [bridge] sRGB conversion ready: R8G8B8A8_UNORM -> linear BT.709 (normalized SDR) -> original encoding.
+09:01:22.459  [synth] colour in R8G8B8A8_UNORM, output R8G8B8A8_UNORM -- the frame is copied into the first and the result is copied back out of the second, because NGX reads one as a shader resource and writes the other through a UAV in the same call.
+09:01:22.459  [synth]   Color  fmt 28 5120x2160 flags=0x20: sample yes, typed UAV yes, UAV load yes, UAV store yes
+09:01:22.460  [synth]   Output fmt 28 5120x2160 flags=0x24: sample yes, typed UAV yes, UAV load yes, UAV store yes
+09:01:22.460  [synth]   Depth  fmt 41 5120x2160 flags=0x20: sample yes, typed UAV yes, UAV load yes, UAV store yes
+09:01:22.460  [synth]   MV     fmt 34 5120x2160 flags=0x20: sample yes, typed UAV yes, UAV load yes, UAV store yes
+09:01:22.460  [bridge] the synthetic contract's create flags 8: DepthInverted
+09:01:22.571  [synth] feature ready on this add-on's own D3D12 device: 5120x2160 -> 5120x2160 handle=00000028D592A670
+09:01:22.571  [synth] imported memory: the image allows types 0x00000003, the imported handle allows 0x00000002 (query returned 0), and the lowest of the two together is taken, index 1. UNVERIFIED on AMD and on Intel -- if the import fails or the picture is wrong on one of those, this line is the first thing to compare.
+09:01:22.572  [synth] 5 D3D12 textures imported into the game's VkDevice -- the four slots, and the pipeline's second Output -- and a 44236800-byte buffer made for the depth aspect to travel through.
+09:01:22.573  [present-adapter] NGX evaluate module: _nvngx.dll internal=nvngx.dll product=NGX.
+09:01:22.573  [present-adapter] NGX evaluate module: 160_E658700.bin internal=DLSS product=NVIDIA Deep Learning SuperSampling.
+09:01:22.573  [present-adapter] NGX evaluate module: nvngx_dlssg.dll internal=DLSS-G product=NVIDIA DLSS-G MFGLW.
+09:01:22.573  [present-adapter] NGX evaluate module: nvngx_deepdvc.dll internal=DEEPDVC product=NVIDIA DEEPDVC.
+09:01:22.573  [present-adapter] NGX evaluate module: nvngx_dlssd.dll internal=DLSS product=NVIDIA DLSS Ray Reconstruction.
+09:01:22.574  [present-adapter] NGX evaluate module: nvngx_dlssnr.dll internal=DLSSNR product=NVIDIA DLSSNR.
+09:01:22.643  [present-adapter] private SR carrier copy ready; external SR calls remain tail-forwarded.
+09:01:22.708  [present-adapter] NR entry witness ready (tail-forward, CPU observation only).
+09:01:22.712  [fg-input] ready: HUD-less -> linear sRGB carrier -> Generic NR -> UI-preserving composite; FG interpolates processed frames. guides: mv=game (scale 5120.000,2160.000) depth=game inverted=1
+09:01:22.714  === Vulkan CreateFeature1 #10  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:01:22.714  === Vulkan CreateFeature1 #10 returned -1160773630, handle=0000000000000000 ===
+09:01:22.714  [fg-census] evaluate observed: MultiFrameIndex=2 thread=36792
+09:01:22.714  [fg-census] pass 1 begins: 131 keys, types tried u/i/f/d/ull/ptr.
+09:01:22.714  [fg-census] DLSSG.AutomodeOverrideReset u=0 i=0 f=0 d=0 ull=0
+09:01:22.714  [fg-census] DLSSG.Backbuffer ptr=0000000134EF6228
+09:01:22.714  [fg-census] DLSSG.BackbufferFormat u=37 i=37 f=37 d=37 ull=37
+09:01:22.714  [fg-census] DLSSG.BackbufferFrameID ptr=00000000000002C5
+09:01:22.714  [fg-census] DLSSG.BackbufferSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.715  [fg-census] DLSSG.BackbufferSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.715  [fg-census] DLSSG.BackbufferSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.715  [fg-census] DLSSG.BackbufferSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.715  [fg-census] DLSSG.BidirectionalDistortionField ptr=0000000000000000
+09:01:22.715  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.Bias u=0 i=0 f=0 d=0 ull=0
+09:01:22.715  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.IsLowPrecision u=0 i=0 f=0 d=0 ull=0
+09:01:22.715  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.Scale u=1 i=1 f=1 d=1 ull=1
+09:01:22.715  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.715  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.715  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.715  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.715  [fg-census] DLSSG.CameraAspectRatio u=2 i=2 f=2.37037 d=2.37037039 ull=2
+09:01:22.716  [fg-census] DLSSG.CameraFOV u=1 i=1 f=1.01229 d=1.01229095 ull=1
+09:01:22.716  [fg-census] DLSSG.CameraFar u=10000 i=10000 f=10000 d=10000 ull=10000
+09:01:22.716  [fg-census] DLSSG.CameraFwdX u=0 i=0 f=-0.738958 d=-0.738957703 ull=0
+09:01:22.716  [fg-census] DLSSG.CameraFwdY u=0 i=0 f=-0.117557 d=-0.117557049 ull=0
+09:01:22.716  [fg-census] DLSSG.CameraFwdZ u=0 i=0 f=0.663417 d=0.663416862 ull=0
+09:01:22.716  [fg-census] DLSSG.CameraMotionIncluded u=1 i=1 f=1 d=1 ull=1
+09:01:22.716  [fg-census] DLSSG.CameraNear u=0 i=0 f=0.1 d=0.100000001 ull=0
+09:01:22.716  [fg-census] DLSSG.CameraPinholeOffsetX u=0 i=0 f=0 d=0 ull=0
+09:01:22.716  [fg-census] DLSSG.CameraPinholeOffsetY u=0 i=0 f=0 d=0 ull=0
+09:01:22.716  [fg-census] DLSSG.CameraPosX u=0 i=0 f=1.19209e-07 d=1.1920929e-07 ull=0
+09:01:22.716  [fg-census] DLSSG.CameraPosY u=4294967295 i=-1 f=-1.37852 d=-1.37852466 ull=18446744073709551615
+09:01:22.716  [fg-census] DLSSG.CameraPosZ u=4294967293 i=-3 f=-3.86705 d=-3.86705446 ull=18446744073709551613
+09:01:22.716  [fg-census] DLSSG.CameraRightX u=0 i=0 f=0.673752 d=0.673751891 ull=0
+09:01:22.717  [fg-census] DLSSG.CameraRightY u=0 i=0 f=-0.128934 d=-0.128934234 ull=0
+09:01:22.717  [fg-census] DLSSG.CameraRightZ u=0 i=0 f=0.727622 d=0.727622449 ull=0
+09:01:22.717  [fg-input] frame=1 5120x2160 vkfmt=37 mode=NR pipeline=serial nr_entries=0 sr_entries=1 sr_copies=1 ok=1 busy_skips=0 token=1.
+09:01:22.717  [fg-census] DLSSG.CameraUpX u=0 i=0 f=7.45058e-09 d=7.4505806e-09 ull=0
+09:01:22.717  [fg-census] DLSSG.CameraUpY u=0 i=0 f=0.984661 d=0.984660506 ull=0
+09:01:22.717  [fg-census] DLSSG.CameraUpZ u=0 i=0 f=0.174481 d=0.174481213 ull=0
+09:01:22.717  [fg-census] DLSSG.CameraViewToClip ptr=0000000134EF6478 m=[0.7611 0 0 0 | 0 1.804 0 0 | 0 0 9.954e-06 -1 | 0 0 0.1 0]
+09:01:22.717  [fg-census] DLSSG.ClipToCameraView ptr=0000000134EF64B8 m=[1.314 -0 -0 0 | 0 -0.5543 -0 0 | 0 -0 -0 10 | 0 -0 -1 9.954e-05]
+09:01:22.717  [fg-census] DLSSG.ClipToLensClip ptr=0000000134EF64F8 m=[1 0 0 0 | 0 1 0 0 | 0 0 1 0 | 0 0 0 1]
+09:01:22.717  [fg-census] DLSSG.ClipToPrevClip ptr=0000000134EF6538 m=[1 -1.49e-08 -4.547e-13 0 | -1.118e-08 1 -2.842e-14 0 | -2.907e-06 0 1 3.815e-06 | 9.031e-12 7.247e-09 0 1]
+09:01:22.717  [fg-census] DLSSG.CmdAlloc ptr=0000000041770FD0
+09:01:22.717  [fg-census] DLSSG.CmdQueue ptr=000000002E393CD0
+09:01:22.717  [fg-census] DLSSG.ColorBuffersHDR u=0 i=0 f=0 d=0 ull=0
+09:01:22.717  [fg-census] DLSSG.Depth ptr=0000000134EF6108
+09:01:22.717  [fg-census] DLSSG.DepthInverted u=1 i=1 f=1 d=1 ull=1
+09:01:22.717  [fg-census] DLSSG.DepthSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.717  [fg-census] DLSSG.DepthSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.717  [fg-census] DLSSG.DepthSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.717  [fg-census] DLSSG.DepthSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.717  [fg-census] DLSSG.Dynamic.ReflexDriven u=0 i=0 f=0 d=0 ull=0
+09:01:22.717  [fg-census] DLSSG.DynamicMaxFrameCount u=5 i=5 f=5 d=5 ull=5
+09:01:22.717  [fg-census] DLSSG.DynamicResolution u=0 i=0 f=0 d=0 ull=0
+09:01:22.718  [fg-census] DLSSG.EnableInterp u=1 i=1 f=1 d=1 ull=1
+09:01:22.718  [fg-census] DLSSG.EstimateVRAMCallback ptr=00007FF94BFD7A70
+09:01:22.718  [fg-census] DLSSG.EvalFlags u=0 i=0 f=0 d=0 ull=0
+09:01:22.718  [fg-census] DLSSG.FenceEvent ptr=0000000000000000
+09:01:22.718  [fg-census] DLSSG.FlipMetering u=0 i=0 f=0 d=0 ull=0
+09:01:22.718  [fg-census] DLSSG.HUDLess ptr=0000000134EF6288
+09:01:22.718  [fg-census] DLSSG.HUDLessSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.718  [fg-census] DLSSG.HUDLessSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.719  [fg-census] DLSSG.HUDLessSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.719  [fg-census] DLSSG.HUDLessSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.719  [fg-census] DLSSG.Height u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.719  [fg-census] DLSSG.InternalHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.719  [fg-census] DLSSG.InternalWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.719  [fg-census] DLSSG.IsRecording u=1 i=1 f=1 d=1 ull=1
+09:01:22.719  [fg-census] DLSSG.JitterOffsetX u=0 i=0 f=-0.125 d=-0.125 ull=0
+09:01:22.719  [fg-census] DLSSG.JitterOffsetY u=0 i=0 f=-0.277778 d=-0.277777791 ull=0
+09:01:22.719  [fg-census] DLSSG.MVecs ptr=0000000134EF6168
+09:01:22.719  [fg-census] DLSSG.MVecsSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.719  [fg-census] DLSSG.MVecsSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.719  [fg-census] DLSSG.MVecsSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.719  [fg-census] DLSSG.MVecsSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.719  [fg-census] DLSSG.MenuDetectionEnabled u=0 i=0 f=0 d=0 ull=0
+09:01:22.719  [fg-census] DLSSG.MinRelativeLinearDepthObjectSeparation u=40 i=40 f=40 d=40 ull=40
+09:01:22.719  [fg-census] DLSSG.ModelVersion u=512 i=512 f=512 d=512 ull=512
+09:01:22.719  [fg-census] DLSSG.MultiFrameCount u=5 i=5 f=5 d=5 ull=5
+09:01:22.719  [fg-census] DLSSG.MultiFrameCountMax u=5 i=5 f=5 d=5 ull=5
+09:01:22.719  [fg-census] DLSSG.MultiFrameIndex u=2 i=2 f=2 d=2 ull=2
+09:01:22.719  [fg-census] DLSSG.MvecDilated u=0 i=0 f=0 d=0 ull=0
+09:01:22.720  [fg-census] DLSSG.MvecInvalidValue u=0 i=-2147483648 f=3.40282e+38 d=3.40282347e+38 ull=9223372036854775808
+09:01:22.720  [fg-census] DLSSG.MvecJittered u=0 i=0 f=0 d=0 ull=0
+09:01:22.720  [fg-census] DLSSG.MvecScaleX u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.720  [fg-census] DLSSG.MvecScaleY u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.720  [fg-census] DLSSG.NoWarp ptr=0000000000000000
+09:01:22.720  [fg-census] DLSSG.NoWarpSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.720  [fg-census] DLSSG.NoWarpSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.720  [fg-census] DLSSG.NoWarpSubrectHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.720  [fg-census] DLSSG.NoWarpSubrectWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.720  [fg-census] DLSSG.NotRenderingGameFrames u=0 i=0 f=0 d=0 ull=0
+09:01:22.720  [fg-census] DLSSG.NvAppOvrAppliedVal.MultiFrameCount u=5 i=5 f=5 d=5 ull=5
+09:01:22.720  [fg-census] DLSSG.NvAppOvrAppliedVal.StreamlineMode u=1 i=1 f=1 d=1 ull=1
+09:01:22.720  [fg-census] DLSSG.OrthoProjection u=0 i=0 f=0 d=0 ull=0
+09:01:22.720  [fg-census] DLSSG.OutputDisableInterpolation ptr=0000000134EF6408
+09:01:22.720  [fg-census] DLSSG.OutputInterpolated ptr=00000026F22EBA88
+09:01:22.720  [fg-census] DLSSG.OutputReal ptr=0000000000000000
+09:01:22.720  [fg-census] DLSSG.PrevClipToClip ptr=0000000134EF6578 m=[1 1.49e-08 4.547e-13 -1.735e-18 | 1.118e-08 1 2.842e-14 -1.084e-19 | 2.907e-06 7.097e-14 1 -3.815e-06 | -9.031e-12 -7.247e-09 -2.101e-22 1]
+09:01:22.720  [fg-census] DLSSG.QueueSubmitCallback ptr=0000000000000000
+09:01:22.721  [fg-census] DLSSG.QueueSubmitCallbackData ptr=0000000000000000
+09:01:22.721  [fg-census] DLSSG.RefreshRate u=119 i=119 f=119.996 d=119.996002 ull=119
+09:01:22.721  [fg-census] DLSSG.Reset u=1 i=1 f=1 d=1 ull=1
+09:01:22.721  [fg-census] DLSSG.StreamlineMode u=1 i=1 f=1 d=1 ull=1
+09:01:22.721  [fg-census] DLSSG.StreamlineVersionTag ptr=00007FF9F993CB50
+09:01:22.721  [fg-census] DLSSG.SyncFlushCallback ptr=0000000000000000
+09:01:22.721  [fg-census] DLSSG.SyncFlushCallbackData ptr=0000000000000000
+09:01:22.721  [fg-census] DLSSG.SyncSignalCallback ptr=0000000000000000
+09:01:22.721  [fg-census] DLSSG.SyncSignalCallbackData ptr=0000000000000000
+09:01:22.721  [fg-census] DLSSG.SyncSignalOnlyCallback ptr=0000000000000000
+09:01:22.721  [fg-census] DLSSG.SyncSignalOnlyCallbackData ptr=0000000000000000
+09:01:22.721  [fg-census] DLSSG.SyncWaitCallback ptr=0000000000000000
+09:01:22.721  [fg-census] DLSSG.SyncWaitCallbackData ptr=0000000000000000
+09:01:22.721  [fg-census] DLSSG.SyncWaitOnlyCallback ptr=0000000000000000
+09:01:22.721  [fg-census] DLSSG.SyncWaitOnlyCallbackData ptr=0000000000000000
+09:01:22.721  [fg-census] DLSSG.TargetFrameRate u=119 i=119 f=119.996 d=119.996002 ull=119
+09:01:22.721  [fg-census] DLSSG.UI ptr=0000000000000000
+09:01:22.721  [fg-census] DLSSG.UIAlpha ptr=0000000000000000
+09:01:22.721  [fg-census] DLSSG.UIAlphaSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.721  [fg-census] DLSSG.UIAlphaSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.722  [fg-census] DLSSG.UIAlphaSubrectHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.722  [fg-census] DLSSG.UIAlphaSubrectWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.722  [fg-census] DLSSG.UISubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.722  [fg-census] DLSSG.UISubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.722  [fg-census] DLSSG.UISubrectHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.722  [fg-census] DLSSG.UISubrectWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.722  [fg-census] DLSSG.UserInterfaceRecompositionEnabled u=0 i=0 f=0 d=0 ull=0
+09:01:22.722  [fg-census] DLSSG.VSyncDriverRequested u=1 i=1 f=1 d=1 ull=1
+09:01:22.722  [fg-census] DLSSG.VSyncOn u=0 i=0 f=0 d=0 ull=0
+09:01:22.722  [fg-census] DLSSG.VSyncSupported u=0 i=0 f=0 d=0 ull=0
+09:01:22.722  [fg-census] DLSSG.VkOFAModeRequest u=1 i=1 f=1 d=1 ull=1
+09:01:22.722  [fg-census] DLSSG.Width u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.722  [fg-census] DLSSG.run_lowres_mvec_pass u=1 i=1 f=1 d=1 ull=1
+09:01:22.722  [fg-census] pass 1 ends.
+09:01:22.722  [fg-census] evaluate observed: MultiFrameIndex=3 thread=36792
+09:01:22.723  [fg-census] pass 2 begins: 131 keys, types tried u/i/f/d/ull/ptr.
+09:01:22.723  [fg-census] DLSSG.AutomodeOverrideReset u=0 i=0 f=0 d=0 ull=0
+09:01:22.723  [fg-census] DLSSG.Backbuffer ptr=0000000134EF6228
+09:01:22.723  [fg-census] DLSSG.BackbufferFormat u=37 i=37 f=37 d=37 ull=37
+09:01:22.723  [fg-census] DLSSG.BackbufferFrameID ptr=00000000000002C5
+09:01:22.723  [fg-census] DLSSG.BackbufferSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.723  [fg-census] DLSSG.BackbufferSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.723  [fg-census] DLSSG.BackbufferSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.723  [fg-census] DLSSG.BackbufferSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.723  [fg-census] DLSSG.BidirectionalDistortionField ptr=0000000000000000
+09:01:22.723  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.Bias u=0 i=0 f=0 d=0 ull=0
+09:01:22.723  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.IsLowPrecision u=0 i=0 f=0 d=0 ull=0
+09:01:22.723  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.Scale u=1 i=1 f=1 d=1 ull=1
+09:01:22.723  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.723  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.723  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.723  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.723  [fg-census] DLSSG.CameraAspectRatio u=2 i=2 f=2.37037 d=2.37037039 ull=2
+09:01:22.724  [fg-census] DLSSG.CameraFOV u=1 i=1 f=1.01229 d=1.01229095 ull=1
+09:01:22.724  [fg-census] DLSSG.CameraFar u=10000 i=10000 f=10000 d=10000 ull=10000
+09:01:22.724  [fg-census] DLSSG.CameraFwdX u=0 i=0 f=-0.738958 d=-0.738957703 ull=0
+09:01:22.724  [fg-census] DLSSG.CameraFwdY u=0 i=0 f=-0.117557 d=-0.117557049 ull=0
+09:01:22.724  [fg-census] DLSSG.CameraFwdZ u=0 i=0 f=0.663417 d=0.663416862 ull=0
+09:01:22.724  [fg-census] DLSSG.CameraMotionIncluded u=1 i=1 f=1 d=1 ull=1
+09:01:22.724  [fg-census] DLSSG.CameraNear u=0 i=0 f=0.1 d=0.100000001 ull=0
+09:01:22.724  [fg-census] DLSSG.CameraPinholeOffsetX u=0 i=0 f=0 d=0 ull=0
+09:01:22.724  [fg-census] DLSSG.CameraPinholeOffsetY u=0 i=0 f=0 d=0 ull=0
+09:01:22.724  [fg-census] DLSSG.CameraPosX u=0 i=0 f=1.19209e-07 d=1.1920929e-07 ull=0
+09:01:22.724  [fg-census] DLSSG.CameraPosY u=4294967295 i=-1 f=-1.37852 d=-1.37852466 ull=18446744073709551615
+09:01:22.724  [fg-census] DLSSG.CameraPosZ u=4294967293 i=-3 f=-3.86705 d=-3.86705446 ull=18446744073709551613
+09:01:22.724  [fg-census] DLSSG.CameraRightX u=0 i=0 f=0.673752 d=0.673751891 ull=0
+09:01:22.724  [fg-census] DLSSG.CameraRightY u=0 i=0 f=-0.128934 d=-0.128934234 ull=0
+09:01:22.724  [fg-census] DLSSG.CameraRightZ u=0 i=0 f=0.727622 d=0.727622449 ull=0
+09:01:22.724  [fg-census] DLSSG.CameraUpX u=0 i=0 f=7.45058e-09 d=7.4505806e-09 ull=0
+09:01:22.724  [fg-census] DLSSG.CameraUpY u=0 i=0 f=0.984661 d=0.984660506 ull=0
+09:01:22.725  [fg-census] DLSSG.CameraUpZ u=0 i=0 f=0.174481 d=0.174481213 ull=0
+09:01:22.725  [fg-census] DLSSG.CameraViewToClip ptr=0000000134EF6478 m=[0.7611 0 0 0 | 0 1.804 0 0 | 0 0 9.954e-06 -1 | 0 0 0.1 0]
+09:01:22.725  [fg-census] DLSSG.ClipToCameraView ptr=0000000134EF64B8 m=[1.314 -0 -0 0 | 0 -0.5543 -0 0 | 0 -0 -0 10 | 0 -0 -1 9.954e-05]
+09:01:22.725  [fg-census] DLSSG.ClipToLensClip ptr=0000000134EF64F8 m=[1 0 0 0 | 0 1 0 0 | 0 0 1 0 | 0 0 0 1]
+09:01:22.725  [fg-census] DLSSG.ClipToPrevClip ptr=0000000134EF6538 m=[1 -1.49e-08 -4.547e-13 0 | -1.118e-08 1 -2.842e-14 0 | -2.907e-06 0 1 3.815e-06 | 9.031e-12 7.247e-09 0 1]
+09:01:22.725  [fg-census] DLSSG.CmdAlloc ptr=00000000417714D0
+09:01:22.725  [fg-census] DLSSG.CmdQueue ptr=000000002E393CD0
+09:01:22.725  [fg-census] DLSSG.ColorBuffersHDR u=0 i=0 f=0 d=0 ull=0
+09:01:22.725  [fg-census] DLSSG.Depth ptr=0000000134EF6108
+09:01:22.725  [fg-census] DLSSG.DepthInverted u=1 i=1 f=1 d=1 ull=1
+09:01:22.726  [fg-census] DLSSG.DepthSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.726  [fg-census] DLSSG.DepthSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.726  [fg-census] DLSSG.DepthSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.726  [fg-census] DLSSG.DepthSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.726  [fg-census] DLSSG.Dynamic.ReflexDriven u=0 i=0 f=0 d=0 ull=0
+09:01:22.726  [fg-census] DLSSG.DynamicMaxFrameCount u=5 i=5 f=5 d=5 ull=5
+09:01:22.726  [fg-census] DLSSG.DynamicResolution u=0 i=0 f=0 d=0 ull=0
+09:01:22.726  [fg-census] DLSSG.EnableInterp u=1 i=1 f=1 d=1 ull=1
+09:01:22.726  [fg-census] DLSSG.EstimateVRAMCallback ptr=00007FF94BFD7A70
+09:01:22.726  [fg-census] DLSSG.EvalFlags u=0 i=0 f=0 d=0 ull=0
+09:01:22.726  [fg-census] DLSSG.FenceEvent ptr=0000000000000000
+09:01:22.726  [fg-census] DLSSG.FlipMetering u=0 i=0 f=0 d=0 ull=0
+09:01:22.726  [fg-census] DLSSG.HUDLess ptr=0000000134EF6288
+09:01:22.726  [fg-census] DLSSG.HUDLessSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.726  [fg-census] DLSSG.HUDLessSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.726  [fg-census] DLSSG.HUDLessSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.726  [fg-census] DLSSG.HUDLessSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.727  [fg-census] DLSSG.Height u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.727  [fg-census] DLSSG.InternalHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.727  [fg-census] DLSSG.InternalWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.727  [fg-census] DLSSG.IsRecording u=1 i=1 f=1 d=1 ull=1
+09:01:22.727  [fg-census] DLSSG.JitterOffsetX u=0 i=0 f=-0.125 d=-0.125 ull=0
+09:01:22.727  [fg-census] DLSSG.JitterOffsetY u=0 i=0 f=-0.277778 d=-0.277777791 ull=0
+09:01:22.727  [fg-census] DLSSG.MVecs ptr=0000000134EF6168
+09:01:22.727  [fg-census] DLSSG.MVecsSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.727  [fg-census] DLSSG.MVecsSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.727  [fg-census] DLSSG.MVecsSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.727  [fg-census] DLSSG.MVecsSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.727  [fg-census] DLSSG.MenuDetectionEnabled u=0 i=0 f=0 d=0 ull=0
+09:01:22.727  [fg-census] DLSSG.MinRelativeLinearDepthObjectSeparation u=40 i=40 f=40 d=40 ull=40
+09:01:22.727  [fg-census] DLSSG.ModelVersion u=512 i=512 f=512 d=512 ull=512
+09:01:22.727  [fg-census] DLSSG.MultiFrameCount u=5 i=5 f=5 d=5 ull=5
+09:01:22.727  [fg-census] DLSSG.MultiFrameCountMax u=5 i=5 f=5 d=5 ull=5
+09:01:22.727  [fg-census] DLSSG.MultiFrameIndex u=3 i=3 f=3 d=3 ull=3
+09:01:22.727  [fg-census] DLSSG.MvecDilated u=0 i=0 f=0 d=0 ull=0
+09:01:22.727  [fg-census] DLSSG.MvecInvalidValue u=0 i=-2147483648 f=3.40282e+38 d=3.40282347e+38 ull=9223372036854775808
+09:01:22.728  [fg-census] DLSSG.MvecJittered u=0 i=0 f=0 d=0 ull=0
+09:01:22.728  [fg-census] DLSSG.MvecScaleX u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.728  [fg-census] DLSSG.MvecScaleY u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.728  [fg-census] DLSSG.NoWarp ptr=0000000000000000
+09:01:22.728  [fg-census] DLSSG.NoWarpSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.728  [fg-census] DLSSG.NoWarpSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.728  [fg-census] DLSSG.NoWarpSubrectHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.728  [fg-census] DLSSG.NoWarpSubrectWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.728  [fg-census] DLSSG.NotRenderingGameFrames u=0 i=0 f=0 d=0 ull=0
+09:01:22.728  [fg-census] DLSSG.NvAppOvrAppliedVal.MultiFrameCount u=5 i=5 f=5 d=5 ull=5
+09:01:22.728  [fg-census] DLSSG.NvAppOvrAppliedVal.StreamlineMode u=1 i=1 f=1 d=1 ull=1
+09:01:22.728  [fg-census] DLSSG.OrthoProjection u=0 i=0 f=0 d=0 ull=0
+09:01:22.728  [fg-census] DLSSG.OutputDisableInterpolation ptr=0000000134EF6408
+09:01:22.728  [fg-census] DLSSG.OutputInterpolated ptr=00000026F22EBB48
+09:01:22.728  [fg-census] DLSSG.OutputReal ptr=0000000000000000
+09:01:22.728  [fg-census] DLSSG.PrevClipToClip ptr=0000000134EF6578 m=[1 1.49e-08 4.547e-13 -1.735e-18 | 1.118e-08 1 2.842e-14 -1.084e-19 | 2.907e-06 7.097e-14 1 -3.815e-06 | -9.031e-12 -7.247e-09 -2.101e-22 1]
+09:01:22.728  [fg-census] DLSSG.QueueSubmitCallback ptr=0000000000000000
+09:01:22.728  [fg-census] DLSSG.QueueSubmitCallbackData ptr=0000000000000000
+09:01:22.729  [fg-census] DLSSG.RefreshRate u=119 i=119 f=119.996 d=119.996002 ull=119
+09:01:22.729  [fg-census] DLSSG.Reset u=1 i=1 f=1 d=1 ull=1
+09:01:22.729  [fg-census] DLSSG.StreamlineMode u=1 i=1 f=1 d=1 ull=1
+09:01:22.729  [fg-census] DLSSG.StreamlineVersionTag ptr=00007FF9F993CB50
+09:01:22.729  [fg-census] DLSSG.SyncFlushCallback ptr=0000000000000000
+09:01:22.729  [fg-census] DLSSG.SyncFlushCallbackData ptr=0000000000000000
+09:01:22.729  [fg-census] DLSSG.SyncSignalCallback ptr=0000000000000000
+09:01:22.729  [fg-census] DLSSG.SyncSignalCallbackData ptr=0000000000000000
+09:01:22.729  [fg-census] DLSSG.SyncSignalOnlyCallback ptr=0000000000000000
+09:01:22.729  [fg-census] DLSSG.SyncSignalOnlyCallbackData ptr=0000000000000000
+09:01:22.729  [fg-census] DLSSG.SyncWaitCallback ptr=0000000000000000
+09:01:22.729  [fg-census] DLSSG.SyncWaitCallbackData ptr=0000000000000000
+09:01:22.730  [fg-census] DLSSG.SyncWaitOnlyCallback ptr=0000000000000000
+09:01:22.730  [fg-census] DLSSG.SyncWaitOnlyCallbackData ptr=0000000000000000
+09:01:22.730  [fg-census] DLSSG.TargetFrameRate u=119 i=119 f=119.996 d=119.996002 ull=119
+09:01:22.730  [fg-census] DLSSG.UI ptr=0000000000000000
+09:01:22.730  [fg-census] DLSSG.UIAlpha ptr=0000000000000000
+09:01:22.730  [fg-census] DLSSG.UIAlphaSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.730  [fg-census] DLSSG.UIAlphaSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.730  [fg-census] DLSSG.UIAlphaSubrectHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.730  [fg-census] DLSSG.UIAlphaSubrectWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.730  [fg-census] DLSSG.UISubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.730  [fg-census] DLSSG.UISubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.731  [fg-census] DLSSG.UISubrectHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.731  [fg-census] DLSSG.UISubrectWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.731  [fg-census] DLSSG.UserInterfaceRecompositionEnabled u=0 i=0 f=0 d=0 ull=0
+09:01:22.731  [fg-census] DLSSG.VSyncDriverRequested u=1 i=1 f=1 d=1 ull=1
+09:01:22.731  [fg-census] DLSSG.VSyncOn u=0 i=0 f=0 d=0 ull=0
+09:01:22.731  [fg-census] DLSSG.VSyncSupported u=0 i=0 f=0 d=0 ull=0
+09:01:22.731  [fg-census] DLSSG.VkOFAModeRequest u=1 i=1 f=1 d=1 ull=1
+09:01:22.731  [fg-census] DLSSG.Width u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.731  [fg-census] DLSSG.run_lowres_mvec_pass u=1 i=1 f=1 d=1 ull=1
+09:01:22.731  [fg-census] pass 2 ends.
+09:01:22.731  [fg-census] evaluate observed: MultiFrameIndex=4 thread=36792
+09:01:22.731  [fg-census] pass 3 begins: 131 keys, types tried u/i/f/d/ull/ptr.
+09:01:22.731  [fg-census] DLSSG.AutomodeOverrideReset u=0 i=0 f=0 d=0 ull=0
+09:01:22.731  [fg-census] DLSSG.Backbuffer ptr=0000000134EF6228
+09:01:22.731  [fg-census] DLSSG.BackbufferFormat u=37 i=37 f=37 d=37 ull=37
+09:01:22.732  [fg-census] DLSSG.BackbufferFrameID ptr=00000000000002C5
+09:01:22.732  [fg-census] DLSSG.BackbufferSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.732  [fg-census] DLSSG.BackbufferSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.732  [fg-census] DLSSG.BackbufferSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.732  [fg-census] DLSSG.BackbufferSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.732  [fg-census] DLSSG.BidirectionalDistortionField ptr=0000000000000000
+09:01:22.732  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.Bias u=0 i=0 f=0 d=0 ull=0
+09:01:22.732  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.IsLowPrecision u=0 i=0 f=0 d=0 ull=0
+09:01:22.732  [fg-census] DLSSG.BidirectionalDistortionFieldLowPrecision.Scale u=1 i=1 f=1 d=1 ull=1
+09:01:22.732  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.732  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.732  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.732  [fg-census] DLSSG.BidirectionalDistortionFieldSubrectWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.732  [fg-census] DLSSG.CameraAspectRatio u=2 i=2 f=2.37037 d=2.37037039 ull=2
+09:01:22.732  [fg-census] DLSSG.CameraFOV u=1 i=1 f=1.01229 d=1.01229095 ull=1
+09:01:22.732  [fg-census] DLSSG.CameraFar u=10000 i=10000 f=10000 d=10000 ull=10000
+09:01:22.732  [fg-census] DLSSG.CameraFwdX u=0 i=0 f=-0.738958 d=-0.738957703 ull=0
+09:01:22.732  [fg-census] DLSSG.CameraFwdY u=0 i=0 f=-0.117557 d=-0.117557049 ull=0
+09:01:22.732  [fg-census] DLSSG.CameraFwdZ u=0 i=0 f=0.663417 d=0.663416862 ull=0
+09:01:22.733  [fg-census] DLSSG.CameraMotionIncluded u=1 i=1 f=1 d=1 ull=1
+09:01:22.733  [fg-census] DLSSG.CameraNear u=0 i=0 f=0.1 d=0.100000001 ull=0
+09:01:22.733  [fg-census] DLSSG.CameraPinholeOffsetX u=0 i=0 f=0 d=0 ull=0
+09:01:22.733  [fg-census] DLSSG.CameraPinholeOffsetY u=0 i=0 f=0 d=0 ull=0
+09:01:22.733  [fg-census] DLSSG.CameraPosX u=0 i=0 f=1.19209e-07 d=1.1920929e-07 ull=0
+09:01:22.733  [fg-census] DLSSG.CameraPosY u=4294967295 i=-1 f=-1.37852 d=-1.37852466 ull=18446744073709551615
+09:01:22.733  [fg-census] DLSSG.CameraPosZ u=4294967293 i=-3 f=-3.86705 d=-3.86705446 ull=18446744073709551613
+09:01:22.733  [fg-census] DLSSG.CameraRightX u=0 i=0 f=0.673752 d=0.673751891 ull=0
+09:01:22.733  [fg-census] DLSSG.CameraRightY u=0 i=0 f=-0.128934 d=-0.128934234 ull=0
+09:01:22.733  [fg-census] DLSSG.CameraRightZ u=0 i=0 f=0.727622 d=0.727622449 ull=0
+09:01:22.733  [fg-census] DLSSG.CameraUpX u=0 i=0 f=7.45058e-09 d=7.4505806e-09 ull=0
+09:01:22.733  [fg-census] DLSSG.CameraUpY u=0 i=0 f=0.984661 d=0.984660506 ull=0
+09:01:22.733  [fg-census] DLSSG.CameraUpZ u=0 i=0 f=0.174481 d=0.174481213 ull=0
+09:01:22.733  [fg-census] DLSSG.CameraViewToClip ptr=0000000134EF6478 m=[0.7611 0 0 0 | 0 1.804 0 0 | 0 0 9.954e-06 -1 | 0 0 0.1 0]
+09:01:22.733  [fg-census] DLSSG.ClipToCameraView ptr=0000000134EF64B8 m=[1.314 -0 -0 0 | 0 -0.5543 -0 0 | 0 -0 -0 10 | 0 -0 -1 9.954e-05]
+09:01:22.733  [fg-census] DLSSG.ClipToLensClip ptr=0000000134EF64F8 m=[1 0 0 0 | 0 1 0 0 | 0 0 1 0 | 0 0 0 1]
+09:01:22.733  [fg-census] DLSSG.ClipToPrevClip ptr=0000000134EF6538 m=[1 -1.49e-08 -4.547e-13 0 | -1.118e-08 1 -2.842e-14 0 | -2.907e-06 0 1 3.815e-06 | 9.031e-12 7.247e-09 0 1]
+09:01:22.733  [fg-census] DLSSG.CmdAlloc ptr=00000000417719D0
+09:01:22.733  [fg-census] DLSSG.CmdQueue ptr=000000002E393CD0
+09:01:22.733  [fg-census] DLSSG.ColorBuffersHDR u=0 i=0 f=0 d=0 ull=0
+09:01:22.734  [fg-census] DLSSG.Depth ptr=0000000134EF6108
+09:01:22.734  [fg-census] DLSSG.DepthInverted u=1 i=1 f=1 d=1 ull=1
+09:01:22.734  [fg-census] DLSSG.DepthSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.734  [fg-census] DLSSG.DepthSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.734  [fg-census] DLSSG.DepthSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.734  [fg-census] DLSSG.DepthSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.734  [fg-census] DLSSG.Dynamic.ReflexDriven u=0 i=0 f=0 d=0 ull=0
+09:01:22.734  [fg-census] DLSSG.DynamicMaxFrameCount u=5 i=5 f=5 d=5 ull=5
+09:01:22.734  [fg-census] DLSSG.DynamicResolution u=0 i=0 f=0 d=0 ull=0
+09:01:22.734  [fg-census] DLSSG.EnableInterp u=1 i=1 f=1 d=1 ull=1
+09:01:22.734  [fg-census] DLSSG.EstimateVRAMCallback ptr=00007FF94BFD7A70
+09:01:22.734  [fg-census] DLSSG.EvalFlags u=0 i=0 f=0 d=0 ull=0
+09:01:22.734  [fg-census] DLSSG.FenceEvent ptr=0000000000000000
+09:01:22.734  [fg-census] DLSSG.FlipMetering u=0 i=0 f=0 d=0 ull=0
+09:01:22.734  [fg-census] DLSSG.HUDLess ptr=0000000134EF6288
+09:01:22.734  [fg-census] DLSSG.HUDLessSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.734  [fg-census] DLSSG.HUDLessSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.734  [fg-census] DLSSG.HUDLessSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.734  [fg-census] DLSSG.HUDLessSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.734  [fg-census] DLSSG.Height u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.735  [fg-census] DLSSG.InternalHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.735  [fg-census] DLSSG.InternalWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.735  [fg-census] DLSSG.IsRecording u=1 i=1 f=1 d=1 ull=1
+09:01:22.735  [fg-census] DLSSG.JitterOffsetX u=0 i=0 f=-0.125 d=-0.125 ull=0
+09:01:22.735  [fg-census] DLSSG.JitterOffsetY u=0 i=0 f=-0.277778 d=-0.277777791 ull=0
+09:01:22.735  [fg-census] DLSSG.MVecs ptr=0000000134EF6168
+09:01:22.735  [fg-census] DLSSG.MVecsSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.735  [fg-census] DLSSG.MVecsSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.735  [fg-census] DLSSG.MVecsSubrectHeight u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.735  [fg-census] DLSSG.MVecsSubrectWidth u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.735  [fg-census] DLSSG.MenuDetectionEnabled u=0 i=0 f=0 d=0 ull=0
+09:01:22.735  [fg-census] DLSSG.MinRelativeLinearDepthObjectSeparation u=40 i=40 f=40 d=40 ull=40
+09:01:22.735  [fg-census] DLSSG.ModelVersion u=512 i=512 f=512 d=512 ull=512
+09:01:22.735  [fg-census] DLSSG.MultiFrameCount u=5 i=5 f=5 d=5 ull=5
+09:01:22.735  [fg-census] DLSSG.MultiFrameCountMax u=5 i=5 f=5 d=5 ull=5
+09:01:22.735  [fg-census] DLSSG.MultiFrameIndex u=4 i=4 f=4 d=4 ull=4
+09:01:22.735  [fg-census] DLSSG.MvecDilated u=0 i=0 f=0 d=0 ull=0
+09:01:22.735  [fg-census] DLSSG.MvecInvalidValue u=0 i=-2147483648 f=3.40282e+38 d=3.40282347e+38 ull=9223372036854775808
+09:01:22.735  [fg-census] DLSSG.MvecJittered u=0 i=0 f=0 d=0 ull=0
+09:01:22.736  [fg-census] DLSSG.MvecScaleX u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.736  [fg-census] DLSSG.MvecScaleY u=2160 i=2160 f=2160 d=2160 ull=2160
+09:01:22.736  [fg-census] DLSSG.NoWarp ptr=0000000000000000
+09:01:22.736  [fg-census] DLSSG.NoWarpSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.736  [fg-census] DLSSG.NoWarpSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.736  [fg-census] DLSSG.NoWarpSubrectHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.736  [fg-census] DLSSG.NoWarpSubrectWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.736  [fg-census] DLSSG.NotRenderingGameFrames u=0 i=0 f=0 d=0 ull=0
+09:01:22.736  [fg-census] DLSSG.NvAppOvrAppliedVal.MultiFrameCount u=5 i=5 f=5 d=5 ull=5
+09:01:22.736  [fg-census] DLSSG.NvAppOvrAppliedVal.StreamlineMode u=1 i=1 f=1 d=1 ull=1
+09:01:22.736  [fg-census] DLSSG.OrthoProjection u=0 i=0 f=0 d=0 ull=0
+09:01:22.736  [fg-census] DLSSG.OutputDisableInterpolation ptr=0000000134EF6408
+09:01:22.736  [fg-census] DLSSG.OutputInterpolated ptr=00000026F22EBC08
+09:01:22.736  [fg-census] DLSSG.OutputReal ptr=0000000000000000
+09:01:22.736  [fg-census] DLSSG.PrevClipToClip ptr=0000000134EF6578 m=[1 1.49e-08 4.547e-13 -1.735e-18 | 1.118e-08 1 2.842e-14 -1.084e-19 | 2.907e-06 7.097e-14 1 -3.815e-06 | -9.031e-12 -7.247e-09 -2.101e-22 1]
+09:01:22.736  [fg-census] DLSSG.QueueSubmitCallback ptr=0000000000000000
+09:01:22.736  [fg-census] DLSSG.QueueSubmitCallbackData ptr=0000000000000000
+09:01:22.736  [fg-census] DLSSG.RefreshRate u=119 i=119 f=119.996 d=119.996002 ull=119
+09:01:22.736  [fg-census] DLSSG.Reset u=1 i=1 f=1 d=1 ull=1
+09:01:22.736  [fg-census] DLSSG.StreamlineMode u=1 i=1 f=1 d=1 ull=1
+09:01:22.736  [fg-census] DLSSG.StreamlineVersionTag ptr=00007FF9F993CB50
+09:01:22.737  [fg-census] DLSSG.SyncFlushCallback ptr=0000000000000000
+09:01:22.737  [fg-census] DLSSG.SyncFlushCallbackData ptr=0000000000000000
+09:01:22.737  [fg-census] DLSSG.SyncSignalCallback ptr=0000000000000000
+09:01:22.737  [fg-census] DLSSG.SyncSignalCallbackData ptr=0000000000000000
+09:01:22.737  [fg-census] DLSSG.SyncSignalOnlyCallback ptr=0000000000000000
+09:01:22.737  [fg-census] DLSSG.SyncSignalOnlyCallbackData ptr=0000000000000000
+09:01:22.737  [fg-census] DLSSG.SyncWaitCallback ptr=0000000000000000
+09:01:22.737  [fg-census] DLSSG.SyncWaitCallbackData ptr=0000000000000000
+09:01:22.737  [fg-census] DLSSG.SyncWaitOnlyCallback ptr=0000000000000000
+09:01:22.737  [fg-census] DLSSG.SyncWaitOnlyCallbackData ptr=0000000000000000
+09:01:22.737  [fg-census] DLSSG.TargetFrameRate u=119 i=119 f=119.996 d=119.996002 ull=119
+09:01:22.737  [fg-census] DLSSG.UI ptr=0000000000000000
+09:01:22.737  [fg-census] DLSSG.UIAlpha ptr=0000000000000000
+09:01:22.737  [fg-census] DLSSG.UIAlphaSubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.737  [fg-census] DLSSG.UIAlphaSubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.737  [fg-census] DLSSG.UIAlphaSubrectHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.737  [fg-census] DLSSG.UIAlphaSubrectWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.737  [fg-census] DLSSG.UISubrectBaseX u=0 i=0 f=0 d=0 ull=0
+09:01:22.737  [fg-census] DLSSG.UISubrectBaseY u=0 i=0 f=0 d=0 ull=0
+09:01:22.737  [fg-census] DLSSG.UISubrectHeight u=0 i=0 f=0 d=0 ull=0
+09:01:22.737  [fg-census] DLSSG.UISubrectWidth u=0 i=0 f=0 d=0 ull=0
+09:01:22.737  [fg-census] DLSSG.UserInterfaceRecompositionEnabled u=0 i=0 f=0 d=0 ull=0
+09:01:22.738  [fg-census] DLSSG.VSyncDriverRequested u=1 i=1 f=1 d=1 ull=1
+09:01:22.738  [fg-census] DLSSG.VSyncOn u=0 i=0 f=0 d=0 ull=0
+09:01:22.738  [fg-census] DLSSG.VSyncSupported u=0 i=0 f=0 d=0 ull=0
+09:01:22.738  [fg-census] DLSSG.VkOFAModeRequest u=1 i=1 f=1 d=1 ull=1
+09:01:22.738  [fg-census] DLSSG.Width u=5120 i=5120 f=5120 d=5120 ull=5120
+09:01:22.738  [fg-census] DLSSG.run_lowres_mvec_pass u=1 i=1 f=1 d=1 ull=1
+09:01:22.738  [fg-census] pass 3 ends.
+09:01:22.738  NGX layer 4 retirement finalized.
+09:01:22.739  [fg-relay] open. Copy completion is signalled to the private queue on the GPU (exported timeline semaphore); the park release is set on the GPU (imported D3D12 fence). Pipeline=2 Import=1.
+09:01:22.739  [fg-relay] command pool for queue 000000002E393CD0: family=2.
+09:01:22.739  [fg-relay] armed by evaluate: hud=435f7ed0 back=3df15ad0 depth=435f78d0 mv=435f72d0 5120x2160 copy=1 nr=1 import=1 slot=1 arm=1 gpu-wait-nr=0 pending=0.
+09:01:22.739  [fg-relay] evaluate: slot=1 nr=1 import=1 stage=3.
+09:01:22.950  [fg-relay] frame=1 slot=1 nr=1 ok=1 wrote=1 nr_entries=0 import=1 armed=1 skipped=0 busy=0 mismatch=0 conflicts=0.
+09:01:22.951  [fg-relay] armed by evaluate: hud=435f7ed0 back=3df1d2d0 depth=435f78d0 mv=435f72d0 5120x2160 copy=2 nr=2 import=1 slot=2 arm=2 gpu-wait-nr=1 pending=0.
+09:01:22.951  [fg-relay] evaluate: slot=2 nr=2 import=1 stage=3.
+09:01:23.052  [fg-relay] frame=2 slot=2 nr=2 ok=1 wrote=1 nr_entries=1 import=1 armed=2 skipped=0 busy=0 mismatch=0 conflicts=0.
+09:01:24.782  [fg-relay] armed by evaluate: hud=435f7ed0 back=3df18ad0 depth=435f78d0 mv=435f72d0 5120x2160 copy=3 nr=3 import=1 slot=3 arm=3 gpu-wait-nr=2 pending=0.
+09:01:24.783  [fg-relay] evaluate: slot=3 nr=3 import=1 stage=3.
+09:01:24.795  [fg-relay] frame=3 slot=3 nr=3 ok=1 wrote=1 nr_entries=2 import=1 armed=3 skipped=0 busy=0 mismatch=0 conflicts=0.
+09:01:34.711  [fg-relay] rate/15.0s p2 import_opt=1: presents=16.9/s present-gate[point=16.9 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=14.4/s armed=14.4/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=13.5/s flips=0.0/s
+09:01:34.711  [fg-relay] rate2: fginput eval=72.1/s index!=1=57.6/s eval-gate[off=0.0 fallback=0.0 notready=0.1 noinput=0.0 noqueue=0.0]/s relay eval=14.4/s consume=0.0/s inplace=14.4/s(ok 14.4/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=14.4/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=14.4/s ok=14.4/s fail=0.0/s nr_absent=0.1/s copyfail=0.0/s
+09:01:34.711  [fg-relay] rate3: arm->arm avg=55.55ms max=1830.66ms n=215 | arm->work avg=0.01ms max=0.13ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.063ms | copy-land<= avg=55.50ms max=1829.60ms | work avg=5.88ms max=211.27ms | totals armed=216 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=216 conflicts=0
+09:01:40.679  [fg-relay] command pool for queue 000000002E3928D0: family=0.
+09:01:49.711  [fg-relay] rate/15.0s p2 import_opt=1: presents=36.8/s present-gate[point=36.8 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=15.1/s armed=15.1/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=14.4/s flips=0.0/s
+09:01:49.711  [fg-relay] rate2: fginput eval=75.9/s index!=1=60.8/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=15.1/s consume=0.0/s inplace=15.1/s(ok 15.1/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=15.1/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=15.1/s ok=15.1/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:01:49.711  [fg-relay] rate3: arm->arm avg=55.63ms max=1830.66ms n=442 | arm->work avg=0.01ms max=0.13ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.063ms | copy-land<= avg=56.28ms max=1829.60ms | work avg=5.60ms max=211.27ms | totals armed=443 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=443 conflicts=0
+09:01:52.330  === Vulkan CreateFeature1 #11  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:01:52.330  === Vulkan CreateFeature1 #11 returned -1160773630, handle=0000000000000000 ===
+09:01:56.336  === Vulkan CreateFeature1 #12  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:01:56.336  === Vulkan CreateFeature1 #12 returned -1160773630, handle=0000000000000000 ===
+09:02:04.343  === Vulkan CreateFeature1 #13  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:02:04.343  === Vulkan CreateFeature1 #13 returned -1160773630, handle=0000000000000000 ===
+09:02:04.701  [fg-relay] rate/15.0s p2 import_opt=1: presents=86.1/s present-gate[point=86.1 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:02:04.701  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:02:04.701  [fg-relay] rate3: arm->arm avg=55.63ms max=1830.66ms n=442 | arm->work avg=0.01ms max=0.13ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.063ms | copy-land<= avg=56.28ms max=1829.60ms | work avg=5.60ms max=211.27ms | totals armed=443 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=443 conflicts=0
+09:02:19.701  [fg-relay] rate/15.0s p2 import_opt=1: presents=86.9/s present-gate[point=86.9 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:02:19.702  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:02:19.702  [fg-relay] rate3: arm->arm avg=55.63ms max=1830.66ms n=442 | arm->work avg=0.01ms max=0.13ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.063ms | copy-land<= avg=56.28ms max=1829.60ms | work avg=5.60ms max=211.27ms | totals armed=443 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=443 conflicts=0
+09:02:20.346  === Vulkan CreateFeature1 #14  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:02:20.347  === Vulkan CreateFeature1 #14 returned -1160773630, handle=0000000000000000 ===
+09:02:31.736  [bridge] 600 frames delivered so far.
+09:02:34.713  [fg-relay] rate/15.0s p2 import_opt=1: presents=43.7/s present-gate[point=43.7 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=14.7/s armed=14.7/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=14.4/s flips=0.0/s
+09:02:34.713  [fg-relay] rate2: fginput eval=73.4/s index!=1=58.7/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=14.7/s consume=0.0/s inplace=14.7/s(ok 14.7/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=14.7/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=14.7/s ok=14.7/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:02:34.713  [fg-relay] rate3: arm->arm avg=108.51ms max=37300.28ms n=663 | arm->work avg=0.01ms max=0.13ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.063ms | copy-land<= avg=109.40ms max=37300.15ms | work avg=5.61ms max=211.27ms | totals armed=664 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=664 conflicts=0
+09:02:49.729  [fg-relay] rate/15.0s p2 import_opt=1: presents=22.1/s present-gate[point=22.1 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=22.1/s armed=22.1/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=22.1/s flips=0.0/s
+09:02:49.730  [fg-relay] rate2: fginput eval=110.6/s index!=1=88.4/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=22.1/s consume=0.0/s inplace=22.1/s(ok 22.1/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=22.1/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=22.1/s ok=22.1/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:02:49.730  [fg-relay] rate3: arm->arm avg=87.40ms max=37300.28ms n=995 | arm->work avg=0.01ms max=0.13ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.063ms | copy-land<= avg=87.97ms max=37300.15ms | work avg=5.25ms max=211.27ms | totals armed=996 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=996 conflicts=0
+09:02:58.971  [bridge] 1200 frames delivered so far.
+09:03:04.717  [fg-relay] rate/15.0s p2 import_opt=1: presents=22.0/s present-gate[point=22.0 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=22.0/s armed=22.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=22.0/s flips=0.0/s
+09:03:04.717  [fg-relay] rate2: fginput eval=110.0/s index!=1=88.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=22.0/s consume=0.0/s inplace=22.0/s(ok 22.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=22.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=22.0/s ok=22.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:03:04.717  [fg-relay] rate3: arm->arm avg=76.94ms max=37300.28ms n=1325 | arm->work avg=0.01ms max=0.13ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.063ms | copy-land<= avg=77.36ms max=37300.15ms | work avg=5.09ms max=211.27ms | totals armed=1326 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=1326 conflicts=0
+09:03:11.888  === Vulkan CreateFeature1 #15  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:03:11.888  === Vulkan CreateFeature1 #15 returned -1160773630, handle=0000000000000000 ===
+09:03:19.731  [fg-relay] rate/15.0s p2 import_opt=1: presents=51.5/s present-gate[point=51.5 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=11.1/s armed=11.1/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=10.6/s flips=0.0/s
+09:03:19.731  [fg-relay] rate2: fginput eval=55.3/s index!=1=44.3/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=11.1/s consume=0.0/s inplace=11.1/s(ok 11.1/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=11.1/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=11.1/s ok=11.1/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:03:19.731  [fg-relay] rate3: arm->arm avg=78.45ms max=37300.28ms n=1491 | arm->work avg=0.01ms max=0.14ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.098ms | copy-land<= avg=78.95ms max=37300.15ms | work avg=5.13ms max=211.27ms | totals armed=1492 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=1492 conflicts=0
+09:03:34.727  [fg-relay] rate/15.0s p2 import_opt=1: presents=66.9/s present-gate[point=66.9 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=5.9/s armed=5.9/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=5.7/s flips=0.0/s
+09:03:34.727  [fg-relay] rate2: fginput eval=29.6/s index!=1=23.7/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=5.9/s consume=0.0/s inplace=5.9/s(ok 5.9/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=5.9/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=5.9/s ok=5.9/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:03:34.727  [fg-relay] rate3: arm->arm avg=77.32ms max=37300.28ms n=1579 | arm->work avg=0.01ms max=0.14ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.098ms | copy-land<= avg=77.79ms max=37300.15ms | work avg=5.11ms max=211.27ms | totals armed=1580 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=1580 conflicts=0
+09:03:41.899  === Vulkan CreateFeature1 #16  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:03:41.899  === Vulkan CreateFeature1 #16 returned -1160773630, handle=0000000000000000 ===
+09:03:49.717  [fg-relay] rate/15.0s p2 import_opt=1: presents=86.7/s present-gate[point=86.7 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:03:49.718  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:03:49.718  [fg-relay] rate3: arm->arm avg=77.32ms max=37300.28ms n=1579 | arm->work avg=0.01ms max=0.14ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.098ms | copy-land<= avg=77.79ms max=37300.15ms | work avg=5.11ms max=211.27ms | totals armed=1580 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=1580 conflicts=0
+09:04:04.723  [fg-relay] rate/15.0s p2 import_opt=1: presents=86.8/s present-gate[point=86.8 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:04:04.723  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:04:04.723  [fg-relay] rate3: arm->arm avg=77.32ms max=37300.28ms n=1579 | arm->work avg=0.01ms max=0.14ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.098ms | copy-land<= avg=77.79ms max=37300.15ms | work avg=5.11ms max=211.27ms | totals armed=1580 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=1580 conflicts=0
+09:04:11.900  === Vulkan CreateFeature1 #17  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:04:11.901  === Vulkan CreateFeature1 #17 returned -1160773630, handle=0000000000000000 ===
+09:04:19.727  [fg-relay] rate/15.0s p2 import_opt=1: presents=83.9/s present-gate[point=83.9 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:04:19.727  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:04:19.727  [fg-relay] rate3: arm->arm avg=77.32ms max=37300.28ms n=1579 | arm->work avg=0.01ms max=0.14ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.098ms | copy-land<= avg=77.79ms max=37300.15ms | work avg=5.11ms max=211.27ms | totals armed=1580 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=1580 conflicts=0
+09:04:34.722  [fg-relay] rate/15.0s p2 import_opt=1: presents=84.1/s present-gate[point=84.1 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:04:34.722  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:04:34.722  [fg-relay] rate3: arm->arm avg=77.32ms max=37300.28ms n=1579 | arm->work avg=0.01ms max=0.14ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.098ms | copy-land<= avg=77.79ms max=37300.15ms | work avg=5.11ms max=211.27ms | totals armed=1580 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=1580 conflicts=0
+09:04:41.903  === Vulkan CreateFeature1 #18  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:04:41.903  === Vulkan CreateFeature1 #18 returned -1160773630, handle=0000000000000000 ===
+09:04:49.720  [fg-relay] rate/15.0s p2 import_opt=1: presents=82.5/s present-gate[point=82.5 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:04:49.720  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:04:49.720  [fg-relay] rate3: arm->arm avg=77.32ms max=37300.28ms n=1579 | arm->work avg=0.01ms max=0.14ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.098ms | copy-land<= avg=77.79ms max=37300.15ms | work avg=5.11ms max=211.27ms | totals armed=1580 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=1580 conflicts=0
+09:05:04.717  [fg-relay] rate/15.0s p2 import_opt=1: presents=84.3/s present-gate[point=84.3 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:05:04.717  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:05:04.717  [fg-relay] rate3: arm->arm avg=77.32ms max=37300.28ms n=1579 | arm->work avg=0.01ms max=0.14ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.098ms | copy-land<= avg=77.79ms max=37300.15ms | work avg=5.11ms max=211.27ms | totals armed=1580 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=1580 conflicts=0
+09:05:11.906  === Vulkan CreateFeature1 #19  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:05:11.906  === Vulkan CreateFeature1 #19 returned -1160773630, handle=0000000000000000 ===
+09:05:19.729  [fg-relay] rate/15.0s p2 import_opt=1: presents=84.4/s present-gate[point=84.4 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:05:19.729  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:05:19.729  [fg-relay] rate3: arm->arm avg=77.32ms max=37300.28ms n=1579 | arm->work avg=0.01ms max=0.14ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.098ms | copy-land<= avg=77.79ms max=37300.15ms | work avg=5.11ms max=211.27ms | totals armed=1580 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=1580 conflicts=0
+09:05:34.722  [fg-relay] rate/15.0s p2 import_opt=1: presents=70.5/s present-gate[point=70.5 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=4.5/s armed=4.5/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=4.4/s flips=0.0/s
+09:05:34.723  [fg-relay] rate2: fginput eval=22.3/s index!=1=17.9/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=4.5/s consume=0.0/s inplace=4.5/s(ok 4.5/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=4.5/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=4.5/s ok=4.5/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:05:34.723  [fg-relay] rate3: arm->arm avg=146.26ms max=115738.52ms n=1646 | arm->work avg=0.01ms max=0.14ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.098ms | copy-land<= avg=146.73ms max=115738.38ms | work avg=5.12ms max=211.27ms | totals armed=1647 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=1647 conflicts=0
+09:05:48.694  [bridge] 1800 frames delivered so far.
+09:05:48.734  [fg-relay] armed by evaluate: hud=435f7ed0 back=3df18ad0 depth=435f78d0 mv=435f72d0 5120x2160 copy=1800 nr=1800 import=1 slot=0 arm=1800 gpu-wait-nr=1799 pending=1.
+09:05:48.734  [fg-relay] evaluate: slot=0 nr=1800 import=1 stage=3.
+09:05:48.738  [fg-relay] frame=1800 slot=0 nr=1800 ok=1 wrote=1 nr_entries=2 import=1 armed=1800 skipped=0 busy=0 mismatch=0 conflicts=0.
+09:05:49.734  [fg-relay] rate/15.0s p2 import_opt=1: presents=52.1/s present-gate[point=52.1 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=11.7/s armed=11.7/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=11.2/s flips=0.0/s
+09:05:49.734  [fg-relay] rate2: fginput eval=58.0/s index!=1=46.4/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=11.7/s consume=0.0/s inplace=11.7/s(ok 11.7/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=11.7/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=11.7/s ok=11.7/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:05:49.735  [fg-relay] rate3: arm->arm avg=146.61ms max=115738.52ms n=1821 | arm->work avg=0.01ms max=0.14ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=147.15ms max=115738.38ms | work avg=5.16ms max=211.27ms | totals armed=1822 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=1822 conflicts=0
+09:06:04.735  [fg-relay] rate/15.0s p2 import_opt=1: presents=33.2/s present-gate[point=33.2 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=17.1/s armed=17.1/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=17.0/s flips=0.0/s
+09:06:04.735  [fg-relay] rate2: fginput eval=85.9/s index!=1=68.8/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=17.1/s consume=0.0/s inplace=17.1/s(ok 17.1/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=17.1/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=17.1/s ok=17.1/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:06:04.735  [fg-relay] rate3: arm->arm avg=135.29ms max=115738.52ms n=2078 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=135.75ms max=115738.38ms | work avg=5.07ms max=211.27ms | totals armed=2079 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2079 conflicts=0
+09:06:19.759  [fg-relay] rate/15.0s p2 import_opt=1: presents=37.1/s present-gate[point=37.1 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=15.5/s armed=15.5/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=14.7/s flips=0.0/s
+09:06:19.760  [fg-relay] rate2: fginput eval=77.3/s index!=1=61.8/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=15.5/s consume=0.0/s inplace=15.5/s(ok 15.5/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=15.5/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=15.5/s ok=15.5/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:06:19.760  [fg-relay] rate3: arm->arm avg=128.51ms max=115738.52ms n=2311 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=129.14ms max=115738.38ms | work avg=5.21ms max=211.27ms | totals armed=2312 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2312 conflicts=0
+09:06:23.604  [bridge] 2400 frames delivered so far.
+09:06:34.772  [fg-relay] rate/15.0s p2 import_opt=1: presents=35.4/s present-gate[point=35.4 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=17.0/s armed=17.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=16.5/s flips=0.0/s
+09:06:34.772  [fg-relay] rate2: fginput eval=84.9/s index!=1=67.9/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=17.0/s consume=0.0/s inplace=17.0/s(ok 17.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=17.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=17.0/s ok=17.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:06:34.772  [fg-relay] rate3: arm->arm avg=121.59ms max=115738.52ms n=2566 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=122.20ms max=115738.38ms | work avg=5.21ms max=211.27ms | totals armed=2567 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2567 conflicts=0
+09:06:42.719  === Vulkan CreateFeature1 #20  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:06:42.719  === Vulkan CreateFeature1 #20 returned -1160773630, handle=0000000000000000 ===
+09:06:49.768  [fg-relay] rate/15.0s p2 import_opt=1: presents=71.0/s present-gate[point=71.0 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=4.3/s armed=4.3/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=4.3/s flips=0.0/s
+09:06:49.768  [fg-relay] rate2: fginput eval=21.9/s index!=1=17.6/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=4.3/s consume=0.0/s inplace=4.3/s(ok 4.3/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=4.3/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=4.3/s ok=4.3/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:06:49.768  [fg-relay] rate3: arm->arm avg=119.72ms max=115738.52ms n=2631 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=120.31ms max=115738.38ms | work avg=5.19ms max=211.27ms | totals armed=2632 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2632 conflicts=0
+09:07:04.764  [fg-relay] rate/15.0s p2 import_opt=1: presents=85.1/s present-gate[point=85.1 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:07:04.764  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:07:04.765  [fg-relay] rate3: arm->arm avg=119.72ms max=115738.52ms n=2631 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=120.31ms max=115738.38ms | work avg=5.19ms max=211.27ms | totals armed=2632 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2632 conflicts=0
+09:07:12.722  === Vulkan CreateFeature1 #21  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:07:12.723  === Vulkan CreateFeature1 #21 returned -1160773630, handle=0000000000000000 ===
+09:07:19.772  [fg-relay] rate/15.0s p2 import_opt=1: presents=86.7/s present-gate[point=86.7 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:07:19.773  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:07:19.773  [fg-relay] rate3: arm->arm avg=119.72ms max=115738.52ms n=2631 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=120.31ms max=115738.38ms | work avg=5.19ms max=211.27ms | totals armed=2632 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2632 conflicts=0
+09:07:34.767  [fg-relay] rate/15.0s p2 import_opt=1: presents=86.2/s present-gate[point=86.2 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:07:34.767  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:07:34.767  [fg-relay] rate3: arm->arm avg=119.72ms max=115738.52ms n=2631 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=120.31ms max=115738.38ms | work avg=5.19ms max=211.27ms | totals armed=2632 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2632 conflicts=0
+09:07:42.732  === Vulkan CreateFeature1 #22  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:07:42.732  === Vulkan CreateFeature1 #22 returned -1160773630, handle=0000000000000000 ===
+09:07:49.766  [fg-relay] rate/15.0s p2 import_opt=1: presents=86.7/s present-gate[point=86.7 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:07:49.767  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:07:49.767  [fg-relay] rate3: arm->arm avg=119.72ms max=115738.52ms n=2631 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=120.31ms max=115738.38ms | work avg=5.19ms max=211.27ms | totals armed=2632 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2632 conflicts=0
+09:08:04.772  [fg-relay] rate/15.0s p2 import_opt=1: presents=86.8/s present-gate[point=86.8 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:08:04.773  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:08:04.773  [fg-relay] rate3: arm->arm avg=119.72ms max=115738.52ms n=2631 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=120.31ms max=115738.38ms | work avg=5.19ms max=211.27ms | totals armed=2632 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2632 conflicts=0
+09:08:12.735  === Vulkan CreateFeature1 #23  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:08:12.735  === Vulkan CreateFeature1 #23 returned -1160773630, handle=0000000000000000 ===
+09:08:19.772  [fg-relay] rate/15.0s p2 import_opt=1: presents=84.5/s present-gate[point=84.5 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:08:19.772  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:08:19.772  [fg-relay] rate3: arm->arm avg=119.72ms max=115738.52ms n=2631 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=120.31ms max=115738.38ms | work avg=5.19ms max=211.27ms | totals armed=2632 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2632 conflicts=0
+09:08:34.765  [fg-relay] rate/15.0s p2 import_opt=1: presents=47.0/s present-gate[point=47.0 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=12.6/s armed=12.6/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=12.3/s flips=0.0/s
+09:08:34.765  [fg-relay] rate2: fginput eval=63.0/s index!=1=50.4/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=12.6/s consume=0.0/s inplace=12.6/s(ok 12.6/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=12.6/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=12.6/s ok=12.6/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:08:34.765  [fg-relay] rate3: arm->arm avg=151.59ms max=115738.52ms n=2820 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=152.23ms max=115738.38ms | work avg=5.25ms max=211.27ms | totals armed=2821 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2821 conflicts=0
+09:08:42.744  === Vulkan CreateFeature1 #24  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:08:42.745  === Vulkan CreateFeature1 #24 returned -1160773630, handle=0000000000000000 ===
+09:08:49.766  [fg-relay] rate/15.0s p2 import_opt=1: presents=84.7/s present-gate[point=84.7 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:08:49.766  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:08:49.766  [fg-relay] rate3: arm->arm avg=151.59ms max=115738.52ms n=2820 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=152.23ms max=115738.38ms | work avg=5.25ms max=211.27ms | totals armed=2821 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2821 conflicts=0
+09:09:04.769  [fg-relay] rate/15.0s p2 import_opt=1: presents=60.7/s present-gate[point=60.7 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=8.3/s armed=8.3/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=7.9/s flips=0.0/s
+09:09:04.769  [fg-relay] rate2: fginput eval=41.3/s index!=1=33.1/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=8.3/s consume=0.0/s inplace=8.3/s(ok 8.3/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=8.3/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=8.3/s ok=8.3/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:09:04.769  [fg-relay] rate3: arm->arm avg=155.12ms max=115738.52ms n=2944 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=155.81ms max=115738.38ms | work avg=5.32ms max=211.27ms | totals armed=2945 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2945 conflicts=0
+09:09:12.752  === Vulkan CreateFeature1 #25  feature_id=18  VkDevice=000000002F4400D0  thread 11608 ===
+09:09:12.752  === Vulkan CreateFeature1 #25 returned -1160773630, handle=0000000000000000 ===
+09:09:19.763  [fg-relay] rate/15.0s p2 import_opt=1: presents=86.2/s present-gate[point=86.2 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:09:19.764  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:09:19.764  [fg-relay] rate3: arm->arm avg=155.12ms max=115738.52ms n=2944 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=155.81ms max=115738.38ms | work avg=5.32ms max=211.27ms | totals armed=2945 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2945 conflicts=0
+09:09:34.771  [fg-relay] rate/15.0s p2 import_opt=1: presents=86.2/s present-gate[point=86.2 ready=0.0 fallback=0.0 inactive=0.0]/s noinfo=0.0/s stale=0.0/s unlearned=0.0/s attempts=0.0/s armed=0.0/s skipped=0.0/s busy=0.0/s arm-reject[state=0.0 request=0.0 refused=0.0 stopping=0.0 res=0.0 size=0.0]/s pool[cap=0.0 family=0.0 create=0.0 alloc=0.0]/s copy-drop[fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s cf[seq=0.0/s idle=0.0/s nrfence=0.0/s] slotbusy=0.0/s copyfence-busy=0.0/s nr-gpuwait=0.0/s flips=0.0/s
+09:09:34.771  [fg-relay] rate2: fginput eval=0.0/s index!=1=0.0/s eval-gate[off=0.0 fallback=0.0 notready=0.0 noinput=0.0 noqueue=0.0]/s relay eval=0.0/s consume=0.0/s inplace=0.0/s(ok 0.0/s) unarmed=0.0/s mismatch=0.0/s relbusy=0.0/s relok=0.0/s relfail=0.0/s release-stage[queue=0.0 pool=0.0 fence=0.0 reset=0.0 begin=0.0 end=0.0 submit=0.0]/s watchdog=0.0/s | worker plays=0.0/s ok=0.0/s fail=0.0/s nr_absent=0.0/s copyfail=0.0/s
+09:09:34.771  [fg-relay] rate3: arm->arm avg=155.12ms max=115738.52ms n=2944 | arm->work avg=0.01ms max=0.24ms | arm->eval avg=0.00ms max=0.00ms | copywait avg=0.007ms max=0.105ms | copy-land<= avg=155.81ms max=115738.38ms | work avg=5.32ms max=211.27ms | totals armed=2945 unarmed=0 skipped=0 busy=0 mismatch=0 copies_failed=0 writes=2945 conflicts=0
+09:09:39.565  [bridge] 3000 frames delivered so far.
