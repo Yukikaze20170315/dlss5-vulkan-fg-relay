@@ -1,0 +1,3 @@
+scenario: cold startup with repeated runtime replacement
+scenario: repeated empty runtime replacement after a retired real session
+hooks: 535 checks, 0 failures

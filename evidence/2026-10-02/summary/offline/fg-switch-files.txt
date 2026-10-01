@@ -1,0 +1,16 @@
+PASS not a game folder is refused
+PASS stock set recognised
+PASS switch to 2.14.1
+PASS upgraded files match archive
+PASS interposer untouched
+PASS switch back to 2.10.3
+PASS stock files match archive
+PASS mixed set recognised
+PASS mixed set completes to 2.14.1
+PASS unknown version refused
+PASS unknown version left unchanged
+PASS restored after tamper
+PASS running game refused
+PASS running game left unchanged
+PASS no leftover temp files
+file tests: failures=0

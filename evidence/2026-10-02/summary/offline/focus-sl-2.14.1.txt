@@ -1,0 +1,5 @@
+policy: 512 guards; exact return-address scope; runtime retirement; explicit Off and free passthrough PASS
+disk contract search: matches=1 return RVA=0x4c0a7 object slot RVA=0x94450
+disk contract: unique return RVA=0x4c0a7 object slot RVA=0x94450 PASS (no DLL load)
+contract rejection: changed ABI, different branches, truncation, out of bounds, ambiguous sites PASS
+focus FG tests PASS

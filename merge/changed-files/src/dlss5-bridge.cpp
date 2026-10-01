@@ -42,6 +42,7 @@
 #include <MinHook.h>
 #include "module-lifetime.h"
 #include "ngx-module-scan.h"
+#include "fg-handle-registry.h"
 // SHA-256 for identifying a neighbour build whose version resource does not.
 #include <bcrypt.h>
 #include <d3d11.h>
@@ -66,7 +67,7 @@
 #pragma comment(lib, "version.lib")
 
 // Kept in step with version.rc, which is where ReShade's overlay reads it from.
-#define BRIDGE_VERSION "1.4.13-pre8-vk-fgrelay"
+#define BRIDGE_VERSION "1.4.13-pre8-vk-fgrelay-20261002"
 
 extern "C" __declspec(dllexport) const char *NAME =
     "DLSS 5 Bridge " BRIDGE_VERSION;
@@ -490,6 +491,7 @@ struct Layer
     Hook    eval;
     Hook    eval_c;
     Hook    create;
+    Hook    release;
 
     // The Vulkan NGX API, hooked in the same layer slot and by the same
     // mechanism. CreateFeature1 is a third class rather than a variant of
@@ -500,6 +502,7 @@ struct Layer
     Hook    vk_eval_c;
     Hook    vk_create;
     Hook    vk_create1;
+    Hook    vk_release;
     bool pending_retirement = false;
 };
 
@@ -559,7 +562,8 @@ static void RememberRejected(HMODULE m)
 }
 static CRITICAL_SECTION g_hook_cs;
 
-// One NGX call at a time in this process, across both backends.
+// Serialize NGX Create/Evaluate across both backends. Release is an exception:
+// it can wait for FG work which needs this bridge's private NR worker to run.
 //
 // The mirror's worker runs a D3D12 NGX evaluate while the game's render thread
 // runs its own Vulkan NGX evaluate, and until now nothing kept the two apart:
@@ -628,8 +632,6 @@ static bool HookInstall(Hook &h, void *target, void *detour)
             "patch does not overwrite the entries beside it.", at, next);
         at = static_cast<BYTE *>(const_cast<void *>(next));
     }
-    h.target = at;
-
     if (!PinHookModule(reinterpret_cast<const void *>(&HookInstall))) return false;
     const MH_STATUS init = MH_Initialize();
     if (init != MH_OK && init != MH_ERROR_ALREADY_INITIALIZED) return false;
@@ -641,6 +643,9 @@ static bool HookInstall(Hook &h, void *target, void *detour)
         h.original = nullptr;
         return false;
     }
+    // This Hook owns the target only after Create succeeds. In particular,
+    // ALREADY_CREATED belongs to another layer: retirement must not remove it.
+    h.target = at;
 
     st = MH_EnableHook(at);
     if (st != MH_OK)
@@ -657,6 +662,7 @@ static bool HookInstall(Hook &h, void *target, void *detour)
         MH_RemoveHook(at);
         h.active = false;
         h.original = nullptr;
+        h.target = nullptr;
         return false;
     }
 
@@ -694,8 +700,9 @@ static bool HookRetire(Hook &h)
 
 static bool RetireLayerHooks(Layer &layer)
 {
-    Hook *hooks[] = {&layer.eval, &layer.eval_c, &layer.create, &layer.vk_eval,
-                    &layer.vk_eval_c, &layer.vk_create, &layer.vk_create1};
+    Hook *hooks[] = {&layer.eval, &layer.eval_c, &layer.create, &layer.release,
+                    &layer.vk_eval, &layer.vk_eval_c, &layer.vk_create,
+                    &layer.vk_create1, &layer.vk_release};
     bool retired = true;
     for (Hook *hook : hooks) retired = HookRetire(*hook) && retired;
     return retired;
@@ -2188,14 +2195,77 @@ static void LogReShadeConfig(const wchar_t *dir)
 // to be something else are rejected: an unrecognised handle still drives the
 // bridge, so a game whose feature was created before the hooks went in keeps
 // working exactly as before.
-static const NVSDK_NGX_Handle *g_other_feature[32];
-static volatile LONG           g_other_feature_count;
+using FeatureApi = bridge_lifecycle::Api;
+static bridge_lifecycle::Registry g_feature_registry;
+static volatile LONG g_feature_registration_failed;
 
-static bool IsOtherFeature(const NVSDK_NGX_Handle *h)
+static const void *FeatureHookOwner(const Hook &hook)
 {
-    for (LONG i = 0; i < g_other_feature_count; ++i)
-        if (g_other_feature[i] == h) return true;
-    return false;
+    // An in-flight trampoline guard prevents this layer from being retired.
+    // A newly enabled hook may run before the scan publishes g_layer_count.
+    for (LONG i = 0; i < kMaxLayers; ++i)
+    {
+        const Layer &layer = g_layer[i];
+        if (&hook == &layer.create || &hook == &layer.vk_create ||
+            &hook == &layer.vk_create1) return layer.mod;
+    }
+    return nullptr;
+}
+
+static void FeatureNoteCreated(FeatureApi api, const Hook &hook, int feature,
+                               NVSDK_NGX_Result result, NVSDK_NGX_Handle **out)
+{
+    if (result != NGX_SUCCESS || out == nullptr || *out == nullptr) return;
+    bridge_lifecycle::Feature added;
+    if (!g_feature_registry.Created(api, *out, feature, FeatureHookOwner(hook), &added))
+    {
+        if (InterlockedExchange(&g_feature_registration_failed, 1) == 0)
+            Log("[feature-lifecycle] cannot allocate live-handle tracking; unknown handles "
+                "will be forwarded without NR rather than interpreted as super resolution.");
+        return;
+    }
+    Log("[feature-lifecycle] %s created feature=%d handle=%p generation=%llu live=%zu",
+        api == FeatureApi::vulkan ? "Vulkan" : "D3D11", feature, static_cast<void *>(*out),
+        static_cast<unsigned long long>(added.generation), g_feature_registry.Size(api));
+}
+
+static bool IsOtherFeature(FeatureApi api, const NVSDK_NGX_Handle *handle)
+{
+    const auto feature = g_feature_registry.Find(api, handle);
+    return feature ? feature.id != 1
+                   : InterlockedCompareExchange(&g_feature_registration_failed, 0, 0) != 0;
+}
+
+static bool FgInputIsFgHandle(const NVSDK_NGX_Handle *handle)
+{
+    const auto feature = g_feature_registry.Find(FeatureApi::vulkan, handle);
+    return feature && feature.id == 11;
+}
+
+// Release uses the public NGX entry point, with the same outermost-call and
+// trampoline lifetime rules as Create/Evaluate. Do not hold g_ngx_cs here:
+// the driver may wait for FG GPU completion, whose relay waits for an NR worker
+// that needs g_ngx_cs. The generation token makes post-call removal safe without
+// putting that potential GPU wait inside the bridge's NGX critical section.
+// Never acquire g_bridge_cs here either; render-thread teardown owns resources.
+static NVSDK_NGX_Result ForwardFeatureRelease(Hook &hook, FeatureApi api,
+                                               NVSDK_NGX_Handle *handle)
+{
+    TrampolineCallGuard call_guard;
+    auto fwd = reinterpret_cast<PFN_D3D12ReleaseFeature>(hook.original ? hook.original : hook.target);
+    if (g_nest > 0)
+    {
+        return fwd(handle);
+    }
+    NestGuard nest;
+    const auto before = g_feature_registry.Find(api, handle);
+    const NVSDK_NGX_Result result = fwd(handle);
+    const bool removed = g_feature_registry.Released(api, handle, before, result == NGX_SUCCESS);
+    if (before)
+        Log("[feature-lifecycle] %s release handle=%p feature=%d generation=%llu result=%d removed=%d",
+            api == FeatureApi::vulkan ? "Vulkan" : "D3D11", static_cast<void *>(handle), before.id,
+            static_cast<unsigned long long>(before.generation), result, removed ? 1 : 0);
+    return result;
 }
 
 // A Ray Reconstruction evaluate hands over the same Color, Depth, MotionVectors
@@ -2209,7 +2279,7 @@ static bool IsOtherFeature(const NVSDK_NGX_Handle *h)
 // created through these hooks is recognised by handle and never reaches here.
 // This exists for the one case that table cannot cover -- a feature created
 // before the hooks went in -- which is exactly the case the comment above
-// g_other_feature says keeps driving the bridge.
+// the live-feature registry says keeps driving the bridge.
 //
 // Only resource keys are probed. The matrices a denoiser also sets are float
 // arrays, and asking for one through a resource accessor answers a question
@@ -2228,8 +2298,7 @@ static const char *const kDenoiserKeys[] = {
 // Returns the key that matched, or nullptr. Probed on every evaluate rather than
 // cached against the handle: NGX recycles freed handle addresses, so a cache
 // keyed on one needs the same invalidation ForwardCreate carries for
-// g_other_feature -- and writing that table from the render thread while the
-// create path writes it too is a race this does not need. Twelve calls that
+// the live-feature registry. Twelve calls that
 // return a result code cost nothing beside a texture copy and a DLSS evaluate.
 static const char *DenoiserKeyPresent(const NVSDK_NGX_Parameter *p)
 {
@@ -2290,7 +2359,7 @@ static NVSDK_NGX_Result ForwardEvaluate(Hook &h, const char *tag, ID3D11DeviceCo
         return bogus;
     }
 
-    if (IsOtherFeature(handle))
+    if (IsOtherFeature(FeatureApi::d3d11, handle))
     {
         if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
         NVSDK_NGX_Result other = fwd(ctx, handle, p, cb);
@@ -2490,38 +2559,16 @@ static NVSDK_NGX_Result ForwardCreate(Hook &h, ID3D11DeviceContext *ctx, int fea
 
     if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
     NVSDK_NGX_Result r = fwd(ctx, feature_id, p, out);
+    FeatureNoteCreated(FeatureApi::d3d11, h, feature_id, r, out);
     if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
 
     Log("=== CreateFeature #%ld returned %d, handle=%p ===", n, r,
         (out != nullptr && *out != nullptr) ? static_cast<void *>(*out) : nullptr);
 
-    // 1 is DLSS super resolution, the only feature whose contract this bridge
-    // knows how to mirror.
-    // Nothing ever removed entries, and NGX recycles freed handle addresses. A
-    // super-resolution feature created at an address this table still holds
-    // would take the "not super resolution" branch on every evaluate for the
-    // rest of the session -- the add-on silently doing nothing while the game
-    // renders on its own DLSS. A successful super-resolution create at an
-    // address is exactly the event that invalidates an older entry for it.
+    // 1 is DLSS super resolution, the only D3D11 contract the bridge mirrors.
+    // FeatureNoteCreated above replaces an older lifetime at a reused address.
     if (feature_id == 1 && r == NGX_SUCCESS && out != nullptr && *out != nullptr)
         BridgeNoteCreate(*out, p);
-    if (feature_id == 1 && r == NGX_SUCCESS && out != nullptr && *out != nullptr)
-        for (LONG i = 0; i < g_other_feature_count; ++i)
-            if (g_other_feature[i] == *out)
-            {
-                g_other_feature[i] = g_other_feature[--g_other_feature_count];
-                Log("  handle %p was recorded as another feature and has been reused "
-                    "for super resolution; the old entry is dropped.", *out);
-                break;
-            }
-
-    if (feature_id != 1 && r == NGX_SUCCESS && out != nullptr && *out != nullptr &&
-        g_other_feature_count < static_cast<LONG>(_countof(g_other_feature)))
-    {
-        g_other_feature[g_other_feature_count++] = *out;
-        Log("  feature %d is not super resolution; evaluates on this handle will be "
-            "forwarded and otherwise ignored.", feature_id);
-    }
     return r;
 }
 
@@ -2556,6 +2603,8 @@ static NVSDK_NGX_Result ForwardVkCreate1(Hook &h, void *dev, void *cmd, int feat
     static NVSDK_NGX_Result Detour_Create_##i(                                       \
         ID3D11DeviceContext *c, int f, NVSDK_NGX_Parameter *p, NVSDK_NGX_Handle **o) \
     { return ForwardCreate(g_layer[i].create, c, f, p, o); }                         \
+    static NVSDK_NGX_Result Detour_Release_##i(NVSDK_NGX_Handle *h)                  \
+    { return ForwardFeatureRelease(g_layer[i].release, FeatureApi::d3d11, h); }     \
     static NVSDK_NGX_Result Detour_VkEvaluate_##i(                                   \
         void *c, const NVSDK_NGX_Handle *h,                                          \
         const NVSDK_NGX_Parameter *p, void *cb)                                      \
@@ -2571,7 +2620,9 @@ static NVSDK_NGX_Result ForwardVkCreate1(Hook &h, void *dev, void *cmd, int feat
     { return ForwardVkCreate(g_layer[i].vk_create, c, f, p, o); }                    \
     static NVSDK_NGX_Result Detour_VkCreate1_##i(                                    \
         void *d, void *c, int f, NVSDK_NGX_Parameter *p, NVSDK_NGX_Handle **o)       \
-    { return ForwardVkCreate1(g_layer[i].vk_create1, d, c, f, p, o); }
+    { return ForwardVkCreate1(g_layer[i].vk_create1, d, c, f, p, o); }               \
+    static NVSDK_NGX_Result Detour_VkRelease_##i(NVSDK_NGX_Handle *h)                \
+    { return ForwardFeatureRelease(g_layer[i].vk_release, FeatureApi::vulkan, h); }
 
 LAYER_DETOURS(0) LAYER_DETOURS(1) LAYER_DETOURS(2)  LAYER_DETOURS(3)
 LAYER_DETOURS(4) LAYER_DETOURS(5) LAYER_DETOURS(6)  LAYER_DETOURS(7)
@@ -2582,19 +2633,23 @@ struct DetourSet
     PFN_Evaluate eval;
     PFN_Evaluate eval_c;
     PFN_Create   create;
+    void        *release;
     // void *, because the Vulkan detours' own prototypes are not the D3D11 ones
     // and HookInstall takes a void * anyway.
     void        *vk_eval;
     void        *vk_eval_c;
     void        *vk_create;
     void        *vk_create1;
+    void        *vk_release;
 };
 
 #define LAYER_ENTRY(i) { &Detour_Evaluate_##i, &Detour_Evaluate_C_##i, &Detour_Create_##i, \
+                         reinterpret_cast<void *>(&Detour_Release_##i),                  \
                          reinterpret_cast<void *>(&Detour_VkEvaluate_##i),                 \
                          reinterpret_cast<void *>(&Detour_VkEvaluate_C_##i),               \
                          reinterpret_cast<void *>(&Detour_VkCreate_##i),                   \
-                         reinterpret_cast<void *>(&Detour_VkCreate1_##i) }
+                         reinterpret_cast<void *>(&Detour_VkCreate1_##i),                  \
+                         reinterpret_cast<void *>(&Detour_VkRelease_##i) }
 static const DetourSet kDetour[kMaxLayers] = {
     LAYER_ENTRY(0), LAYER_ENTRY(1), LAYER_ENTRY(2),  LAYER_ENTRY(3),
     LAYER_ENTRY(4), LAYER_ENTRY(5), LAYER_ENTRY(6),  LAYER_ENTRY(7),
@@ -2704,6 +2759,7 @@ static int HookNewNgxModules(ScanModuleRefs &held)
         void *eval   = reinterpret_cast<void *>(GetProcAddress(mods[i], "NVSDK_NGX_D3D11_EvaluateFeature"));
         void *eval_c = reinterpret_cast<void *>(GetProcAddress(mods[i], "NVSDK_NGX_D3D11_EvaluateFeature_C"));
         void *create = reinterpret_cast<void *>(GetProcAddress(mods[i], "NVSDK_NGX_D3D11_CreateFeature"));
+        void *release = reinterpret_cast<void *>(GetProcAddress(mods[i], "NVSDK_NGX_D3D11_ReleaseFeature"));
 
         // The Vulkan API, only when the mirror is switched on. There is no
         // NVSDK_NGX_VULKAN_EvaluateFeature_C in any driver -- there is no _C
@@ -2714,12 +2770,14 @@ static int HookNewNgxModules(ScanModuleRefs &held)
         void *vk_eval_c  = nullptr;
         void *vk_create  = nullptr;
         void *vk_create1 = nullptr;
+        void *vk_release = nullptr;
         if (g_vk_mirror != 0)
         {
             vk_eval    = reinterpret_cast<void *>(GetProcAddress(mods[i], "NVSDK_NGX_VULKAN_EvaluateFeature"));
             vk_eval_c  = reinterpret_cast<void *>(GetProcAddress(mods[i], "NVSDK_NGX_VULKAN_EvaluateFeature_C"));
             vk_create  = reinterpret_cast<void *>(GetProcAddress(mods[i], "NVSDK_NGX_VULKAN_CreateFeature"));
             vk_create1 = reinterpret_cast<void *>(GetProcAddress(mods[i], "NVSDK_NGX_VULKAN_CreateFeature1"));
+            vk_release = reinterpret_cast<void *>(GetProcAddress(mods[i], "NVSDK_NGX_VULKAN_ReleaseFeature"));
         }
 
         const bool has_d11 = create != nullptr && (eval != nullptr || eval_c != nullptr);
@@ -2747,6 +2805,7 @@ static int HookNewNgxModules(ScanModuleRefs &held)
                         RetireLayerHooks(g_layer[k]))
                     {
                         InterlockedExchangePointer(&g_layer_modules[k], nullptr);
+                        g_feature_registry.ForgetOwner(g_layer[k].mod);
                         g_layer[k] = {};
                     }
                     else
@@ -2836,6 +2895,16 @@ static int HookNewNgxModules(ScanModuleRefs &held)
             continue;
         }
 
+        // Some placeholder DLLs alias Release to a different operation. Do not
+        // install incompatible signatures at one address or hook padding. The
+        // actual loader/snippet layers are scanned independently and can still
+        // observe the release if this layer does not expose a real entry point.
+        if (release && (IsFillerStub(release) || release == create ||
+                        release == eval || release == eval_c)) release = nullptr;
+        if (vk_release && (IsFillerStub(vk_release) || vk_release == vk_create ||
+            vk_release == vk_create1 || vk_release == vk_eval || vk_release == vk_eval_c))
+            vk_release = nullptr;
+
         // Slots used to be handed out forward only, so every unload and reload
         // of an NGX module burned one permanently and a long session could run
         // out of a table it was no longer using. ForgetUnloadedLayer nulls mod,
@@ -2863,6 +2932,7 @@ static int HookNewNgxModules(ScanModuleRefs &held)
         Log("  NVSDK_NGX_D3D11_CreateFeature     = %p", create);
         Log("  NVSDK_NGX_D3D11_EvaluateFeature   = %p", eval);
         Log("  NVSDK_NGX_D3D11_EvaluateFeature_C = %p", eval_c);
+        Log("  NVSDK_NGX_D3D11_ReleaseFeature    = %p", release);
         if (create != nullptr) LogPrologue("CreateFeature", static_cast<const BYTE *>(create));
         if (eval   != nullptr) LogPrologue("EvaluateFeature", static_cast<const BYTE *>(eval));
         if (eval_c != nullptr) LogPrologue("EvaluateFeature_C", static_cast<const BYTE *>(eval_c));
@@ -2874,6 +2944,8 @@ static int HookNewNgxModules(ScanModuleRefs &held)
             HookInstall(L.eval, eval, reinterpret_cast<void *>(kDetour[slot].eval));
         const bool ok_eval_c = eval_c != nullptr &&
             HookInstall(L.eval_c, eval_c, reinterpret_cast<void *>(kDetour[slot].eval_c));
+        const bool ok_release = release != nullptr &&
+            HookInstall(L.release, release, kDetour[slot].release);
         LeaveCriticalSection(&g_hook_cs);
 
         // "absent" rather than "FAILED" for a null CreateFeature, which used to be
@@ -2883,6 +2955,9 @@ static int HookNewNgxModules(ScanModuleRefs &held)
             create != nullptr ? (ok_create ? "yes" : "FAILED") : "absent",
             eval   != nullptr ? (ok_eval   ? "yes" : "FAILED") : "absent",
             eval_c != nullptr ? (ok_eval_c ? "yes" : "FAILED") : "absent");
+        if (has_d11)
+            Log("  hooked: D3D11 ReleaseFeature=%s", release != nullptr
+                ? (ok_release ? "yes" : "FAILED") : "absent or unsupported");
 
         // Said and done only where there is something to say, so a session with
         // vk_mirror off -- which is every D3D11 session -- logs exactly what it
@@ -2893,6 +2968,7 @@ static int HookNewNgxModules(ScanModuleRefs &held)
             Log("  NVSDK_NGX_VULKAN_CreateFeature1    = %p", vk_create1);
             Log("  NVSDK_NGX_VULKAN_EvaluateFeature   = %p", vk_eval);
             Log("  NVSDK_NGX_VULKAN_EvaluateFeature_C = %p", vk_eval_c);
+            Log("  NVSDK_NGX_VULKAN_ReleaseFeature    = %p", vk_release);
             if (vk_create  != nullptr) LogPrologue("VK CreateFeature", static_cast<const BYTE *>(vk_create));
             if (vk_create1 != nullptr) LogPrologue("VK CreateFeature1", static_cast<const BYTE *>(vk_create1));
             if (vk_eval    != nullptr) LogPrologue("VK EvaluateFeature", static_cast<const BYTE *>(vk_eval));
@@ -2907,6 +2983,8 @@ static int HookNewNgxModules(ScanModuleRefs &held)
                 HookInstall(L.vk_eval, vk_eval, kDetour[slot].vk_eval);
             const bool okv_eval_c = vk_eval_c != nullptr &&
                 HookInstall(L.vk_eval_c, vk_eval_c, kDetour[slot].vk_eval_c);
+            const bool okv_release = vk_release != nullptr &&
+                HookInstall(L.vk_release, vk_release, kDetour[slot].vk_release);
             LeaveCriticalSection(&g_hook_cs);
 
             Log("  hooked: VULKAN CreateFeature=%s CreateFeature1=%s EvaluateFeature=%s "
@@ -2915,6 +2993,8 @@ static int HookNewNgxModules(ScanModuleRefs &held)
                 vk_create1 != nullptr ? (okv_create1 ? "yes" : "FAILED") : "absent",
                 vk_eval    != nullptr ? (okv_eval    ? "yes" : "FAILED") : "absent",
                 vk_eval_c  != nullptr ? (okv_eval_c  ? "yes" : "FAILED") : "absent");
+            Log("  hooked: VULKAN ReleaseFeature=%s", vk_release != nullptr
+                ? (okv_release ? "yes" : "FAILED") : "absent or unsupported");
         }
 
         if (slot == g_layer_count) InterlockedIncrement(&g_layer_count);
@@ -3632,6 +3712,7 @@ static bool ProcessPendingRetirements()
             layer.pending_retirement = true;
             layer.eval.active = layer.eval_c.active = layer.create.active = false;
             layer.vk_eval.active = layer.vk_eval_c.active = layer.vk_create.active = layer.vk_create1.active = false;
+            layer.release.active = layer.vk_release.active = false;
         }
     for (LONG i = 0; i < g_layer_count; ++i)
     {
@@ -3666,6 +3747,7 @@ static bool ProcessPendingRetirements()
             }
 
             InterlockedExchangePointer(&g_layer_modules[i], nullptr);
+            g_feature_registry.ForgetOwner(g_layer[i].mod);
             g_layer[i] = {};
             Log("NGX layer %ld retirement finalized.", i);
         }

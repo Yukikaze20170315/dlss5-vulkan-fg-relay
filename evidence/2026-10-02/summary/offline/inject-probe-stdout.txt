@@ -1,0 +1,11 @@
+instance created; the add-on is loaded from here on
+waiting 3000 ms before device creation, so the hook worker has installed the create-device hook
+GPU=NVIDIA GeForce RTX 5090
+device created at 0000000002BF00D0 without the extension in the caller's list
+bridge: [fg-relay] Import=1: the ReShade layer's vkCreateDevice at 00007FFA192907A0 is hooked. Every device created from here on gets VK_KHR_external_semaphore_win32 appended to its extension list, and a driver that refuses the name gets the caller's own list retried unchanged.
+bridge: [fg-relay] Import=1: the device created at 0000000002BF00D0 carries VK_KHR_external_semaphore_win32.
+INJECTION: the hook appended the name and the device was created with it
+export: D3D12 fence completed=0 before the signal
+PASS export: D3D12 Signal(7) advanced the Vulkan timeline semaphore to 7
+PASS import: the D3D12 shared fence released the Vulkan timeline semaphore
+PASS injection and both shared-fence directions verified offline; the relay's own arm/release chain still needs the game.

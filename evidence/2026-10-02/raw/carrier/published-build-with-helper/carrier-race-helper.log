@@ -1,0 +1,32 @@
+00:31:43.172  registered; waiting for the first D3D12 device
+00:31:44.394  registered; waiting for the first D3D12 device
+00:31:44.789  registered; waiting for the first D3D12 device
+00:31:46.324  registered; waiting for the first D3D12 device
+00:31:46.517  registered; waiting for the first D3D12 device
+00:31:46.741  registered; waiting for the first D3D12 device
+00:31:52.978  a D3D12 device was created; holding the game folder's nvngx_dlss.dll for 3000 ms
+00:31:55.979  released nvngx_dlss.dll; compare with the bridge log (multiple SR modules found / attempt N)
+00:34:25.542  registered; waiting for the first D3D12 device
+00:34:26.716  registered; waiting for the first D3D12 device
+00:34:27.103  registered; waiting for the first D3D12 device
+00:34:28.592  registered; waiting for the first D3D12 device
+00:34:28.761  registered; waiting for the first D3D12 device
+00:34:28.955  registered; waiting for the first D3D12 device
+00:34:34.876  a D3D12 device was created; holding the game folder's nvngx_dlss.dll for 3000 ms
+00:34:37.878  released nvngx_dlss.dll; compare with the bridge log (multiple SR modules found / attempt N)
+00:36:25.484  registered; waiting for the first D3D12 device
+00:36:26.795  registered; waiting for the first D3D12 device
+00:36:27.187  registered; waiting for the first D3D12 device
+00:36:28.717  registered; waiting for the first D3D12 device
+00:36:28.909  registered; waiting for the first D3D12 device
+00:36:29.142  registered; waiting for the first D3D12 device
+00:36:35.231  a D3D12 device was created; holding the game folder's nvngx_dlss.dll for 3000 ms
+00:36:38.233  released nvngx_dlss.dll; compare with the bridge log (multiple SR modules found / attempt N)
+00:40:50.316  registered; waiting for the first D3D12 device
+00:40:51.505  registered; waiting for the first D3D12 device
+00:40:51.930  registered; waiting for the first D3D12 device
+00:40:53.506  registered; waiting for the first D3D12 device
+00:40:53.723  registered; waiting for the first D3D12 device
+00:40:53.966  registered; waiting for the first D3D12 device
+00:41:00.885  a D3D12 device was created; holding the game folder's nvngx_dlss.dll for 3000 ms
+00:41:03.887  released nvngx_dlss.dll; compare with the bridge log (multiple SR modules found / attempt N)

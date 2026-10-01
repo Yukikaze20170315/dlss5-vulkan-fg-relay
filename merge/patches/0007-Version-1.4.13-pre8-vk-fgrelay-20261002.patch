@@ -1,0 +1,53 @@
+From 9751b156b079daa26aa07a4a8a10a1d207ecafb0 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E7=9B=97=E7=89=88=E3=81=AE=E9=9B=AA=E9=A2=A8=E9=85=B1?=
+ <50561019+Yukikaze20170315@users.noreply.github.com>
+Date: Thu, 1 Oct 2026 23:37:11 +0800
+Subject: [PATCH 07/10] Version 1.4.13-pre8-vk-fgrelay-20261002
+
+---
+ src/dlss5-bridge.cpp | 2 +-
+ src/version.rc       | 8 ++++----
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/src/dlss5-bridge.cpp b/src/dlss5-bridge.cpp
+index fb1f774..13441ef 100644
+--- a/src/dlss5-bridge.cpp
++++ b/src/dlss5-bridge.cpp
+@@ -67,7 +67,7 @@
+ #pragma comment(lib, "version.lib")
+ 
+ // Kept in step with version.rc, which is where ReShade's overlay reads it from.
+-#define BRIDGE_VERSION "1.4.13-pre8-vk-fgrelay-20261001"
++#define BRIDGE_VERSION "1.4.13-pre8-vk-fgrelay-20261002"
+ 
+ extern "C" __declspec(dllexport) const char *NAME =
+     "DLSS 5 Bridge " BRIDGE_VERSION;
+diff --git a/src/version.rc b/src/version.rc
+index b7c3db8..8d96c34 100644
+--- a/src/version.rc
++++ b/src/version.rc
+@@ -3,8 +3,8 @@
+ // ReShade reads the add-on's version from here and shows it in its overlay, so
+ // a bug report can name the exact build instead of describing it.
+ VS_VERSION_INFO VERSIONINFO
+- FILEVERSION    1,4,13,18
+- PRODUCTVERSION 1,4,13,18
++ FILEVERSION    1,4,13,19
++ PRODUCTVERSION 1,4,13,19
+  FILEOS         VOS_NT_WINDOWS32
+  FILETYPE       VFT_DLL
+ BEGIN
+@@ -13,11 +13,11 @@ BEGIN
+         BLOCK "040904b0"
+         BEGIN
+             VALUE "FileDescription",  "DLSS 5 Bridge"
+-            VALUE "FileVersion",      "1.4.13-pre8-vk-fgrelay-20261001"
++            VALUE "FileVersion",      "1.4.13-pre8-vk-fgrelay-20261002"
+             VALUE "InternalName",     "dlss5-bridge"
+             VALUE "OriginalFilename", "dlss5-bridge.addon64"
+             VALUE "ProductName",      "DLSS 5 Bridge"
+-            VALUE "ProductVersion",   "1.4.13-pre8-vk-fgrelay-20261001"
++            VALUE "ProductVersion",   "1.4.13-pre8-vk-fgrelay-20261002"
+         END
+     END
+     BLOCK "VarFileInfo"

@@ -1,3 +1,65 @@
+#include "present-compatibility.h"
+#include "present-carrier-retry.h"
+static_assert(MH_ERROR_MEMORY_ALLOC == 9, "present-carrier-retry.h classifies MinHook status 9");
+
+static const char *const kPresentCompatibleGeneric =
+    u8"Generic builds confirmed to work with this bridge: 8.5.0-rc10 / 已经确定可以正常使用该版本插件的Generic插件：8.5.0-rc10";
+struct PresentCompatibilityStatus {
+    unsigned code[2];
+    char reason[2][384];
+    bool unknown_build;
+};
+static SRWLOCK g_present_compatibility_lock = SRWLOCK_INIT;
+static PresentCompatibilityStatus g_present_compatibility = {};
+
+static void PresentCompatibilitySet(unsigned slot, unsigned code, const char *reason)
+{
+    if (slot >= 2) return;
+    bool changed = false;
+    AcquireSRWLockExclusive(&g_present_compatibility_lock);
+    changed = g_present_compatibility.code[slot] != code ||
+              (code != PC_OK && strcmp(g_present_compatibility.reason[slot], reason != nullptr ? reason : "") != 0);
+    if (changed) {
+        g_present_compatibility.code[slot] = code;
+        strncpy_s(g_present_compatibility.reason[slot], reason != nullptr ? reason : "", _TRUNCATE);
+    }
+    ReleaseSRWLockExclusive(&g_present_compatibility_lock);
+    if (changed && code != PC_OK)
+        Log("[nr-compat] processing unavailable: %s %s", reason, kPresentCompatibleGeneric);
+    else if (changed)
+        Log("[nr-compat] %s condition recovered; normal processing may resume.", slot == 0 ? "configuration" : "runtime");
+}
+
+static void PresentCompatibilityIssue(unsigned code, const char *reason)
+{
+    PresentCompatibilitySet(1, code, reason);
+}
+
+static void PresentCompatibilityFrame(bool ok, unsigned nr_entries, unsigned sr_entries, unsigned sr_copies)
+{
+    if (sr_entries != 1 || sr_copies != 1)
+        PresentCompatibilityIssue(PC_CARRIER_MISMATCH, "Private SR carrier call/identity contract mismatch; this frame was not accepted.");
+    else if (!ok)
+        PresentCompatibilityIssue(PC_PROCESSING_FAILED, "NR carrier processing or GPU completion failed; the failure is not attributed to a Generic version.");
+    else {
+        // Zero entries can mean NR was switched off or is warming up. An entry
+        // witness counts calls, not successful NR returns or image quality.
+        AcquireSRWLockShared(&g_present_compatibility_lock);
+        const unsigned previous = g_present_compatibility.code[1];
+        ReleaseSRWLockShared(&g_present_compatibility_lock);
+        if (previous == PC_OK || previous == PC_CARRIER_MISMATCH || previous == PC_PROCESSING_FAILED || nr_entries != 0)
+            PresentCompatibilityIssue(PC_OK, "");
+    }
+}
+
+static PresentCompatibilityStatus PresentCompatibilitySnapshot()
+{
+    AcquireSRWLockShared(&g_present_compatibility_lock);
+    const PresentCompatibilityStatus value = g_present_compatibility;
+    ReleaseSRWLockShared(&g_present_compatibility_lock);
+    return value;
+}
+
 extern "C" {
 void* g_present_nr_original = nullptr;
 void* g_present_sr_original = nullptr;
@@ -56,35 +118,72 @@ static bool PresentAdapterConfiguration()
 {
     wchar_t ini[1024] = {};
     PresentAdapterPath(ini, _countof(ini), L"ReShade.ini");
-    const int hook_point = GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint", 0, ini);
-    if (GetPrivateProfileIntW(L"RenoDX.DLSS5", L"EnableHooks", 2, ini) != 1 ||
-        (hook_point != 0 && hook_point != 2))
-    {
-        Log("[present-adapter] refused: keep EnableHooks=1 and NRHookPoint=0 (Upscaled) or2 (Present) for the D3D12 carrier.");
-        return false;
-    }
-    if (GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRSourceEncoding", 0, ini) != 0 ||
-        GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRSourcePrimaries", 0, ini) != 0 ||
-        GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRLinearUnitNits", 0, ini) != 0) {
-        Log("[present-adapter] refused: source encoding, primaries and linear-unit overrides must be Auto; the carrier supplies normalized SDR or scRGB.");
-        return false;
-    }
-    return true;
+    wchar_t unit[80] = {};
+    GetPrivateProfileStringW(L"RenoDX.DLSS5", L"NRLinearUnitNits", L"0", unit, _countof(unit), ini);
+    const int hook_point = GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint",
+                                                PresentAdapterFollow() ? -1 : 0, ini);
+    const auto code = PresentCompatibilityConfigCode(
+        GetModuleHandleW(L"renodx-dlss5.addon64") != nullptr,
+        GetPrivateProfileIntW(L"RenoDX.DLSS5", L"EnableHooks", 2, ini), hook_point,
+        PresentAdapterFollow(), GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRSourceEncoding", 0, ini),
+        GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRSourcePrimaries", 0, ini), wcstod(unit, nullptr));
+    PresentCompatibilitySet(0, code, PresentCompatibilityConfigReason(code));
+    return code == PC_OK;
 }
 
 static bool PresentAdapterConsumer()
 {
     const HMODULE consumer = GetModuleHandleW(L"renodx-dlss5.addon64");
-    wchar_t path[1024] = {};
-    char hash[65] = {};
-    if (consumer == nullptr || GetModuleFileNameW(consumer, path, _countof(path)) == 0 ||
-        !Sha256File(path, hash, sizeof(hash)) ||
-        _stricmp(hash, "DCD93881E976AD033D83C2BB01F4BC3E4DDC59C15FE0DD4CA165BC5FC7D1AC68") != 0)
-    {
-        Log("[present-adapter] refused: this experiment requires the unmodified Generic 8.5.0-rc10 DCD93881 build.");
+    if (consumer == nullptr) {
+        PresentCompatibilitySet(0, PC_GENERIC_MISSING, PresentCompatibilityConfigReason(PC_GENERIC_MISSING));
         return false;
     }
     return PresentAdapterConfiguration();
+}
+
+// Called by the hook-maintenance worker, not the frame's GPU hand-over. Hashes
+// label the loaded file once; an unknown or unreadable hash never rejects it.
+static bool PresentAdapterWitness();
+static void PresentCompatibilityPoll()
+{
+    if (!PresentAdapterFgInput()) return;
+    static ULONGLONG next;
+    static HMODULE identified;
+    const ULONGLONG now = GetTickCount64();
+    if (now < next) return;
+    next = now + 1000;
+    const HMODULE consumer = GetModuleHandleW(L"renodx-dlss5.addon64");
+    if (consumer == nullptr) identified = nullptr;
+    if (consumer != nullptr && identified != consumer) {
+        wchar_t path[1024] = {};
+        char hash[65] = {};
+        const bool hashed = GetModuleFileNameW(consumer, path, _countof(path)) != 0 &&
+                            Sha256File(path, hash, sizeof(hash));
+        const bool known = hashed && _stricmp(hash, "DCD93881E976AD033D83C2BB01F4BC3E4DDC59C15FE0DD4CA165BC5FC7D1AC68") == 0;
+        AcquireSRWLockExclusive(&g_present_compatibility_lock);
+        g_present_compatibility.unknown_build = !known;
+        ReleaseSRWLockExclusive(&g_present_compatibility_lock);
+        Log("[nr-compat] Generic build %s; SHA256=%s. No version/hash gate. %s",
+            known ? "identified" : "not previously verified (allowed)", hashed ? hash : "unavailable", kPresentCompatibleGeneric);
+        identified = consumer;
+    }
+    // Some consumers load NR lazily on their first evaluate. A missing initial
+    // witness must not leave every subsequent frame classified as NR absent.
+    if (consumer != nullptr && g_s12.feature != nullptr && !g_present_adapter.nr_hook) {
+        if (PresentAdapterWitness() && PresentCompatibilitySnapshot().code[1] == PC_NR_ENTRY_UNAVAILABLE)
+            PresentCompatibilityIssue(PC_OK, "");
+    }
+    // Render is a valid user-selected alternate path. Only diagnose carrier
+    // requirements when Present is selected, or its selector is unavailable.
+    if (!PresentAdapterFollow() || PresentAdapterHookPoint() == 2 || consumer == nullptr) {
+        PresentAdapterConfiguration();
+    } else {
+        wchar_t ini[1024] = {};
+        PresentAdapterPath(ini, _countof(ini), L"ReShade.ini");
+        const int point = GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint", -1, ini);
+        if (point < 0) PresentCompatibilitySet(0, PC_HOOK_POINT_UNAVAILABLE, PresentCompatibilityConfigReason(PC_HOOK_POINT_UNAVAILABLE));
+        else PresentCompatibilitySet(0, PC_OK, "");
+    }
 }
 
 static bool PresentAdapterWitness()
@@ -93,23 +192,36 @@ static bool PresentAdapterWitness()
     HMODULE runtime = GetModuleHandleW(L"nvngx_dlssnr.dll");
     void* entry = runtime != nullptr
         ? reinterpret_cast<void*>(GetProcAddress(runtime, "NVSDK_NGX_D3D12_EvaluateFeature")) : nullptr;
-    if (entry == nullptr) return false;
+    if (entry == nullptr) {
+        PresentCompatibilityIssue(PC_NR_ENTRY_UNAVAILABLE, "NR runtime D3D12 evaluate export is unavailable (nvngx_dlssnr.dll).");
+        return false;
+    }
     // The tail forward preserves the caller's return address and all four args.
     // A module reference prevents a live hook from pointing into an unloaded DLL.
     HMODULE keep = nullptr;
     if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
-                          reinterpret_cast<LPCWSTR>(entry), &keep)) return false;
+                          reinterpret_cast<LPCWSTR>(entry), &keep)) {
+        PresentCompatibilityIssue(PC_HOOK_INSTALL_FAILED, "The NR runtime could not be retained for its evaluate witness.");
+        return false;
+    }
     const MH_STATUS made = MH_CreateHook(entry, reinterpret_cast<void*>(&PresentAdapterNrHook),
                                          &g_present_nr_original);
-    if (made != MH_OK) return false;
+    if (made != MH_OK) {
+        PresentCompatibilityIssue(PC_HOOK_INSTALL_FAILED, "The NR evaluate witness could not be installed.");
+        return false;
+    }
     const MH_STATUS enabled = MH_EnableHook(entry);
-    if (enabled != MH_OK) { MH_RemoveHook(entry); g_present_nr_original = nullptr; return false; }
+    if (enabled != MH_OK) {
+        MH_RemoveHook(entry); g_present_nr_original = nullptr;
+        PresentCompatibilityIssue(PC_HOOK_INSTALL_FAILED, "The NR evaluate witness could not be enabled.");
+        return false;
+    }
     g_present_adapter.nr_hook = true;
     Log("[present-adapter] NR entry witness ready (tail-forward, CPU observation only).");
     return true;
 }
 
-static HMODULE PresentAdapterSrModule()
+static HMODULE PresentAdapterSrModule(bool verbose)
 {
     auto enumerate = reinterpret_cast<PFN_EnumProcessModules>(
         GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "K32EnumProcessModules"));
@@ -149,7 +261,7 @@ static HMODULE PresentAdapterSrModule()
             const wchar_t* leaf = wcsrchr(path, L'\\');
             leaf = leaf != nullptr ? leaf + 1 : path;
             // Full paths with non-ANSI characters print empty through %ls; the leaf is enough to identify the module.
-            Log("[present-adapter] NGX evaluate module: %ls internal=%ls product=%ls.", leaf, name, product);
+            if (verbose) Log("[present-adapter] NGX evaluate module: %ls internal=%ls product=%ls.", leaf, name, product);
             // Ray Reconstruction shares InternalName=DLSS; only the super-sampling product is the SR carrier.
             if (_wcsicmp(name, L"DLSS") == 0 &&
                 _wcsicmp(product, L"NVIDIA Deep Learning SuperSampling") == 0) is_sr = true;
@@ -164,34 +276,46 @@ static HMODULE PresentAdapterSrModule()
     return found;
 }
 
-static bool PresentAdapterCarrier()
+// verbose lists every NGX evaluate module; retries pass false to keep the log short.
+static PresentCarrierResult PresentAdapterCarrier(bool verbose = true)
 {
-    if (g_present_adapter.sr_hook) return true;
-    const HMODULE runtime = PresentAdapterSrModule();
+    if (g_present_adapter.sr_hook) return PCR_READY;
+    const HMODULE runtime = PresentAdapterSrModule(verbose);
     void* entry = runtime != nullptr
         ? reinterpret_cast<void*>(GetProcAddress(runtime, "NVSDK_NGX_D3D12_EvaluateFeature")) : nullptr;
     if (entry == nullptr) {
         Log("[present-adapter] SR export unavailable: module=%p entry=%p error=%lu.", runtime, entry, GetLastError());
-        return false;
+        PresentCompatibilityIssue(PC_SR_ENTRY_UNAVAILABLE, "A unique DLSS SR carrier evaluate export could not be found.");
+        return PCR_TRANSIENT;
     }
     HMODULE keep = nullptr;
     if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
-                          reinterpret_cast<LPCWSTR>(entry), &keep)) return false;
+                          reinterpret_cast<LPCWSTR>(entry), &keep)) {
+        Log("[present-adapter] SR module could not be retained: entry=%p error=%lu.", entry, GetLastError());
+        return PCR_TRANSIENT;
+    }
     const MH_STATUS made = MH_CreateHook(entry, reinterpret_cast<void*>(&PresentAdapterSrHook), &g_present_sr_original);
     if (made != MH_OK) {
         Log("[present-adapter] SR hook creation failed: status=%d entry=%p.", static_cast<int>(made), entry);
-        return false;
+        PresentCompatibilityIssue(PC_HOOK_INSTALL_FAILED, "The private SR carrier hook could not be installed.");
+        return PresentCarrierHookStatusResult(static_cast<int>(made));
     }
     const MH_STATUS enabled = MH_EnableHook(entry);
     if (enabled != MH_OK) {
         Log("[present-adapter] SR hook enable failed: status=%d.", static_cast<int>(enabled));
         MH_RemoveHook(entry);
         g_present_sr_original = nullptr;
-        return false;
+        return PCR_FATAL;
     }
     g_present_adapter.sr_hook = true;
-    Log("[present-adapter] private SR carrier copy ready; external SR calls remain tail-forwarded.");
-    return true;
+    const unsigned previous = PresentCompatibilitySnapshot().code[1];
+    if (previous == PC_SR_ENTRY_UNAVAILABLE || previous == PC_HOOK_INSTALL_FAILED) PresentCompatibilityIssue(PC_OK, "");
+    wchar_t path[1024] = {};
+    GetModuleFileNameW(runtime, path, _countof(path));
+    const wchar_t* leaf = wcsrchr(path, L'\\');
+    Log("[present-adapter] private SR carrier copy ready on %ls; external SR calls remain tail-forwarded.",
+        leaf != nullptr ? leaf + 1 : path);
+    return PCR_READY;
 }
 
 static void PresentAdapterRequest()
@@ -220,7 +344,7 @@ static void PresentAdapterRequest()
     if (frames > 1800 || nr > 2 || g_present_adapter.refused) {
         Log("[present-adapter] request refused (invalid count/mode or retired session)."); return;
     }
-    if (!PresentAdapterConsumer()) { g_present_adapter.refused = true; return; }
+    if (!PresentAdapterConsumer()) return;
     g_present_adapter.remaining = frames;
     g_present_adapter.stopped = false;
     g_present_adapter.continuous = false;
@@ -284,8 +408,6 @@ static void PresentAdapterFrame(reshade::api::effect_runtime* rt, reshade::api::
     }
     if (g_present_adapter.owner != nullptr && g_present_adapter.owner != rt) return;
     if (!PresentAdapterConfiguration()) {
-        g_present_adapter.remaining = 0;
-        g_present_adapter.refused = true;
         return;
     }
     if (g_cfg.mode != 2 || g_cfg.stage != 3) {
@@ -350,7 +472,7 @@ static void PresentAdapterFrame(reshade::api::effect_runtime* rt, reshade::api::
         Log("[present-adapter] source space=%u; working colour=%s.", static_cast<unsigned>(space),
             srgb ? "linear normalized SDR" : "linear BT.709, 1.0=80 nits");
     }
-    if (g_present_adapter.run_nr && !PresentAdapterCarrier()) {
+    if (g_present_adapter.run_nr && PresentAdapterCarrier() != PCR_READY) {
         g_present_adapter.refused = true;
         Log("[present-adapter] private SR carrier hook unavailable; no image modified.");
         return;

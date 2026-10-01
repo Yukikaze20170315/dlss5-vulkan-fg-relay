@@ -1,0 +1,3 @@
+policy: 512 guards; exact return-address scope; runtime retirement; explicit Off and free passthrough PASS
+disk contract search: matches=0 return RVA=0x0 object slot RVA=0x0
+report only

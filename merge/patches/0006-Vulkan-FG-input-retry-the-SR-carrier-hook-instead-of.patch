@@ -1,0 +1,759 @@
+From d6bdb97a445e9a0054c1362bc0269b4bf0d6cf0f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E7=9B=97=E7=89=88=E3=81=AE=E9=9B=AA=E9=A2=A8=E9=85=B1?=
+ <50561019+Yukikaze20170315@users.noreply.github.com>
+Date: Thu, 1 Oct 2026 23:36:47 +0800
+Subject: [PATCH 06/10] Vulkan FG input: retry the SR carrier hook instead of
+ refusing for the session
+
+NGX briefly maps the game folder's nvngx_dlss.dll while the bridge creates its
+private feature, and the bridge's own NGX module scanner keeps it mapped until
+its hooks there are installed. When that scan is slow, the carrier search sees
+two DLSS SR modules, correctly declines the ambiguous hook, and NR stayed off
+for the whole session (a resolution change recovered it).
+
+- Classify carrier failures: no unique SR module, an SR module that could not
+  be retained, and MinHook status 9 are transient; everything else is fatal.
+- Keep the private session built and owned while the carrier is pending; arm
+  and process no frame; retry once per second, up to 30 attempts, then refuse
+  as before. An ambiguous carrier is still never hooked.
+- Log the module list on the first and last attempt only; name the module the
+  hook was installed on; clear the SR/hook diagnostic on success.
+- Tests: run.cmd carrier (fixture SR/RR modules, production search, MinHook
+  install, retry step, relay guard); run.cmd racehelper builds a test-only
+  add-on that recreates the race in a game.
+---
+ VULKAN-FG-INPUT-NR.md                         |  49 +++++-
+ src/fg-input.inc                              |  47 +++++-
+ src/fg-relay.inc                              |   1 +
+ src/present-adapter.inc                       |  36 +++--
+ src/present-carrier-retry.h                   |  42 +++++
+ tests/vulkan-fg-quality/README.md             |   4 +-
+ .../vulkan-fg-quality/carrier-race-helper.cpp | 137 ++++++++++++++++
+ tests/vulkan-fg-quality/run.cmd               |  18 ++-
+ tests/vulkan-fg-quality/sr-fixture.cpp        |  14 ++
+ tests/vulkan-fg-quality/sr-fixture.rc         |  29 ++++
+ tests/vulkan-fg-quality/test-carrier.cpp      | 147 ++++++++++++++++++
+ 11 files changed, 502 insertions(+), 22 deletions(-)
+ create mode 100644 src/present-carrier-retry.h
+ create mode 100644 tests/vulkan-fg-quality/carrier-race-helper.cpp
+ create mode 100644 tests/vulkan-fg-quality/sr-fixture.cpp
+ create mode 100644 tests/vulkan-fg-quality/sr-fixture.rc
+ create mode 100644 tests/vulkan-fg-quality/test-carrier.cpp
+
+diff --git a/VULKAN-FG-INPUT-NR.md b/VULKAN-FG-INPUT-NR.md
+index 41536bb..5a35ca1 100644
+--- a/VULKAN-FG-INPUT-NR.md
++++ b/VULKAN-FG-INPUT-NR.md
+@@ -91,6 +91,52 @@ restart. `[fg-transition]` logs bounded CPU metadata (queue, reset, metering,
+ frame ID, handles) for the first 12 FG calls after a queue, focus or reset
+ change, at most 128 windows per thread.
+ 
++## Update 2026-10-02: SR carrier retry
++
++**Symptom.** In some game sessions NR never starts. Frame generation runs
++normally on the game's own frames, and changing the resolution once brings NR
++back. The bridge log shows:
++
++```
++[present-adapter] multiple SR modules found; refusing ambiguous carrier hook.
++[fg-input] refused: private SR carrier hook unavailable. Frame generation continues on the game's own frames.
++```
++
++**Cause.** The private carrier is the D3D12 evaluate export of the one loaded
++module whose version resource says DLSS Super Resolution. With a driver-side
++DLSS override, that module is the driver's model (`...\NGX\models\dlss\...\*.bin`).
++While the bridge creates its private NGX feature, NGX also maps the game
++folder's `nvngx_dlss.dll` and releases it shortly afterwards. The bridge's own
++NGX module scanner holds a reference to each NGX module while it installs its
++hooks there, so the DLL stays mapped until that scan has finished. In every
++session where NR started, the scan finished 28-296 ms before the private
++feature was ready. In the failing session it took 1.26 s instead of the usual
++0.43-0.77 s, the carrier search ran 190 ms before it finished, and both modules
++were visible. Refusing an ambiguous carrier is correct, but the refusal lasted
++for the whole session. A resolution change recovered only because it rebuilds
++the private session and searches again.
++
++**Change.** A carrier failure that can clear by itself no longer refuses for the
++session: no unique SR module (none yet, or two at once), an SR module that
++could not be retained, and MinHook status 9 (no free memory within +-1 GB of the
++target). The private session stays built and owned, no frame is armed or
++processed, and the search is repeated once per second, up to 30 attempts.
++Any other failure, and the 30th failed attempt, refuse as before. An ambiguous
++carrier is still never hooked. The module list is logged on the first and last
++attempt only. When the hook is installed, the log names the module and the
++panel's SR/hook diagnostic is cleared. A size change or runtime loss while the
++carrier is pending releases the session through the normal drained path,
++because the session is owned from the moment it is imported. Sessions where
++the first attempt succeeds behave exactly as before.
++
++Files: `src/present-carrier-retry.h` (new, policy), `src/present-adapter.inc`
++(result classification), `src/fg-input.inc` (retry step), `src/fg-relay.inc`
++(no arm while pending). Tests: `tests/vulkan-fg-quality/run.cmd carrier`
++(production search, MinHook install and retry step against fixture DLLs), and
++the test-only add-on `carrier-race-helper.cpp` (`run.cmd racehelper`), which
++recreates the race in the game by holding `nvngx_dlss.dll` until the bridge has
++seen two SR modules.
++
+ ## Problem
+ 
+ RenoDX's DLSS 5 Generic offers three hook points: Upscaled, Render and Present.
+@@ -346,6 +392,7 @@ handed over on the render thread.
+ | `src/focus-fg.inc`, `src/focus-fg-contract.h` | Scoped Streamline focus gate (2026-10-01). |
+ | `src/composition-guard.inc` | Keeps the game's monitor composed (2026-10-01). |
+ | `src/present-compatibility.h` | Compatibility codes and messages instead of a hash whitelist (2026-10-01). |
++| `src/present-carrier-retry.h` | Which SR carrier failures are retried, how often and how many times (2026-10-02). |
+ | `src/vk-present-adapter.ini.example` | Documented configuration. |
+ | `tests/vulkan-fg-input/`, `tests/vulkan-fg-relay/`, `tests/vulkan-fg-quality/` | Offline tests (below). |
+ 
+@@ -361,7 +408,7 @@ handed over on the render thread.
+ | `tests/vulkan-fg-relay/lifetime/` | Real ReShade 6.8 + real Generic, two Vulkan instances: `race` reproduces the Generic unregistration with an older bridge, `stable` / `control` pass, `late-ref` must fail with exit 12. |
+ | `tests/vulkan-fg-relay/inject/` | A device created without the extension gets it through the hook; D3D12 Signal -> Vulkan timeline value, and D3D12 Signal -> `vkWaitSemaphores`, both pass. |
+ 
+-| `tests/vulkan-fg-quality/run.cmd SUITE <new-dir>` | 2026-10-01 suites: `registry` (handle table, 188780 checks), `guides` (57), `hooks` (production NGX wrappers, 535), `colour` (sub-rectangle copies, 39), `recovery` (real D3D12 marker, 34), `compatibility` (26), `guard` (real Win32 windows, 28), `focus <sl.dlss_g.dll>` (512 guard combinations and the disk contract), `gpu` (real Vulkan compute scaling; needs `VULKAN_SDK`). |
++| `tests/vulkan-fg-quality/run.cmd SUITE <new-dir>` | 2026-10-01 suites: `registry` (handle table, 188780 checks), `guides` (57), `hooks` (production NGX wrappers, 535), `colour` (sub-rectangle copies, 39), `recovery` (real D3D12 marker, 34), `compatibility` (26), `guard` (real Win32 windows, 28), `focus <sl.dlss_g.dll>` (512 guard combinations and the disk contract), `gpu` (real Vulkan compute scaling; needs `VULKAN_SDK`). 2026-10-02: `carrier` (46), and `racehelper`, which only builds the test-only in-game race add-on. |
+ 
+ The relay's arm/copy/park/release chain has no offline host: it needs a real
+ DLSS-G evaluate. It was validated in the game (below).
+diff --git a/src/fg-input.inc b/src/fg-input.inc
+index 0949a5a..7dc4890 100644
+--- a/src/fg-input.inc
++++ b/src/fg-input.inc
+@@ -23,6 +23,10 @@ static FgComposite g_fg_composite;
+ 
+ struct FgInputState {
+     bool refused, armed, worker_ok, want_release;
++    // The private session is built and owned, but the SR carrier hook is not
++    // installed yet; no frame is armed or processed until it is.
++    bool carrier_pending;
++    PresentCarrierRetry carrier;
+     uint32_t vk_fmt;
+     UINT w, h;
+     unsigned depth_inverted;
+@@ -417,6 +421,8 @@ static void FgInputOnSessionRelease()
+     g_fg_input.w = g_fg_input.h = g_fg_input.depth_inverted = 0;
+     g_fg_input.want_release = false;
+     g_fg_input.refused = false;
++    g_fg_input.carrier_pending = false;
++    g_fg_input.carrier = {};
+     g_s12.w = 0;
+     g_s12.need_reset = true;
+     FgGuideRequestReset();
+@@ -468,6 +474,35 @@ static bool MirrorReleaseForFgInput()
+     return true;
+ }
+ 
++// Called with the private session built and owned. Returns true once the SR
++// carrier hook and the composite pass exist; false while a retry is pending or
++// after a refusal. A transient failure keeps the session and retries later.
++static bool FgInputCarrierStep(const FgGuideContract &guides)
++{
++    const ULONGLONG now = GetTickCount64();
++    if (!PresentCarrierRetryDue(g_fg_input.carrier, now)) return false;
++    const unsigned attempt = g_fg_input.carrier.attempts + 1;
++    const PresentCarrierResult result = PresentAdapterCarrier(attempt == 1 || attempt == kPresentCarrierRetryLimit);
++    if (result != PCR_READY) {
++        if (PresentCarrierRetryAfterFailure(g_fg_input.carrier, result, now)) {
++            Log("[fg-input] SR carrier hook not installed (attempt %u of %u); the private session is kept and the hook is retried in %llu ms.",
++                attempt, kPresentCarrierRetryLimit, kPresentCarrierRetryMs);
++            return false;
++        }
++        FgInputRefuse("private SR carrier hook unavailable");
++        return false;
++    }
++    if (attempt > 1) Log("[fg-input] SR carrier hook installed on attempt %u.", attempt);
++    PresentAdapterWitness();
++    if (!FgCompositeMake(g_s12.dev, g_s12.tex[SLOT_COLOR], g_s12.tex[SLOT_OUTPUT], g_s12.tex[kOutB])) {
++        FgInputRefuse("composite pass unavailable"); return false;
++    }
++    g_fg_input.carrier_pending = false;
++    Log("[fg-input] ready: HUD-less -> linear sRGB carrier -> Generic NR -> UI-preserving composite; FG interpolates processed frames. guides: mv=%s (scale %.3f,%.3f) depth=%s inverted=%u",
++        "game", guides.carrier_scale_x, guides.carrier_scale_y, "game", guides.inverted);
++    return true;
++}
++
+ // Render-thread half: records copies of the FG inputs into the FG evaluate's own
+ // command buffer, parks it, and records the copy back before the evaluate is
+ // forwarded -- so FG and the real-frame present both see the processed image.
+@@ -589,18 +624,16 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
+             FgInputRefuse("the private D3D12 feature or its second carrier could not be built"); return;
+         }
+         if (!SynthVkImport()) { SynthVkReleaseImages(); g_svk.ready = false; FgInputRefuse("import into the game's VkDevice failed"); return; }
+-        if (!PresentAdapterCarrier()) { FgInputRefuse("private SR carrier hook unavailable"); return; }
+-        PresentAdapterWitness();
+-        if (!FgCompositeMake(g_s12.dev, g_s12.tex[SLOT_COLOR], g_s12.tex[SLOT_OUTPUT], g_s12.tex[kOutB])) {
+-            FgInputRefuse("composite pass unavailable"); return;
+-        }
++        // Owned from here, so a shape change or runtime loss while the carrier
++        // is pending releases the session through the normal drained path.
+         g_fg_input.vk_fmt = back.fmt; g_fg_input.w = back.w; g_fg_input.h = back.h;
+         g_fg_input.depth_inverted = guides.inverted;
+         g_s12.need_reset = true;
+         InterlockedExchange(&g_adapter_owner, OWNER_FG);
+-        Log("[fg-input] ready: HUD-less -> linear sRGB carrier -> Generic NR -> UI-preserving composite; FG interpolates processed frames. guides: mv=%s (scale %.3f,%.3f) depth=%s inverted=%u",
+-            "game", guides.carrier_scale_x, guides.carrier_scale_y, "game", guides.inverted);
++        g_fg_input.carrier = {};
++        g_fg_input.carrier_pending = true;
+     }
++    if (g_fg_input.carrier_pending && !FgInputCarrierStep(guides)) return;
+ 
+     SVkCommandBuffer cb = reinterpret_cast<SVkCommandBuffer>(cmd_raw);
+     const LONG drain = InterlockedCompareExchange(&g_vkm.drain, 0, 0);
+diff --git a/src/fg-relay.inc b/src/fg-relay.inc
+index 0de0c70..24619d6 100644
+--- a/src/fg-relay.inc
++++ b/src/fg-relay.inc
+@@ -841,6 +841,7 @@ static bool FgRelayArmCopy(void *queue, const char *who, const VkmRes &hud, cons
+     if (!f.ready || f.fell_back || !f.cs_ready) { FgrCount(f.arm_guard); return false; }
+     if (!g_present_adapter.run_nr || g_present_adapter.remaining == 0) { FgrCount(f.arm_noreq); return false; }
+     if (g_present_adapter.refused || g_fg_input.refused || g_vkm.refused) { FgrCount(f.arm_refused); return false; }
++    if (g_fg_input.carrier_pending) { FgrCount(f.arm_guard); return false; }
+     if (g_vkm.stopping || g_fg_input.want_release) { FgrCount(f.arm_stopping); return false; }
+     if (g_svk.dev == nullptr || hud.image == 0 || back.image == 0 || depth.image == 0 || mv.image == 0)
+     { FgrCount(f.arm_badres); return false; }
+diff --git a/src/present-adapter.inc b/src/present-adapter.inc
+index c3f597b..bbdff57 100644
+--- a/src/present-adapter.inc
++++ b/src/present-adapter.inc
+@@ -1,4 +1,6 @@
+ #include "present-compatibility.h"
++#include "present-carrier-retry.h"
++static_assert(MH_ERROR_MEMORY_ALLOC == 9, "present-carrier-retry.h classifies MinHook status 9");
+ 
+ static const char *const kPresentCompatibleGeneric =
+     u8"Generic builds confirmed to work with this bridge: 8.5.0-rc10 / 已经确定可以正常使用该版本插件的Generic插件：8.5.0-rc10";
+@@ -219,7 +221,7 @@ static bool PresentAdapterWitness()
+     return true;
+ }
+ 
+-static HMODULE PresentAdapterSrModule()
++static HMODULE PresentAdapterSrModule(bool verbose)
+ {
+     auto enumerate = reinterpret_cast<PFN_EnumProcessModules>(
+         GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "K32EnumProcessModules"));
+@@ -259,7 +261,7 @@ static HMODULE PresentAdapterSrModule()
+             const wchar_t* leaf = wcsrchr(path, L'\\');
+             leaf = leaf != nullptr ? leaf + 1 : path;
+             // Full paths with non-ANSI characters print empty through %ls; the leaf is enough to identify the module.
+-            Log("[present-adapter] NGX evaluate module: %ls internal=%ls product=%ls.", leaf, name, product);
++            if (verbose) Log("[present-adapter] NGX evaluate module: %ls internal=%ls product=%ls.", leaf, name, product);
+             // Ray Reconstruction shares InternalName=DLSS; only the super-sampling product is the SR carrier.
+             if (_wcsicmp(name, L"DLSS") == 0 &&
+                 _wcsicmp(product, L"NVIDIA Deep Learning SuperSampling") == 0) is_sr = true;
+@@ -274,36 +276,46 @@ static HMODULE PresentAdapterSrModule()
+     return found;
+ }
+ 
+-static bool PresentAdapterCarrier()
++// verbose lists every NGX evaluate module; retries pass false to keep the log short.
++static PresentCarrierResult PresentAdapterCarrier(bool verbose = true)
+ {
+-    if (g_present_adapter.sr_hook) return true;
+-    const HMODULE runtime = PresentAdapterSrModule();
++    if (g_present_adapter.sr_hook) return PCR_READY;
++    const HMODULE runtime = PresentAdapterSrModule(verbose);
+     void* entry = runtime != nullptr
+         ? reinterpret_cast<void*>(GetProcAddress(runtime, "NVSDK_NGX_D3D12_EvaluateFeature")) : nullptr;
+     if (entry == nullptr) {
+         Log("[present-adapter] SR export unavailable: module=%p entry=%p error=%lu.", runtime, entry, GetLastError());
+         PresentCompatibilityIssue(PC_SR_ENTRY_UNAVAILABLE, "A unique DLSS SR carrier evaluate export could not be found.");
+-        return false;
++        return PCR_TRANSIENT;
+     }
+     HMODULE keep = nullptr;
+     if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+-                          reinterpret_cast<LPCWSTR>(entry), &keep)) return false;
++                          reinterpret_cast<LPCWSTR>(entry), &keep)) {
++        Log("[present-adapter] SR module could not be retained: entry=%p error=%lu.", entry, GetLastError());
++        return PCR_TRANSIENT;
++    }
+     const MH_STATUS made = MH_CreateHook(entry, reinterpret_cast<void*>(&PresentAdapterSrHook), &g_present_sr_original);
+     if (made != MH_OK) {
+         Log("[present-adapter] SR hook creation failed: status=%d entry=%p.", static_cast<int>(made), entry);
+         PresentCompatibilityIssue(PC_HOOK_INSTALL_FAILED, "The private SR carrier hook could not be installed.");
+-        return false;
++        return PresentCarrierHookStatusResult(static_cast<int>(made));
+     }
+     const MH_STATUS enabled = MH_EnableHook(entry);
+     if (enabled != MH_OK) {
+         Log("[present-adapter] SR hook enable failed: status=%d.", static_cast<int>(enabled));
+         MH_RemoveHook(entry);
+         g_present_sr_original = nullptr;
+-        return false;
++        return PCR_FATAL;
+     }
+     g_present_adapter.sr_hook = true;
+-    Log("[present-adapter] private SR carrier copy ready; external SR calls remain tail-forwarded.");
+-    return true;
++    const unsigned previous = PresentCompatibilitySnapshot().code[1];
++    if (previous == PC_SR_ENTRY_UNAVAILABLE || previous == PC_HOOK_INSTALL_FAILED) PresentCompatibilityIssue(PC_OK, "");
++    wchar_t path[1024] = {};
++    GetModuleFileNameW(runtime, path, _countof(path));
++    const wchar_t* leaf = wcsrchr(path, L'\\');
++    Log("[present-adapter] private SR carrier copy ready on %ls; external SR calls remain tail-forwarded.",
++        leaf != nullptr ? leaf + 1 : path);
++    return PCR_READY;
+ }
+ 
+ static void PresentAdapterRequest()
+@@ -460,7 +472,7 @@ static void PresentAdapterFrame(reshade::api::effect_runtime* rt, reshade::api::
+         Log("[present-adapter] source space=%u; working colour=%s.", static_cast<unsigned>(space),
+             srgb ? "linear normalized SDR" : "linear BT.709, 1.0=80 nits");
+     }
+-    if (g_present_adapter.run_nr && !PresentAdapterCarrier()) {
++    if (g_present_adapter.run_nr && PresentAdapterCarrier() != PCR_READY) {
+         g_present_adapter.refused = true;
+         Log("[present-adapter] private SR carrier hook unavailable; no image modified.");
+         return;
+diff --git a/src/present-carrier-retry.h b/src/present-carrier-retry.h
+new file mode 100644
+index 0000000..1081e00
+--- /dev/null
++++ b/src/present-carrier-retry.h
+@@ -0,0 +1,42 @@
++#pragma once
++
++// Installing the private SR carrier hook can fail for reasons that clear on
++// their own: NGX briefly maps the game's nvngx_dlss.dll next to the driver's
++// DLSS model while a feature is created, so two SR modules are visible for a
++// moment, or the SR module has not been loaded yet. Those failures are retried
++// on later frames with the private session kept; anything else still refuses.
++enum PresentCarrierResult : unsigned {
++    PCR_READY = 0,
++    PCR_TRANSIENT = 1,
++    PCR_FATAL = 2
++};
++
++static const unsigned kPresentCarrierRetryLimit = 30;
++static const unsigned long long kPresentCarrierRetryMs = 1000;
++
++struct PresentCarrierRetry {
++    unsigned attempts;
++    unsigned long long next_at;
++};
++
++static bool PresentCarrierRetryDue(const PresentCarrierRetry &retry, unsigned long long now)
++{
++    return now >= retry.next_at;
++}
++
++// Records a failed attempt. Returns true when another attempt is allowed.
++static bool PresentCarrierRetryAfterFailure(PresentCarrierRetry &retry, PresentCarrierResult result,
++                                            unsigned long long now)
++{
++    ++retry.attempts;
++    if (result != PCR_TRANSIENT || retry.attempts >= kPresentCarrierRetryLimit) return false;
++    retry.next_at = now + kPresentCarrierRetryMs;
++    return true;
++}
++
++// MinHook status 9 (MH_ERROR_MEMORY_ALLOC): no free block within +-1 GB of the
++// target at this moment. Address space near the target can be released later.
++static PresentCarrierResult PresentCarrierHookStatusResult(int minhook_status)
++{
++    return minhook_status == 9 ? PCR_TRANSIENT : PCR_FATAL;
++}
+diff --git a/tests/vulkan-fg-quality/README.md b/tests/vulkan-fg-quality/README.md
+index 24bf2d2..2888d06 100644
+--- a/tests/vulkan-fg-quality/README.md
++++ b/tests/vulkan-fg-quality/README.md
+@@ -1,4 +1,4 @@
+-# Offline tests for the 2026-10-01 update
++# Offline tests for the 2026-10-01 and 2026-10-02 updates
+ 
+ Run from `cmd` or PowerShell on Windows with MSVC installed
+ (`tests/vulkan-fg-input/vcvars.cmd` finds it):
+@@ -18,6 +18,8 @@ started and nothing is installed.
+ | `colour` | FG input sub-rectangles (fullscreen below monitor resolution, non-zero origins) and the recorded production copies | MSVC | `colour regions: 39 checks, 0 failures, ...` |
+ | `recovery` | Automatic rebuild after lost completion, with a real D3D12 queue marker (Vulkan completion is simulated) | MSVC, a D3D12 GPU | `recovery/history: 34 checks, 0 failures` |
+ | `compatibility` | No hash whitelist: an unknown Generic build is tried, configuration problems pause and resume, NR off is not reported as incompatible | MSVC | `PASS compatibility: checks=26 failures=0` |
++| `carrier` | SR carrier retry: production carrier search and MinHook install against fixture DLLs (no SR module, Ray Reconstruction only, two SR modules at once, one again), retry interval and limit, immediate refusal for a non-transient MinHook status, no relay arm while pending, session release clears the state | MSVC | `PASS carrier: checks=46 failures=0` |
++| `racehelper` | Builds only: `carrier-race-helper.addon64`, a test-only ReShade add-on that recreates the SR carrier race in a game (see its source header). Remove it from the game folder after the test | MSVC | `built carrier-race-helper.addon64 ...` |
+ | `guard` | Composition guard with real Win32 windows: styles, alpha 1/255, capture exclusion, foreground unchanged, click-through, follows the monitor, hides on FG stop / minimise / NR off / `HoldComposition=0` | MSVC, a desktop session | `guard: 28 checks, 0 failures` |
+ | `focus` | Focus gate: 512 guard combinations, exact return-address scope, explicit Off/free pass-through, and the instruction contract found in the given `sl.dlss_g.dll` (read from disk, not loaded) | MSVC, the game's `sl.dlss_g.dll` path as ARGUMENT | `focus FG tests PASS` |
+ | `gpu` | Guide scaling on a real Vulkan device, on graphics and compute-only queue families, bit-exact against a CPU reference, plus D3D12 shared-texture round trips | MSVC, `VULKAN_SDK`, NVIDIA GPU | `PASS GPU guide compute/readback checks=402 failures=0 ...` (`gpu <dir> colour-only` runs only the sub-rectangle copies) |
+diff --git a/tests/vulkan-fg-quality/carrier-race-helper.cpp b/tests/vulkan-fg-quality/carrier-race-helper.cpp
+new file mode 100644
+index 0000000..d9510f7
+--- /dev/null
++++ b/tests/vulkan-fg-quality/carrier-race-helper.cpp
+@@ -0,0 +1,137 @@
++// TEST ONLY. A ReShade add-on that recreates, on demand, the start-up race the
++// SR carrier retry handles: it holds an extra reference on the game folder's
++// nvngx_dlss.dll from the moment dlss5-bridge opens its private D3D12 session
++// until 1.5 s after the bridge has logged the ambiguity, so the carrier search
++// sees two SR modules (the driver's DLSS model and nvngx_dlss.dll).
++// Expected: a bridge without the retry refuses NR for the session; a bridge
++// with it logs "SR carrier hook installed on attempt N" and NR runs.
++// Remove it from the game folder after the test.
++#include <windows.h>
++#include <cstdio>
++#include <cstring>
++#include <string>
++
++extern "C" __declspec(dllexport) const char *NAME = "carrier-race-helper (test only)";
++extern "C" __declspec(dllexport) const char *DESCRIPTION =
++    "Holds nvngx_dlss.dll during dlss5-bridge's SR carrier search to reproduce the start-up race. Remove after testing.";
++
++typedef bool (*PFN_Register)(HMODULE, uint32_t);
++static wchar_t g_dir[MAX_PATH];
++
++static void Note(const char *text)
++{
++    wchar_t path[MAX_PATH];
++    swprintf_s(path, L"%ls\\carrier-race-helper.log", g_dir);
++    FILE *file = nullptr;
++    if (_wfopen_s(&file, path, L"ab") != 0 || file == nullptr) return;
++    SYSTEMTIME t;
++    GetLocalTime(&t);
++    fprintf(file, "%02u:%02u:%02u.%03u  %s\r\n", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds, text);
++    fclose(file);
++}
++
++// Reads the bridge log from `offset`, appends to `seen`; the log only grows.
++static void ReadLog(long long &offset, std::string &seen)
++{
++    wchar_t path[MAX_PATH];
++    swprintf_s(path, L"%ls\\dlss5-bridge.log", g_dir);
++    HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
++                              nullptr, OPEN_EXISTING, 0, nullptr);
++    if (file == INVALID_HANDLE_VALUE) return;
++    LARGE_INTEGER size = {};
++    if (GetFileSizeEx(file, &size) && size.QuadPart < offset) { offset = 0; seen.clear(); }
++    LARGE_INTEGER at = {};
++    at.QuadPart = offset;
++    SetFilePointerEx(file, at, nullptr, FILE_BEGIN);
++    char buffer[65536];
++    DWORD got = 0;
++    while (ReadFile(file, buffer, sizeof(buffer), &got, nullptr) && got != 0) {
++        seen.append(buffer, got);
++        offset += got;
++    }
++    CloseHandle(file);
++    if (seen.size() > (1u << 20)) seen.erase(0, seen.size() - (1u << 16));
++}
++
++static long MsOfDay(const SYSTEMTIME &t)
++{
++    return ((t.wHour * 60L + t.wMinute) * 60L + t.wSecond) * 1000L + t.wMilliseconds;
++}
++
++// The bridge recreates its log when it attaches and the log has no process id,
++// so a log is taken as this session's when its first time stamp is within a
++// minute of this add-on's start. Until then an older session's log is ignored.
++static bool LogIsThisSession(const std::string &seen, long started)
++{
++    unsigned h = 0, m = 0, s = 0, ms = 0;
++    if (seen.size() < 12 || sscanf_s(seen.c_str(), "%2u:%2u:%2u.%3u", &h, &m, &s, &ms) != 4) return false;
++    const long stamp = ((h * 60L + m) * 60L + s) * 1000L + ms;
++    return labs(stamp - started) <= 60000;
++}
++
++static DWORD WINAPI Worker(void *)
++{
++    Note("started; waiting for the bridge to open its private D3D12 session");
++    SYSTEMTIME now;
++    GetLocalTime(&now);
++    const long started = MsOfDay(now);
++    long long offset = 0;
++    std::string seen;
++    HMODULE held = nullptr;
++    const ULONGLONG deadline = GetTickCount64() + 15ull * 60ull * 1000ull;
++    while (GetTickCount64() < deadline) {
++        ReadLog(offset, seen);
++        if (!LogIsThisSession(seen, started)) { offset = 0; seen.clear(); Sleep(50); continue; }
++        if (held == nullptr && seen.find("synth: opening on this add-on's own D3D12 device") != std::string::npos) {
++            wchar_t dll[MAX_PATH];
++            swprintf_s(dll, L"%ls\\nvngx_dlss.dll", g_dir);
++            held = LoadLibraryW(dll);
++            Note(held != nullptr ? "holding the game folder's nvngx_dlss.dll" : "nvngx_dlss.dll could not be loaded");
++            if (held == nullptr) return 0;
++        }
++        if (held != nullptr && seen.find("multiple SR modules found") != std::string::npos) {
++            Note("bridge reported two SR modules; releasing nvngx_dlss.dll in 1.5 s");
++            Sleep(1500);
++            FreeLibrary(held);
++            Note("released; the bridge's next carrier attempt should find one SR module");
++            return 0;
++        }
++        if (held != nullptr && seen.find("private SR carrier copy ready") != std::string::npos) {
++            Note("the carrier installed without seeing the race (timing missed); releasing");
++            FreeLibrary(held);
++            return 0;
++        }
++        Sleep(10);
++    }
++    if (held != nullptr) FreeLibrary(held);
++    Note("timed out");
++    return 0;
++}
++
++BOOL APIENTRY DllMain(HMODULE self, DWORD reason, LPVOID)
++{
++    if (reason != DLL_PROCESS_ATTACH) return TRUE;
++    // ReShade loads and unloads add-ons several times at start-up; the worker
++    // must outlive that, so this module stays mapped until the process exits.
++    HMODULE pinned = nullptr;
++    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN | GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
++                       reinterpret_cast<LPCWSTR>(&DllMain), &pinned);
++    static bool started = false;
++    if (started) return TRUE;
++    started = true;
++    GetModuleFileNameW(self, g_dir, MAX_PATH);
++    if (wchar_t *slash = wcsrchr(g_dir, L'\\')) *slash = L'\0';
++    HMODULE reshade = nullptr;
++    for (const wchar_t *name : {L"ReShade64.dll", L"dxgi.dll", L"d3d12.dll", L"d3d11.dll"}) {
++        reshade = GetModuleHandleW(name);
++        if (reshade != nullptr && GetProcAddress(reshade, "ReShadeRegisterAddon") != nullptr) break;
++        reshade = nullptr;
++    }
++    if (reshade != nullptr) {
++        auto reg = reinterpret_cast<PFN_Register>(GetProcAddress(reshade, "ReShadeRegisterAddon"));
++        for (uint32_t version = 18; version >= 5 && !reg(self, version); --version) {}
++    }
++    HANDLE thread = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr);
++    if (thread != nullptr) CloseHandle(thread);
++    return TRUE;
++}
+diff --git a/tests/vulkan-fg-quality/run.cmd b/tests/vulkan-fg-quality/run.cmd
+index 6ff1686..b76a5b2 100644
+--- a/tests/vulkan-fg-quality/run.cmd
++++ b/tests/vulkan-fg-quality/run.cmd
+@@ -1,6 +1,6 @@
+ @echo off
+ rem Offline tests for the 2026-10-01 update. Usage: run.cmd SUITE NEW_OUTPUT_DIRECTORY [ARGUMENT]
+-rem Suites: registry hooks guides colour recovery compatibility guard focus gpu
++rem Suites: registry hooks guides colour recovery compatibility carrier guard focus gpu racehelper
+ rem Every run builds into a NEW directory and refuses an existing one. No game is started.
+ setlocal
+ if "%~2"=="" goto usage
+@@ -53,6 +53,22 @@ call :bridge test-compatibility.cpp || goto failed
+ ( echo [Adapter]& echo Enabled=1& echo Source=fg-input& echo Follow=1& echo Pipeline=0 ) > vk-present-adapter.ini
+ goto run
+ 
++:suite_carrier
++rc /nologo /fo sr-fixture.res "%HERE%sr-fixture.rc" > build.log 2>&1 || goto failed
++rc /nologo /d RR_FIXTURE /fo rr-fixture.res "%HERE%sr-fixture.rc" >> build.log 2>&1 || goto failed
++cl /nologo /W4 /WX /Od /MT /LD "%HERE%sr-fixture.cpp" sr-fixture.res /Fe:sr-a.dll >> build.log 2>&1 || goto failed
++copy /y sr-a.dll sr-b.dll >> build.log || goto failed
++cl /nologo /W4 /WX /Od /MT /LD "%HERE%sr-fixture.cpp" rr-fixture.res /Fe:rr-fixture.dll >> build.log 2>&1 || goto failed
++call :bridge test-carrier.cpp || goto failed
++goto run
++
++:suite_racehelper
++rem Builds only. carrier-race-helper.addon64 is a test-only ReShade add-on; see its source header.
++cl /nologo /W4 /WX /O2 /MT /EHsc /std:c++17 /LD "%HERE%carrier-race-helper.cpp" /Fe:carrier-race-helper.addon64 > build.log 2>&1 || goto failed
++echo built carrier-race-helper.addon64 (test only; put it next to the game executable and remove it after the test)
++popd
++exit /b 0
++
+ :suite_gpu
+ if not defined VULKAN_SDK ( echo run.cmd gpu needs VULKAN_SDK & popd & exit /b 2 )
+ ml64 /nologo /c "%SRC%\present-nr-witness.asm" >> build.log 2>&1 || goto failed
+diff --git a/tests/vulkan-fg-quality/sr-fixture.cpp b/tests/vulkan-fg-quality/sr-fixture.cpp
+new file mode 100644
+index 0000000..249f13f
+--- /dev/null
++++ b/tests/vulkan-fg-quality/sr-fixture.cpp
+@@ -0,0 +1,14 @@
++// A module that looks like an NGX evaluate module to the carrier search: it
++// exports the D3D12 evaluate name and carries a DLSS version resource
++// (sr-fixture.rc). Built twice: as SR, and with /DRR_FIXTURE as Ray Reconstruction.
++#include <windows.h>
++
++extern "C" __declspec(dllexport) int NVSDK_NGX_D3D12_EvaluateFeature(void *list, void *handle, void *params, void *callback)
++{
++    volatile int seen = 0;
++    seen += list != nullptr;
++    seen += handle != nullptr;
++    seen += params != nullptr;
++    seen += callback != nullptr;
++    return seen;
++}
+diff --git a/tests/vulkan-fg-quality/sr-fixture.rc b/tests/vulkan-fg-quality/sr-fixture.rc
+new file mode 100644
+index 0000000..c8918de
+--- /dev/null
++++ b/tests/vulkan-fg-quality/sr-fixture.rc
+@@ -0,0 +1,29 @@
++#include <windows.h>
++
++#ifdef RR_FIXTURE
++#define FIXTURE_PRODUCT "NVIDIA DLSS Ray Reconstruction"
++#else
++#define FIXTURE_PRODUCT "NVIDIA Deep Learning SuperSampling"
++#endif
++
++VS_VERSION_INFO VERSIONINFO
++ FILEVERSION    310,5,2,0
++ PRODUCTVERSION 310,5,2,0
++ FILEOS         VOS_NT_WINDOWS32
++ FILETYPE       VFT_DLL
++BEGIN
++    BLOCK "StringFileInfo"
++    BEGIN
++        BLOCK "040904b0"
++        BEGIN
++            VALUE "FileDescription", "carrier test fixture"
++            VALUE "FileVersion",     "310.5.2.0"
++            VALUE "InternalName",    "DLSS"
++            VALUE "ProductName",     FIXTURE_PRODUCT
++        END
++    END
++    BLOCK "VarFileInfo"
++    BEGIN
++        VALUE "Translation", 0x409, 1200
++    END
++END
+diff --git a/tests/vulkan-fg-quality/test-carrier.cpp b/tests/vulkan-fg-quality/test-carrier.cpp
+new file mode 100644
+index 0000000..44efbaa
+--- /dev/null
++++ b/tests/vulkan-fg-quality/test-carrier.cpp
+@@ -0,0 +1,147 @@
++// SR carrier retry. Production carrier search, MinHook install, FG-input retry
++// step and relay arm guard, against fixture DLLs in this directory (two SR
++// modules visible at once, as when NGX briefly maps the game's nvngx_dlss.dll
++// next to the driver's DLSS model). No DllMain, game, GPU or NGX.
++#include "dlss5-bridge.cpp"
++#include <string>
++
++static unsigned checks, failures;
++static void Check(bool value, const char *description)
++{
++    ++checks;
++    if (!value) { ++failures; std::printf("FAIL %s\n", description); }
++}
++
++static int DummyDetour() { return 7; }
++
++static bool LogContains(const char *text)
++{
++    FILE *file = nullptr;
++    if (fopen_s(&file, g_log_path, "rb") != 0 || file == nullptr) return false;
++    std::string all;
++    char buffer[4096];
++    size_t n = 0;
++    while ((n = fread(buffer, 1, sizeof(buffer), file)) > 0) all.append(buffer, n);
++    fclose(file);
++    return all.find(text) != std::string::npos;
++}
++
++static void CheckPolicy()
++{
++    PresentCarrierRetry r = {};
++    Check(PresentCarrierRetryDue(r, 0), "first attempt is immediate");
++    Check(PresentCarrierRetryAfterFailure(r, PCR_TRANSIENT, 100), "transient failure allows a retry");
++    Check(!PresentCarrierRetryDue(r, 100 + kPresentCarrierRetryMs - 1), "retry waits the interval");
++    Check(PresentCarrierRetryDue(r, 100 + kPresentCarrierRetryMs), "retry is due after the interval");
++    unsigned allowed = 1;
++    while (PresentCarrierRetryAfterFailure(r, PCR_TRANSIENT, 0)) ++allowed;
++    Check(r.attempts == kPresentCarrierRetryLimit, "attempts stop exactly at the limit");
++    Check(allowed == kPresentCarrierRetryLimit - 1, "limit - 1 retries follow the first attempt");
++    PresentCarrierRetry f = {};
++    Check(!PresentCarrierRetryAfterFailure(f, PCR_FATAL, 0), "fatal failure is not retried");
++    Check(f.attempts == 1, "fatal failure is counted once");
++    Check(PresentCarrierHookStatusResult(MH_ERROR_MEMORY_ALLOC) == PCR_TRANSIENT, "MinHook status 9 is transient");
++    Check(PresentCarrierHookStatusResult(MH_ERROR_ALREADY_CREATED) == PCR_FATAL, "an existing hook is fatal");
++    Check(PresentCarrierHookStatusResult(MH_ERROR_UNSUPPORTED_FUNCTION) == PCR_FATAL, "an unhookable function is fatal");
++    Check(PresentCarrierHookStatusResult(MH_ERROR_NOT_EXECUTABLE) == PCR_FATAL, "a non-executable target is fatal");
++}
++
++static void ResetFgInput()
++{
++    g_fg_input = {};
++    g_present_adapter.remaining = 1;
++    g_fg_input.carrier_pending = true;
++}
++
++static void CheckRelayGuard()
++{
++    FgrState &f = g_fgr;
++    f.ready = true; f.cs_ready = true; f.fell_back = false;
++    InterlockedExchange(&f.releasing, 0);
++    g_present_adapter.run_nr = true; g_present_adapter.remaining = 1; g_present_adapter.refused = false;
++    g_fg_input = {}; g_vkm.refused = false; g_vkm.stopping = false;
++    VkmRes hud = {}, back = {};
++    FgGuideContract guides = {};
++    const LONG guard = FgrCountRead(f.arm_guard), badres = FgrCountRead(f.arm_badres);
++    g_fg_input.carrier_pending = true;
++    Check(!FgRelayArmCopy(nullptr, "test", hud, back, guides), "no relay arm while the carrier is pending");
++    Check(FgrCountRead(f.arm_guard) == guard + 1, "pending carrier counted as an arm guard");
++    Check(FgrCountRead(f.arm_badres) == badres, "pending carrier stops before resource checks");
++    g_fg_input.carrier_pending = false;
++    Check(!FgRelayArmCopy(nullptr, "test", hud, back, guides), "fixture has no resources to arm");
++    Check(FgrCountRead(f.arm_badres) == badres + 1, "installed carrier reaches the following checks");
++    f.ready = false; f.cs_ready = false;
++    g_fg_input = {};
++}
++
++int main()
++{
++    InitializeCriticalSection(&g_log_cs);
++    strcpy_s(g_log_path, "carrier.log");
++    g_self = GetModuleHandleW(nullptr);
++    Check(MH_Initialize() == MH_OK, "MinHook initialised");
++    CheckPolicy();
++    CheckRelayGuard();
++
++    Check(PresentAdapterCarrier() == PCR_TRANSIENT, "no SR module yet is transient");
++    Check(PresentCompatibilitySnapshot().code[1] == PC_SR_ENTRY_UNAVAILABLE, "missing SR module is reported");
++
++    const HMODULE rr = LoadLibraryW(L".\\rr-fixture.dll");
++    Check(rr != nullptr, "Ray Reconstruction fixture loaded");
++    Check(PresentAdapterCarrier() == PCR_TRANSIENT, "Ray Reconstruction is not an SR carrier");
++
++    const HMODULE a = LoadLibraryW(L".\\sr-a.dll");
++    const HMODULE b = LoadLibraryW(L".\\sr-b.dll");
++    Check(a != nullptr && b != nullptr && a != b, "two distinct SR modules loaded");
++    void *entry = a != nullptr ? reinterpret_cast<void *>(GetProcAddress(a, "NVSDK_NGX_D3D12_EvaluateFeature")) : nullptr;
++    Check(entry != nullptr, "SR fixture export resolved");
++
++    Check(PresentAdapterCarrier() == PCR_TRANSIENT, "two SR modules are transient, not fatal");
++    Check(!g_present_adapter.sr_hook, "ambiguous carrier installs nothing");
++    Check(LogContains("multiple SR modules found"), "ambiguity is logged");
++
++    // FG-input step while ambiguous: one attempt per interval, session kept, refusal at the limit.
++    ResetFgInput();
++    FgGuideContract guides = {};
++    Check(!FgInputCarrierStep(guides), "ambiguous step does not become ready");
++    Check(g_fg_input.carrier.attempts == 1 && g_fg_input.carrier_pending && !g_fg_input.refused,
++          "first ambiguous attempt keeps the session pending");
++    Check(!FgInputCarrierStep(guides) && g_fg_input.carrier.attempts == 1, "no second attempt inside the interval");
++    unsigned steps = 1;
++    while (!g_fg_input.refused && steps < 2 * kPresentCarrierRetryLimit) {
++        g_fg_input.carrier.next_at = 0;
++        FgInputCarrierStep(guides);
++        ++steps;
++    }
++    Check(g_fg_input.refused, "persistent ambiguity is refused after the limit");
++    Check(steps == kPresentCarrierRetryLimit, "refusal happens on the last allowed attempt");
++    Check(g_present_adapter.remaining == 0, "refusal stops the request as before");
++    Check(!g_present_adapter.sr_hook, "nothing was hooked while ambiguous");
++    Check(LogContains("attempt 1 of 30"), "retry attempts are logged");
++
++    // A failure other than a transient one refuses at once.
++    Check(b != nullptr && FreeLibrary(b), "second SR module unloaded");
++    Check(MH_CreateHook(entry, reinterpret_cast<void *>(&DummyDetour), nullptr) == MH_OK, "foreign hook placed first");
++    ResetFgInput();
++    Check(!FgInputCarrierStep(guides) && g_fg_input.refused && g_fg_input.carrier.attempts == 1,
++          "fatal hook status refuses on the first attempt");
++    Check(MH_RemoveHook(entry) == MH_OK, "foreign hook removed");
++
++    // The ambiguity has cleared: the next attempt installs the carrier.
++    PresentCompatibilityIssue(PC_SR_ENTRY_UNAVAILABLE, "A unique DLSS SR carrier evaluate export could not be found.");
++    Check(PresentAdapterCarrier() == PCR_READY, "unique SR module installs the carrier");
++    Check(g_present_adapter.sr_hook && g_present_sr_original != nullptr, "carrier hook and trampoline exist");
++    Check(entry != nullptr && *static_cast<const unsigned char *>(entry) == 0xE9, "SR entry now jumps to the carrier");
++    Check(PresentCompatibilitySnapshot().code[1] == PC_OK, "carrier success clears the runtime diagnostic");
++    Check(LogContains("private SR carrier copy ready on sr-a.dll"), "installed module is named");
++    Check(PresentAdapterCarrier() == PCR_READY, "carrier install is idempotent");
++
++    g_fg_input = {};
++    FgInputOnSessionRelease();
++    Check(!g_fg_input.carrier_pending && g_fg_input.carrier.attempts == 0, "session release clears the pending carrier");
++
++    if (rr != nullptr) FreeLibrary(rr);
++    DeleteCriticalSection(&g_log_cs);
++    std::printf("%s carrier: checks=%u failures=%u\n", failures == 0 ? "PASS" : "FAIL", checks, failures);
++    return failures == 0 ? 0 : 1;
++}

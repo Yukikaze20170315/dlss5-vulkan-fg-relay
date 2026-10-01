@@ -1,0 +1,32 @@
+session,nvngx_dlss_loaded,scanner_hooks_done,private_feature_ready,carrier_search,scan_ms,search_minus_scan_ms,release_feature_wrappers,outcome
+before-fgrelay-release-20260929,11:43:06.664,11:43:07.094,11:43:07.390,11:43:07.490,430,396,no,carrier ready
+before-vulkan-fginput3-20260928,19:01:42.496,19:01:42.933,19:01:43.258,19:01:43.370,437,437,no,carrier ready
+before-vulkan-fginput4-20260928,19:35:30.222,19:35:30.631,19:35:30.955,19:35:31.053,409,422,no,carrier ready
+before-vulkan-fginput5-probe-20260928,20:10:52.653,20:10:53.130,20:10:53.359,20:10:53.469,477,339,no,carrier ready
+before-vulkan-fginput6-trace-20260928,22:02:59.020,22:02:59.457,22:02:59.727,22:02:59.824,437,367,no,carrier ready
+before-vulkan-fgrelay10-20260929,09:48:46.567,09:48:47.039,09:48:47.298,09:48:47.408,472,369,no,carrier ready
+before-vulkan-fgrelay11-20260929,10:06:21.718,10:06:22.138,10:06:22.415,10:06:22.513,420,375,no,carrier ready
+before-vulkan-fgrelay12-20260929,10:20:15.741,10:20:16.196,10:20:16.454,10:20:16.574,455,378,no,carrier ready
+before-vulkan-fgrelay2-20260929,01:10:53.466,01:10:53.862,01:10:54.177,01:10:54.278,396,416,no,carrier ready
+before-vulkan-fgrelay3-20260929,03:20:44.193,03:20:44.627,03:20:44.949,03:20:45.050,434,423,no,carrier ready
+before-vulkan-fgrelay4-20260929,03:32:06.228,03:32:06.856,03:32:07.021,03:32:07.121,628,265,no,carrier ready
+before-vulkan-fgrelay5-20260929,04:07:43.563,04:07:43.998,04:07:44.243,04:07:44.353,435,355,no,carrier ready
+before-vulkan-fgrelay6-20260929,04:50:23.568,04:50:24.229,04:50:24.423,04:50:24.538,661,309,no,carrier ready
+before-vulkan-fgrelay7-20260929,05:05:58.458,05:05:58.917,05:05:59.219,05:05:59.342,459,425,no,carrier ready
+before-vulkan-fgrelay9-20260929,08:35:52.662,08:35:53.240,08:35:53.456,08:35:53.556,578,316,no,carrier ready
+latency-20260929/A-nr-on,09:01:21.700,09:01:22.189,09:01:22.444,09:01:22.573,489,384,no,carrier ready
+latency-20260929/C-cap120-nr-on,09:41:56.125,09:41:56.613,09:41:56.846,09:41:56.949,488,336,no,carrier ready
+latency-20260929/G-fgrelay12-nocap-nr-on,10:26:43.464,10:26:43.908,10:26:44.194,10:26:44.315,444,407,no,carrier ready
+local-nr-loss-222752,21:50:54.937,21:50:56.194,21:50:55.863,21:50:56.004,1257,-190,yes,two SR modules -> refused for the session
+pr-fg-relay-20260929/game-check-release,13:41:38.257,13:41:38.699,13:41:38.992,13:41:39.089,442,390,no,carrier ready
+quality-followup-20261001/before-quality4,23:56:41.453,23:56:42.143,23:56:42.238,23:59:02.802,690,140659,yes,carrier ready
+quality-followup-20261001/cross-display-20261001-012024-5edeabf5,01:10:30.941,01:10:31.604,01:10:31.727,01:10:31.837,663,233,yes,carrier ready
+quality-followup-20261001/deployment-quality4-005001,00:42:07.634,00:42:08.301,00:42:08.488,00:42:08.581,667,280,yes,carrier ready
+quality-followup-20261001/deployment-quality5-010835/before,00:51:19.901,00:51:20.642,00:51:20.709,00:51:20.825,741,183,yes,carrier ready
+quality-followup-20261001/deployment-quality7-035137,01:35:26.914,01:35:27.649,01:35:27.677,01:35:27.784,735,135,yes,carrier ready
+quality-mode-20260930/A-quality-abnormal-105531,10:14:19.846,10:14:20.270,10:14:20.565,10:14:20.661,424,391,no,carrier ready
+quality-mode-20260930/deployment-145051,14:08:21.528,14:08:21.979,14:08:22.322,14:08:22.420,451,441,no,carrier ready
+quality-mode-20260930/deployment-quality2-201330,20:03:03.627,20:03:04.533,20:03:04.579,20:03:04.718,906,185,yes,carrier ready
+quality-mode-20260930/deployment-quality3-204621,20:15:09.463,20:15:10.296,20:15:10.343,20:15:10.450,833,154,yes,carrier ready
+quality-mode-20260930/game-quality3-quality-working-205232,20:47:25.934,20:47:26.829,20:47:26.819,20:47:26.949,895,120,yes,carrier ready
+vulkan-present-adapter-20260928/game-02-present3-nr30s,15:43:40.617,15:43:41.004,15:43:41.376,15:44:20.990,387,39986,no,carrier ready

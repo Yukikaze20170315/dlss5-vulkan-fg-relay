@@ -1,0 +1,4 @@
+02:54:22.052 -> 02:54:23.159  frames +38  armed +25  without evaluate 13  queue 023CD0->0228D0  metering 1->2  reset=1  foreground=0
+02:54:24.588 -> 02:54:25.246  frames +24  armed +13  without evaluate 11  queue 0228D0->023CD0  metering 2->0  reset=1  foreground=1
+02:54:29.534 -> 02:54:30.931  frames +45  armed +32  without evaluate 13  queue 023CD0->0228D0  metering 0->2  reset=1  foreground=0
+records=64 queue/metering switches=3 frames without evaluate=37

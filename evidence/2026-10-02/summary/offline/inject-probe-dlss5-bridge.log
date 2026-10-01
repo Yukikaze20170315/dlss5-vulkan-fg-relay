@@ -1,0 +1,144 @@
+03:45:55.053  dlss5-bridge 1.4.13-pre8-vk-fgrelay-20261002 (built Oct  2 2026 00:27:10) attached.
+03:45:55.053  
+03:45:55.054  
+03:45:55.054    reshade: C:\ProgramData\ReShade\ReShade64.dll
+03:45:55.054    windows: Windows 11, 10.0 build 26200
+03:45:55.054    files next to this add-on:
+03:45:55.054      nvngx_dlssnr.dll           MISSING from both
+03:45:55.054  nvngx_dlssnr.dll is in neither the add-on's folder nor the game's. The DLSS 5 add-on loads its neural-rendering model from that file.
+03:45:55.055      nvngx_dlss.dll             MISSING from both
+03:45:55.055    add-ons present:
+03:45:55.055      dlss5-bridge.addon64         version 1.4.13.20, 706560 bytes, 2026-10-01 16:28
+03:45:55.055          loaded at 00007FFA2B780000
+03:45:55.056    DLSS 5 add-on settings, read from ReShade.ini [RenoDX.DLSS5]:
+03:45:55.056      ConfigVersion=7
+03:45:55.056      EnableHooks=1
+03:45:55.056      NeuralUplift=1
+03:45:55.056      NRAdaptiveExposure=1
+03:45:55.056      NRAutoMask=1
+03:45:55.056      NRChainedHistory=1
+03:45:55.056      NRChromaClamp=1
+03:45:55.056      NRCodecMode=0
+03:45:55.057      NRColorStrength=1
+03:45:55.057      NRCostMeter=1
+03:45:55.057      NRDepthMode=0
+03:45:55.057      NRDetailStability=0
+03:45:55.057      NRDiffuseWhiteNits=203
+03:45:55.057      NRDisableRelease=0
+03:45:55.058      NRDisplayPedestal=1
+03:45:55.058      NREditTrace=0
+03:45:55.058      NREnableUpscaling=0
+03:45:55.058      NRFeedMode=2
+03:45:55.058      NRFollowInputRes=0
+03:45:55.059      NRGlobalTone=2
+03:45:55.059      NRGpuTimers=0
+03:45:55.059      NRHookPoint=0
+03:45:55.059      NRIntensity=2
+03:45:55.059      NRLinearUnitNits=0
+03:45:55.059      NRLocalStructure=1
+03:45:55.059      NRLocalTone=2
+03:45:55.060      NRLookBrighten=1
+03:45:55.060      NRLookColour=1
+03:45:55.060      NRLookDarken=1
+03:45:55.060      NRLookDetail=1
+03:45:55.060      NRLookDetailRadius=1
+03:45:55.060      NRLookHalo=0
+03:45:55.060      NRLookHaloBrightSide=0
+03:45:55.060      NRLookHighlights=1
+03:45:55.060      NRLookHue=1
+03:45:55.061      NRLookMaxBrighten=0
+03:45:55.061      NRLookMaxColour=0
+03:45:55.061      NRLookMaxDarken=0
+03:45:55.061      NRLookMidtones=1
+03:45:55.061      NRLookMode=1
+03:45:55.061      NRLookShadows=1
+03:45:55.062      NRLookStabilize=0
+03:45:55.062      NRLookStabilizeDetail=0
+03:45:55.062      NRLookStabilizeMs=60
+03:45:55.062      NRLookStrength=1
+03:45:55.062      NRLookTone=1
+03:45:55.062      NRLookUpsample=0
+03:45:55.062      NRMaxWorksets=4
+03:45:55.062      NRMVecScaleX=1
+03:45:55.063      NRMVecScaleY=1
+03:45:55.063      NRNeuralFloorGuard=1
+03:45:55.063      NRNormAttackStops=4
+03:45:55.063      NRNormCutAware=1
+03:45:55.063      NRNormGovernor=0
+03:45:55.063      NRNormReleaseStops=0.5
+03:45:55.063      NRNormSlewStops=0.02
+03:45:55.064      NRPaperWhiteScale=2.54
+03:45:55.064      NRPass2AutoMask=1
+03:45:55.064      NRPass2Color=1
+03:45:55.064      NRPass2FollowPass1=0
+03:45:55.064      NRPass2Intensity=2
+03:45:55.064      NRPass2LocalTone=1.2
+03:45:55.064      NRPass2Skin=0
+03:45:55.065      NRPass2Structure=1.1
+03:45:55.065      NRPass2Style=2
+03:45:55.065      NRPass2Transfer=0
+03:45:55.065      NRPass2UICorrection=1
+03:45:55.065      NRPass3AutoMask=0
+03:45:55.065      NRPass3Color=1
+03:45:55.066      NRPass3FollowPass1=1
+03:45:55.066      NRPass3Intensity=2
+03:45:55.066      NRPass3LocalTone=1
+03:45:55.066      NRPass3Skin=-1
+03:45:55.066      NRPass3Structure=1
+03:45:55.066      NRPass3Style=0
+03:45:55.067      NRPass3Transfer=0
+03:45:55.067      NRPass3UICorrection=0
+03:45:55.067      NRPass4AutoMask=0
+03:45:55.067      NRPass4Color=1
+03:45:55.067      NRPass4FollowPass1=1
+03:45:55.067      NRPass4Intensity=2
+03:45:55.068      NRPass4LocalTone=1
+03:45:55.068      NRPass4Skin=-1
+03:45:55.068      NRPass4Structure=1
+03:45:55.068      NRPass4Style=0
+03:45:55.068      NRPass4Transfer=0
+03:45:55.068      NRPass4UICorrection=0
+03:45:55.069      NRPasses=2
+03:45:55.069      NRPQCalibration=1
+03:45:55.069      NRPresentEncoding=0
+03:45:55.069      NRPresentFgSource=0
+03:45:55.069      NRPresentFrames=0
+03:45:55.069      NRPresentGuides=0
+03:45:55.069      NRPresentUICorrection=1
+03:45:55.070      NRPresentWhiteNits=0
+03:45:55.070      NRPreset=2
+03:45:55.070      NRPreUpscale=0
+03:45:55.070      NRProxyAnchor=4
+03:45:55.070      NRResolutionScale=1
+03:45:55.070      NRScreenshotFormat=0
+03:45:55.070      NRScreenshotJpegQuality=95
+03:45:55.070      NRScreenshotKey=116
+03:45:55.070      NRScreenshotLayout=0
+03:45:55.071      NRScreenshotMaxMB=10
+03:45:55.071      NRScreenshotSource=0
+03:45:55.071      NRShutdownQuiesce=1
+03:45:55.071      NRSkinIndependent=1
+03:45:55.071      NRSkinStructure=0
+03:45:55.071      NRSourceEncoding=0
+03:45:55.072      NRSourcePrimaries=0
+03:45:55.072      NRStyle=2
+03:45:55.072      NRStyleHighlightGuard=0
+03:45:55.072      NRToggleKey=106
+03:45:55.072      NRTransferMode=1
+03:45:55.072      NRTransferStrength=1
+03:45:55.072      NRUICorrection=1
+03:45:55.072      NRWorksetFreePolicy=0
+03:45:55.072      UiLanguage=zh-Hans
+03:45:55.073      UiMode=modern
+03:45:55.073      UiWelcomed=1
+03:45:55.073  [bridge] config: stage=3 mode=2 flags=-1 subrects=1 reset_every=0 pixels=0 skip_game=1 dred=1 skip_exe=1 unwrap=1 source=auto synth=0 hash_out=1 synth_after=0 mv_sign_x=0 mv_sign_y=0 ofa_grid=2 ofa_perf=20 vk_present=0 vk_sync=0
+03:45:55.073  [bridge] settings read from C:\Users\Administrator\Documents\ChatGPT\DLSS 5 й¶�� ��ؿ���\evidence\pr-fg-relay-20261002\tests\inject\dlss5-bridge.cfg
+03:45:55.074  [synth] registered for ReShade effect events at add-on API 18 (synth floor 10).
+03:45:55.074  [vkmirror] colour format tables agree on 7 of 7 entries.
+03:45:55.075  [vkmirror] vk_mirror=1: the Vulkan NGX entry points will be hooked and a Vulkan game's own DLSS contract mirrored onto the private D3D12 session.
+03:45:55.075  [panel] status panel registered in ReShade's overlay. Asked for the ImGui 19000 function table; ReShade reports its own ImGui as 1.92.5.
+03:45:55.076  [nr-compat] processing unavailable: Generic add-on is not loaded (renodx-dlss5.addon64). Generic builds confirmed to work with this bridge: 8.5.0-rc10 / 已经确定可以正常使用该版本插件的Generic插件：8.5.0-rc10
+03:45:55.258  [fg-relay] Import=1: the ReShade layer's vkCreateDevice at 00007FFA192907A0 is hooked. Every device created from here on gets VK_KHR_external_semaphore_win32 appended to its extension list, and a driver that refuses the name gets the caller's own list retried unchanged.
+03:45:55.259  qpc=4578508268302 [focus-fg] state: enabled=0 hooked=0 foreground=0 minimized=0 hwnd=0000000000000000 scope_calls=0 original_false=0 kept=0 presents=0 FG_evaluates=0
+03:45:58.200  [fg-guides] Vulkan capability device=0000000002BF00D0 instance=00000000004D3860 physical=0000000043163AF0 queries=1 blit-formats=1 graphics-families=0x1. compute-families=0x5 local-types=0x12.
+03:45:58.200  [fg-relay] Import=1: the device created at 0000000002BF00D0 carries VK_KHR_external_semaphore_win32.

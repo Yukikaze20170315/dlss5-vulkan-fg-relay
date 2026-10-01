@@ -194,6 +194,9 @@ struct VkmRes
     uint32_t mip;
     uint32_t layer;
     uint32_t w, h;
+    // FG colour contracts use w/h for the validated active viewport; these
+    // offsets locate it in the original image. Native mirror resources use 0.
+    uint32_t fg_x, fg_y;
 };
 
 // Budgets, in milliseconds, and each one is a measurement about the game rather
@@ -345,6 +348,9 @@ static std::unordered_map<uint64_t, uint64_t> g_vkm_cmd_devices;
 // fg-trace.inc, included after the FG-input feed; the runtime hooks above it call in.
 static void FgtRegisterEvents(PFN_ReShadeRegisterEvent reg);
 static void FgtOnRuntime(reshade::api::effect_runtime *rt);
+static void FgtOnDestroyRuntime(reshade::api::effect_runtime *rt);
+static void FgGuideForgetDevice(void *device);
+static void FgRelayForgetDevice(void *device);
 // fg-relay.inc, included after this file's worker but called from it (and from
 // fg-input.inc's release paths, which is included just below).
 static bool FgRelayPending();
@@ -352,6 +358,8 @@ static bool FgRelayWorker();
 static bool FgRelayIdleForRelease();
 static void FgRelayOnSessionRelease();
 static void FgRelayForceReleaseParks();
+static bool FgRelayStopArmingForShutdown();
+static bool FgRelayFinishWorkerShutdown();
 static int  FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p);
 
 static void OnVkmInitCommandList(reshade::api::command_list *cmd)
@@ -373,6 +381,8 @@ static void OnVkmDestroyDevice(reshade::api::device *dev)
 {
     if (dev->get_api() != reshade::api::device_api::vulkan) return;
     const uint64_t native = dev->get_native();
+    FgGuideForgetDevice(reinterpret_cast<void *>(static_cast<uintptr_t>(native)));
+    FgRelayForgetDevice(reinterpret_cast<void *>(static_cast<uintptr_t>(native)));
     std::lock_guard<std::mutex> lock(g_vkm_cmd_mutex);
     // A command pool can be destroyed without individual command-list events.
     for (auto it = g_vkm_cmd_devices.begin(); it != g_vkm_cmd_devices.end(); )
@@ -431,7 +441,7 @@ static void OnVkmInitRuntime(reshade::api::effect_runtime *rt)
 
     g_vkm_rt = rt;
     FgtOnRuntime(rt);
-    if (g_vkm.stopping)
+    if (g_vkm.stopping && !g_vkm.orphaned)
     {
         g_vkm.stopping = false;
         g_vkm.said_no_runtime = false;
@@ -464,6 +474,7 @@ static bool VkmShutdown();
 // is already gone and releasing against it is worse than leaking.
 static void OnVkmDestroyRuntime(reshade::api::effect_runtime *rt)
 {
+    FgtOnDestroyRuntime(rt);
     if (g_vkm_rt != rt) return;
     g_vkm_rt = nullptr;
 
@@ -767,13 +778,34 @@ static bool VkmShutdown()
     // Win32 handles the orphan still sets at the foot of its loop. The detach in
     // DllMain is exactly that second call after a shutdown that orphaned.
     if (g_vkm.orphaned) return false;
-    if (g_vkm.worker == nullptr) return true;
 
     // FIRST, before anything is released. VkMirrorFrame's entry guard reads this,
     // so a render thread that has not started a frame yet cannot arm one behind
     // this function -- which would reset ev_out after the release below and then
     // park the game's GPU on an event no code left in the process would ever set.
     g_vkm.stopping = true;
+
+    // Close the relay's independent present-time producer before the worker's
+    // stop flag. An already published arm must get its ordinary NR fence signal,
+    // otherwise the GPU release batch waits forever after the worker exits.
+    if (!FgRelayStopArmingForShutdown())
+    {
+        Log("[vkmirror] shutdown could not stop the relay producer; retaining its live resources.");
+        g_vkm.refused = g_vkm.orphaned = true;
+        return false;
+    }
+    if (g_vkm.worker == nullptr) return FgRelayFinishWorkerShutdown();
+    if (PresentAdapterRelay() &&
+        (g_vkm.idle == nullptr || WaitForSingleObject(g_vkm.idle, 4000) != WAIT_OBJECT_0 ||
+         FgRelayPending()))
+    {
+        // Do not let an unconsumed arm lose its release signal, and do not free
+        // textures under a worker still producing that signal. The caller keeps
+        // the session rather than attempting a device-wide wait on this path.
+        Log("[vkmirror] shutdown could not drain the relay worker; retaining its live resources.");
+        g_vkm.refused = g_vkm.orphaned = true;
+        return false;
+    }
 
     if (g_svk.EvSet != nullptr && g_svk.dev != nullptr)
         for (int i = 0; i < 2; ++i)
@@ -793,11 +825,6 @@ static bool VkmShutdown()
     if (g_svk.EvSet != nullptr && g_svk.dev != nullptr)
         for (int i = 0; i < 2; ++i)
             if (g_vkm.ev_out[i] != 0) g_svk.EvSet(g_svk.dev, g_vkm.ev_out[i]);
-
-    // The relay's parks too: its release is a D3D12 signal this thread is about
-    // to stop servicing, and the command buffer parked on one of its events is
-    // the game's own.
-    FgRelayForceReleaseParks();
 
     if (!joined)
     {
@@ -828,17 +855,14 @@ static bool VkmShutdown()
     CloseHandle(g_vkm.worker);
     g_vkm.worker = nullptr;
 
-    // The four park events, on the game's device. Only now: every EvSet above needs
-    // them, and the worker has been joined, so nothing can wait on one after this.
-    // They were the last four of the fourteen objects the Khronos validation layer
-    // reported leaked at vkDestroyDevice -- and the only four whose leak this file
-    // owned outright, since the other ten belong to the import layer.
-    if (g_svk.EvDestroy != nullptr && g_svk.dev != nullptr)
-        for (int i = 0; i < 2; ++i)
-        {
-            if (g_vkm.ev_in[i]  != 0) { g_svk.EvDestroy(g_svk.dev, g_vkm.ev_in[i],  nullptr); g_vkm.ev_in[i]  = 0; }
-            if (g_vkm.ev_out[i] != 0) { g_svk.EvDestroy(g_svk.dev, g_vkm.ev_out[i], nullptr); g_vkm.ev_out[i] = 0; }
-        }
+    // Worker completion only proves its CPU submissions have ended. Drain the
+    // private GPU before releasing residual relay waits. Vulkan events remain
+    // alive until the caller proves the game's device idle as well.
+    if (!FgRelayFinishWorkerShutdown())
+    {
+        g_vkm.refused = g_vkm.orphaned = true;
+        return false;
+    }
 
     // The Win32 pair goes with them, and stop goes back to 0. VkmEnsureEvents
     // remakes all of this on the next frame after a runtime returns, and without
@@ -848,6 +872,30 @@ static bool VkmShutdown()
     if (g_vkm.wake != nullptr) { CloseHandle(g_vkm.wake); g_vkm.wake = nullptr; }
     g_vkm.stop = 0;
     return true;
+}
+
+// Called by SynthVkShutdownForDevice only after its successful device-idle and
+// private-queue drain. Joining the worker alone cannot retire submitted event
+// commands, so VkmShutdown deliberately leaves these GPU objects standing.
+static void VkmDestroyRetiredEvents()
+{
+    if (g_svk.EvDestroy == nullptr || g_svk.dev == nullptr) return;
+    for (int i = 0; i < 2; ++i)
+    {
+        if (g_vkm.ev_in[i] != 0) {
+            g_svk.EvDestroy(g_svk.dev, g_vkm.ev_in[i], nullptr);
+            g_vkm.ev_in[i] = 0;
+        }
+        if (g_vkm.ev_out[i] != 0) {
+            g_svk.EvDestroy(g_svk.dev, g_vkm.ev_out[i], nullptr);
+            g_vkm.ev_out[i] = 0;
+        }
+    }
+    // A drain token names the retired event pair, not a new runtime's events.
+    // Keeping it would wait forever for a signal no new frame can produce.
+    InterlockedExchange(&g_vkm.drain, 0);
+    InterlockedExchange(&g_vkm.fg_arm, 0);
+    g_vkm.next = g_vkm.cur = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -894,6 +942,7 @@ static bool VkmGetRes(const NVSDK_NGX_Parameter *p, const char *key, VkmRes *out
     out->layer  = r->iv.baseArrayLayer;
     out->w      = r->iv.Width;
     out->h      = r->iv.Height;
+    out->fg_x = out->fg_y = 0;
     return true;
 }
 
@@ -1849,18 +1898,38 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
         VKM_FORWARD(fwd(cmd, handle, p, cb))
     }
 
-    if (IsOtherFeature(handle))
+    if (IsOtherFeature(FeatureApi::vulkan, handle))
     {
         // Never block the present thread on the render thread's lock: a skipped
         // frame keeps the game's own image, a blocked one can deadlock the device.
         if (PresentAdapterFgInput() && FgInputIsFgHandle(handle))
         {
+            const FgtTransitionSample transition = FgtTransitionBegin(p);
+            const LONG arm_before = FgrCountRead(g_fgr.armed);
+            bool bridge_entered = false;
             FgTraceEvaluate(cmd, p);
             if (TryEnterCriticalSection(&g_bridge_cs))
             {
+                bridge_entered = true;
+                // A replacement FG lifetime invalidates temporal history even
+                // when its input/output dimensions and pointer value are reused.
+                static std::uint64_t last_fg_generation = 0;
+                const auto feature = g_feature_registry.Find(FeatureApi::vulkan, handle);
+                if (feature.generation != last_fg_generation)
+                {
+                    last_fg_generation = feature.generation;
+                    FgGuideRequestReset();
+                }
                 FgInputFrame(cmd, p);
                 LeaveCriticalSection(&g_bridge_cs);
             }
+            const LONG arm_after = FgrCountRead(g_fgr.armed);
+            auto observed_forward = [&]() {
+                const NVSDK_NGX_Result result = fwd(cmd, handle, p, cb);
+                FgtTransitionEnd(transition, p, result, bridge_entered, arm_before, arm_after);
+                return result;
+            };
+            VKM_FORWARD(observed_forward())
         }
         VKM_FORWARD(fwd(cmd, handle, p, cb))
     }
@@ -1868,12 +1937,21 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
     // Present selected in Generic: the FG-input feed owns the session; the mirror
     // stands aside and hands its resources over on the render thread.
     const bool fg_selected = PresentAdapterFgInput() && FgInputActive();
-    if (PresentAdapterFollow())
+    if (fg_selected) {
+        unsigned source_reset = 0;
+        if (FgInputReadU(p, "Reset", &source_reset)) FgGuideObserveSourceReset(source_reset != 0);
+        static volatile LONG previous_source_reset;
+        const LONG value = source_reset != 0 ? 1 : 0;
+        if (InterlockedExchange(&previous_source_reset, value) != value)
+            Log("[fg-history] native game SR Reset=%ld; foreground=%u.", value, ForegroundIsThisProcess() ? 1u : 0u);
+    }
+    if (PresentAdapterFollow() || PresentAdapterFgInput())
     {
         EnterCriticalSection(&g_bridge_cs);
         const LONG owner = InterlockedCompareExchange(&g_adapter_owner, 0, 0);
-        if (fg_selected && owner == OWNER_MIRROR) MirrorReleaseForFgInput();
-        else if (owner == OWNER_FG && (!fg_selected || g_fg_input.want_release)) FgInputRelease();
+        if (PresentAdapterFollow() && fg_selected && owner == OWNER_MIRROR) MirrorReleaseForFgInput();
+        else if (owner == OWNER_FG && (g_fg_input.want_release ||
+                 (PresentAdapterFollow() && !fg_selected))) FgInputRelease();
         LeaveCriticalSection(&g_bridge_cs);
     }
     if ((PresentationAdapterEnabled() && !PresentAdapterFollow()) || fg_selected)
@@ -1964,33 +2042,12 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
     return r;
 }
 
-// Both create entry points record every feature_id other than 1 into the same
-// g_other_feature table the D3D11 path fills, with the same reuse invalidation:
-// NGX recycles freed handle addresses, and a super-resolution feature created at
-// an address the table still holds would be ignored for the rest of the session.
-static void VkmNoteCreated(int feature_id, NVSDK_NGX_Result r, NVSDK_NGX_Handle **out)
+// Both Vulkan create forms register one outermost lifetime before returning to
+// the caller. Generation tokens protect a newer lifetime from a late Release.
+static void VkmNoteCreated(const Hook &hook, int feature_id, NVSDK_NGX_Result r,
+                          NVSDK_NGX_Handle **out)
 {
-    if (r != NGX_SUCCESS || out == nullptr || *out == nullptr) return;
-    FgInputNoteCreated(feature_id, r, out);
-
-    if (feature_id == 1)
-    {
-        for (LONG i = 0; i < g_other_feature_count; ++i)
-            if (g_other_feature[i] == *out)
-            {
-                g_other_feature[i] = g_other_feature[--g_other_feature_count];
-                Log("  handle %p was recorded as another feature and has been reused for "
-                    "super resolution; the old entry is dropped.", static_cast<void *>(*out));
-                break;
-            }
-        return;
-    }
-    if (g_other_feature_count < static_cast<LONG>(_countof(g_other_feature)))
-    {
-        g_other_feature[g_other_feature_count++] = *out;
-        Log("  feature %d is not super resolution; evaluates on this handle will be "
-            "forwarded and otherwise ignored.", feature_id);
-    }
+    FeatureNoteCreated(FeatureApi::vulkan, hook, feature_id, r, out);
 }
 
 // What the game's own create says, and what it costs the mirror.
@@ -2121,11 +2178,11 @@ static NVSDK_NGX_Result ForwardVkCreate(Hook &h, void *cmd, int feature_id,
     }
     else
         r = fwd(cmd, feature_id, p, out);
+    VkmNoteCreated(h, feature_id, r, out);
     if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
 
     Log("=== Vulkan CreateFeature #%ld returned %d, handle=%p ===", n, r,
         (out != nullptr && *out != nullptr) ? static_cast<void *>(*out) : nullptr);
-    VkmNoteCreated(feature_id, r, out);
 
     // The game replacing its own super-resolution feature invalidates ours, and
     // this did nothing about it until now: the shape test is the only thing that
@@ -2182,11 +2239,11 @@ static NVSDK_NGX_Result ForwardVkCreate1(Hook &h, void *dev, void *cmd, int feat
     // worker is inside its own evaluate is the same two-threads-in-one-NGX shape.
     if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
     NVSDK_NGX_Result r = fwd(dev, cmd, feature_id, p, out);
+    VkmNoteCreated(h, feature_id, r, out);
     if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
 
     Log("=== Vulkan CreateFeature1 #%ld returned %d, handle=%p ===", n, r,
         (out != nullptr && *out != nullptr) ? static_cast<void *>(*out) : nullptr);
-    VkmNoteCreated(feature_id, r, out);
     VkmNoteGameCreate(feature_id, r, p);
     return r;
 }

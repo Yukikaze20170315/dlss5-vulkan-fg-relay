@@ -1,0 +1,4 @@
+{"key":["enumerated_counts","Arknights: Endfield"],"before":[{"applications":1,"settings":10}],"after":[{"applications":1,"settings":12}]}
+{"key":["profile","Arknights: Endfield"],"before":[{"predefined":1,"geforce":1,"quadro":1,"nvs":0,"base_profile":false,"current_global_profile":false,"applications":1,"settings":18}],"after":[{"predefined":1,"geforce":1,"quadro":1,"nvs":0,"base_profile":false,"current_global_profile":false,"applications":1,"settings":20}]}
+{"key":["setting","Arknights: Endfield",271614616],"before":null,"after":[{"name":"Override DLSSG mode","type":0,"location":0,"current_predefined":0,"predefined_valid":0,"predefined_value":null,"current_value":2}]}
+{"key":["setting","Arknights: Endfield",273507943],"before":null,"after":[{"name":"Override DLSSG multi-frame count","type":0,"location":0,"current_predefined":0,"predefined_valid":0,"predefined_value":null,"current_value":5}]}

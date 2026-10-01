@@ -32,3 +32,13 @@ Enabled=0
 ; Trace=1 adds pass-through observers (game present, slSetTag, queue submits, FG handles) to the log.
 ; Asynchronous bounded logging; no rendering parameter changes. Restart required.
 ;Trace=0
+; HoldComposition=1 (default) keeps DWM composing the game's monitor while NR runs at the FG
+;  input and the game window is shown: a 2x2, near-transparent, click-through, non-activating
+;  tool window of this process sits at that monitor's top-left corner. Without it, Windows
+;  promotes the unfocused game to Independent Flip and back, and Streamline presents ~12 raw
+;  frames without FG (hence without NR) at each switch. Read every second; 0 removes it.
+;HoldComposition=1
+; HoldCompositionAlpha=1..255 (default 1) is the window's opacity; HoldCompositionHideCapture=1
+;  (default) excludes it from screenshots and recordings where Windows supports that.
+;HoldCompositionAlpha=1
+;HoldCompositionHideCapture=1

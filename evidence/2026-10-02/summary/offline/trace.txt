@@ -1,0 +1,13 @@
+COVERED: Trace=1 evaluate, four three-image rings, indices, missing resources, bounded sets
+COVERED: eight real detours, identity/return bits, tag SEH, timeline chain, submit2 and empty submissions
+COVERED: real MinHook patch and relocated trampoline, no game DLL
+COVERED: five concurrent roles; present/tag/submit=1200 each; evaluates=3600; dropped=1371
+original[0]=1210
+original[1]=603
+original[2]=603
+original[3]=612
+original[4]=602
+original[5]=1
+original[6]=1
+original[7]=1
+PASS: checks=7382 failures=0; CPU synthetic contracts only, NOT game/GPU validation

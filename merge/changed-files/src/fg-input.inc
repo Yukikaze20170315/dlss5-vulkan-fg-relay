@@ -4,25 +4,9 @@
 // presented multiplier is preserved. Generic still runs through the identity SR
 // carrier on the private D3D12 session; nothing here reads Generic's layout.
 #include "fg-composite-shader.h"
-
-static NVSDK_NGX_Handle *g_fg_handles[8];
-static LONG g_fg_handle_count;
-
-static void FgInputNoteCreated(int feature_id, NVSDK_NGX_Result r, NVSDK_NGX_Handle **out)
-{
-    if (r != NGX_SUCCESS || out == nullptr || *out == nullptr) return;
-    for (LONG i = 0; i < g_fg_handle_count; ++i)
-        if (g_fg_handles[i] == *out) { g_fg_handles[i] = g_fg_handles[--g_fg_handle_count]; break; }
-    if (feature_id == 11 && g_fg_handle_count < static_cast<LONG>(_countof(g_fg_handles)))
-        g_fg_handles[g_fg_handle_count++] = *out;
-}
-
-static bool FgInputIsFgHandle(const NVSDK_NGX_Handle *handle)
-{
-    for (LONG i = 0; i < g_fg_handle_count; ++i)
-        if (g_fg_handles[i] == handle) return true;
-    return false;
-}
+static void FgGuideRequestReset();
+static bool FgRelayPrepareRelease();
+static bool FgRelayRecoveryReady();
 
 struct FgComposite {
     ID3D12RootSignature *rs;
@@ -39,8 +23,13 @@ static FgComposite g_fg_composite;
 
 struct FgInputState {
     bool refused, armed, worker_ok, want_release;
+    // The private session is built and owned, but the SR carrier hook is not
+    // installed yet; no frame is armed or processed until it is.
+    bool carrier_pending;
+    PresentCarrierRetry carrier;
     uint32_t vk_fmt;
     UINT w, h;
+    unsigned depth_inverted;
     VkmRes hudless, back;
     unsigned frames, writes, skipped_nr, busy_skips;
     volatile LONG eval_calls, eval_index_skipped;
@@ -295,19 +284,21 @@ static bool FgInputWorker()
         if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
         g_present_nr_scope = false;
         nr_entries = g_present_nr_entries; sr_entries = g_present_sr_entries; sr_copies = g_present_sr_copies;
+        PresentCompatibilityFrame(ok, nr_entries, sr_entries, sr_copies);
         if (ok && (sr_entries != 1 || sr_copies != 1)) {
             Log("[fg-input] carrier contract mismatch: sr_entries=%u sr_copies=%u; frame not written.", sr_entries, sr_copies);
             ok = false;
         }
         // Generic switched off or warming up: the carrier round-trip is the game's own
         // image, so the recorded copy back is harmless and this is not a failure.
-        if (ok && nr_entries == 0) { nr_absent = true; ++g_fg_input.skipped_nr; }
+        if (ok && nr_entries == 0) { nr_absent = true; ++g_fg_input.skipped_nr; FgGuideRequestReset(); }
         if (ok && !nr_absent) ok = FgCompositeRun(g_s12.queue, kVkmEvaluateMs);
     } else {
         ok = PresentAdapterCopy12();
     }
     ok = ok && g_s12.dev->GetDeviceRemovedReason() == S_OK;
     if (!ok) {
+        FgGuideRequestReset();
         // Keep the carriers equal to their inputs so the recorded copy back is a no-op.
         FgIdentityCopy(kVkmEvaluateMs);
     }
@@ -332,6 +323,7 @@ static void FgInputRefuse(const char *why)
     if (g_fg_input.refused) return;
     g_fg_input.refused = true;
     g_present_adapter.remaining = 0;
+    PresentCompatibilityIssue(PC_PROCESSING_FAILED, why);
     Log("[fg-input] refused: %s. Frame generation continues on the game's own frames.", why);
 }
 
@@ -343,11 +335,112 @@ static bool FgInputReadU(const NVSDK_NGX_Parameter *p, const char *key, unsigned
     return false;
 }
 
+#include "fg-guides.inc"
+#include "fg-guide-compute.inc"
+static bool FgRelayQueueFamily(void *queue, uint32_t *family);
+
+static bool FgInputColorRegion(const NVSDK_NGX_Parameter *p, VkmRes &r,
+                              const char *xkey, const char *ykey,
+                              const char *wkey, const char *hkey)
+{
+    unsigned x = 0, y = 0, w = r.w, h = r.h;
+    FgInputReadU(p, xkey, &x); FgInputReadU(p, ykey, &y);
+    FgInputReadU(p, wkey, &w); FgInputReadU(p, hkey, &h);
+    if (r.aspect != kSVkAspectColor || r.mip != 0 || r.layer != 0 ||
+        !FgGuideRectValid(r.w, r.h, x, y, w, h)) return false;
+    r.fg_x = x; r.fg_y = y; r.w = w; r.h = h;
+    return true;
+}
+
+// Both private carriers have the active viewport's dimensions. Copy only that
+// region, preserving letterbox/pillarbox pixels and unrelated UI outside it.
+static void FgColorCopy(SVkCommandBuffer cb, SVkHandle source, uint32_t source_layout,
+                         SVkHandle destination, uint32_t destination_layout,
+                         unsigned sx, unsigned sy, unsigned dx, unsigned dy, unsigned w, unsigned h)
+{
+    SVkImageCopy copy = {};
+    copy.srcSubresource = {kSVkAspectColor, 0, 0, 1};
+    copy.dstSubresource = {kSVkAspectColor, 0, 0, 1};
+    copy.srcOffset = {static_cast<int32_t>(sx), static_cast<int32_t>(sy), 0};
+    copy.dstOffset = {static_cast<int32_t>(dx), static_cast<int32_t>(dy), 0};
+    copy.extent = {w, h, 1};
+    g_svk.CmdCopyImage(cb, source, source_layout, destination, destination_layout, 1, &copy);
+}
+
+// Resource disagreement during a setting change is a temporary input contract,
+// not an unsupported process. Never put it into the permanent refusal state.
+static bool FgInputReadColor(const NVSDK_NGX_Parameter *p, VkmRes *hud, VkmRes *back, const char **why)
+{
+    if (!VkmGetRes(p, "DLSSG.HUDLess", hud, why) || !VkmGetRes(p, "DLSSG.Backbuffer", back, why)) return false;
+    const unsigned hw = hud->w, hh = hud->h, bw = back->w, bh = back->h;
+    if (!FgInputColorRegion(p, *back, "DLSSG.BackbufferSubrectBaseX", "DLSSG.BackbufferSubrectBaseY",
+                         "DLSSG.BackbufferSubrectWidth", "DLSSG.BackbufferSubrectHeight") ||
+        !FgInputColorRegion(p, *hud, "DLSSG.HUDLessSubrectBaseX", "DLSSG.HUDLessSubrectBaseY",
+                         "DLSSG.HUDLessSubrectWidth", "DLSSG.HUDLessSubrectHeight")) {
+        *why = "colour viewport is empty, out of bounds, or not a base-level colour image"; return false;
+    }
+    if (hud->w != back->w || hud->h != back->h || hud->fmt != back->fmt) {
+        *why = "HUD-less and backbuffer active viewports differ in extent or format"; return false;
+    }
+    const DXGI_FORMAT fmt = MapVkColor(back->fmt);
+    if (fmt != DXGI_FORMAT_R8G8B8A8_UNORM && fmt != DXGI_FORMAT_B8G8R8A8_UNORM) {
+        *why = "only UNORM8 sRGB-encoded FG inputs are handled by this build"; return false;
+    }
+    static unsigned previous[8] = {};
+    const unsigned current[] = {hw, hh, bw, bh, hud->fg_x, hud->fg_y, back->fg_x, back->fg_y};
+    static unsigned last_w, last_h;
+    if (memcmp(previous, current, sizeof(current)) != 0 || last_w != back->w || last_h != back->h) {
+        memcpy(previous, current, sizeof(current)); last_w = back->w; last_h = back->h;
+        Log("[fg-colour] active=%ux%u HUD-less texture=%ux%u origin=%u,%u backbuffer texture=%ux%u origin=%u,%u; outside pixels preserved.",
+            back->w, back->h, hw, hh, hud->fg_x, hud->fg_y, bw, bh, back->fg_x, back->fg_y);
+    }
+    return true;
+}
+
+static bool FgInputShapeChanged(const VkmRes &back, const FgGuideContract &guides)
+{
+    return g_fg_input.vk_fmt != 0 && (g_fg_input.w != back.w || g_fg_input.h != back.h ||
+        g_fg_input.vk_fmt != back.fmt || g_fg_input.depth_inverted != guides.inverted);
+}
+
+static void FgInputRequestRebuild()
+{
+    if (!g_fg_input.want_release)
+        Log("[fg-input] output shape/depth convention changed; the render thread will drain and rebuild the private session.");
+    g_fg_input.want_release = true;
+    FgGuideRequestReset();
+}
+
+// Called only after the old shared resources are proven retired. A new runtime
+// may use the same VkDevice and output dimensions but entirely new resources.
+static void FgInputOnSessionRelease()
+{
+    FgGuideComputeRelease();
+    g_fg_composite.hudless = g_fg_composite.nr = g_fg_composite.back = nullptr;
+    g_fg_input.vk_fmt = 0;
+    g_fg_input.w = g_fg_input.h = g_fg_input.depth_inverted = 0;
+    g_fg_input.want_release = false;
+    g_fg_input.refused = false;
+    g_fg_input.carrier_pending = false;
+    g_fg_input.carrier = {};
+    g_s12.w = 0;
+    g_s12.need_reset = true;
+    FgGuideRequestReset();
+    InterlockedExchange(&g_adapter_owner, OWNER_NONE);
+}
+
 // Render-thread only (inside the game's SR evaluate, where the mirror already waits
 // the device idle for its own rebuilds). Hands the private session back so the
 // other path can build. Returns false and keeps everything when completion is unproven.
 static bool FgInputRelease()
 {
+    // Stop present-time arms before testing their ownership. A frame copied but
+    // never evaluated has no park; it is cancelled and drained by the worker.
+    g_fg_input.want_release = true;
+    if (PresentAdapterRelay() && !FgRelayPrepareRelease()) return false;
+    // A watchdog's host signal unblocks the game but is not GPU completion
+    // proof. Poll an independent queue marker before attempting any teardown.
+    if (!FgRelayRecoveryReady()) return false;
     // A relay frame still armed or still being consumed owns the staging images
     // and a parked command buffer; the release refuses rather than races it.
     if (PresentAdapterRelay() && !FgRelayIdleForRelease()) return false;
@@ -358,12 +451,7 @@ static bool FgInputRelease()
     if (PresentAdapterRelay()) FgRelayOnSessionRelease();
     SynthVkReleaseImages();
     if (!Synth12ReleaseTextures()) return false;
-    g_fg_composite.hudless = g_fg_composite.nr = g_fg_composite.back = nullptr;
-    g_fg_input.vk_fmt = 0;
-    g_fg_input.want_release = false;
-    g_s12.w = 0;
-    g_s12.need_reset = true;
-    InterlockedExchange(&g_adapter_owner, OWNER_NONE);
+    FgInputOnSessionRelease();
     Log("[fg-input] released the private session; the native mirror may take it.");
     return true;
 }
@@ -386,19 +474,55 @@ static bool MirrorReleaseForFgInput()
     return true;
 }
 
+// The relay arms nothing while the carrier is pending and ends every unarmed
+// evaluate itself, so those evaluates must reach the carrier retry instead.
+static bool FgInputRelayTakesFrame()
+{
+    return PresentAdapterRelay() && !g_fg_input.carrier_pending;
+}
+
+// Called with the private session built and owned. Returns true once the SR
+// carrier hook and the composite pass exist; false while a retry is pending or
+// after a refusal. A transient failure keeps the session and retries later.
+static bool FgInputCarrierStep(const FgGuideContract &guides)
+{
+    const ULONGLONG now = GetTickCount64();
+    if (!PresentCarrierRetryDue(g_fg_input.carrier, now)) return false;
+    const unsigned attempt = g_fg_input.carrier.attempts + 1;
+    const PresentCarrierResult result = PresentAdapterCarrier(attempt == 1 || attempt == kPresentCarrierRetryLimit);
+    if (result != PCR_READY) {
+        if (PresentCarrierRetryAfterFailure(g_fg_input.carrier, result, now)) {
+            Log("[fg-input] SR carrier hook not installed (attempt %u of %u); the private session is kept and the hook is retried in %llu ms.",
+                attempt, kPresentCarrierRetryLimit, kPresentCarrierRetryMs);
+            return false;
+        }
+        FgInputRefuse("private SR carrier hook unavailable");
+        return false;
+    }
+    if (attempt > 1) Log("[fg-input] SR carrier hook installed on attempt %u.", attempt);
+    PresentAdapterWitness();
+    if (!FgCompositeMake(g_s12.dev, g_s12.tex[SLOT_COLOR], g_s12.tex[SLOT_OUTPUT], g_s12.tex[kOutB])) {
+        FgInputRefuse("composite pass unavailable"); return false;
+    }
+    g_fg_input.carrier_pending = false;
+    Log("[fg-input] ready: HUD-less -> linear sRGB carrier -> Generic NR -> UI-preserving composite; FG interpolates processed frames. guides: mv=%s (scale %.3f,%.3f) depth=%s inverted=%u",
+        "game", guides.carrier_scale_x, guides.carrier_scale_y, "game", guides.inverted);
+    return true;
+}
+
 // Render-thread half: records copies of the FG inputs into the FG evaluate's own
 // command buffer, parks it, and records the copy back before the evaluate is
 // forwarded -- so FG and the real-frame present both see the processed image.
 static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
 {
     InterlockedIncrement(&g_fg_input.eval_calls);
-    if (g_fg_input.refused || g_vkm.stopping || g_cfg.stage < 2) return;
+    if (g_fg_input.refused || g_fg_input.want_release || g_vkm.stopping || g_cfg.stage < 2) return;
     if (!FgInputActive()) return;
     if (InterlockedCompareExchange(&g_adapter_owner, 0, 0) == OWNER_MIRROR) return;
     PresentAdapterRequest();
     if (g_present_adapter.remaining == 0 && (PresentAdapterAutoRun() || PresentAdapterFollow()) &&
         g_present_adapter.request_seen && !g_present_adapter.refused && !g_present_adapter.stopped) {
-        if (!PresentAdapterConsumer()) { g_present_adapter.refused = true; return; }
+        if (!PresentAdapterConsumer()) return;
         g_present_adapter.remaining = UINT_MAX;
         g_present_adapter.continuous = true;
         g_present_adapter.run_nr = true;
@@ -440,9 +564,9 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
         VkmRes real = {};
         if (!VkmGetRes(p, "DLSSG.OutputReal", &real, &why_real)) return;
     }
-    if (!PresentAdapterConfiguration()) { g_present_adapter.remaining = 0; g_present_adapter.refused = true; return; }
+    if (!PresentAdapterConfiguration()) { FgGuidePause("Generic configuration is temporarily unsuitable for the FG carrier"); return; }
     if (g_cfg.mode != 2) { FgInputRefuse("the experiment requires Bridge mode=2"); return; }
-    if (PresentAdapterRelay())
+    if (FgInputRelayTakesFrame())
     {
         // The relay owns the frames it arms: it records the park and the copy
         // back against the copy the present (Pipeline=3) or this evaluate
@@ -458,37 +582,20 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
 
     const char *why = nullptr;
     VkmRes hud = {}, back = {};
-    if (!VkmGetRes(p, "DLSSG.HUDLess", &hud, &why)) { FgInputRefuse("no HUD-less input; this feed requires the game's HUD-less image"); return; }
-    if (!VkmGetRes(p, "DLSSG.Backbuffer", &back, &why)) { FgInputRefuse("no backbuffer input"); return; }
-    if (hud.w != back.w || hud.h != back.h || hud.fmt != back.fmt || hud.w == 0 || hud.h == 0) {
-        FgInputRefuse("HUD-less and backbuffer differ in size or format"); return;
-    }
-    unsigned sub_w = 0, sub_h = 0, sub_x = 0, sub_y = 0;
-    FgInputReadU(p, "DLSSG.BackbufferSubrectWidth", &sub_w);
-    FgInputReadU(p, "DLSSG.BackbufferSubrectHeight", &sub_h);
-    FgInputReadU(p, "DLSSG.BackbufferSubrectBaseX", &sub_x);
-    FgInputReadU(p, "DLSSG.BackbufferSubrectBaseY", &sub_y);
-    if (sub_x != 0 || sub_y != 0 || (sub_w != 0 && sub_w != back.w) || (sub_h != 0 && sub_h != back.h)) {
-        FgInputRefuse("backbuffer subrect is not the whole image"); return;
-    }
+    if (!FgInputReadColor(p, &hud, &back, &why)) { FgGuidePause(why); return; }
     const DXGI_FORMAT fmt = MapVkColor(back.fmt);
-    if (fmt != DXGI_FORMAT_R8G8B8A8_UNORM && fmt != DXGI_FORMAT_B8G8R8A8_UNORM) {
-        FgInputRefuse("only UNORM8 sRGB-encoded FG inputs are handled by this build"); return;
+    FgGuideContract guides = {};
+    if (!FgGuideRead(p, back, &guides, &why)) { FgGuidePause(why); return; }
+    void *queue = nullptr;
+    p->Get("DLSSG.CmdQueue", &queue);
+    uint32_t family = UINT_MAX;
+    FgRelayQueueFamily(queue, &family);
+    if (!FgGuidePrepareTransport(guides, family)) {
+        if (g_fgc.growth_pending) FgInputRequestRebuild();
+        FgGuidePause("GPU nearest compute is unavailable for this queue, dimensions, or allocation");
+        return;
     }
-    // The game's own guides at output resolution, as handed to frame generation.
-    static const uint32_t kVkFmtR16G16Sfloat = 83;
-    VkmRes mv = {}, depth = {};
-    const bool have_mv = VkmGetRes(p, "DLSSG.MVecs", &mv, &why) && mv.fmt == kVkFmtR16G16Sfloat &&
-                         mv.w == back.w && mv.h == back.h;
-    const bool have_depth = VkmGetRes(p, "DLSSG.Depth", &depth, &why) && depth.fmt == kVkFmtR32Sfloat &&
-                            depth.w == back.w && depth.h == back.h;
-    float mv_scale_x = 1.0f, mv_scale_y = 1.0f;
-    unsigned depth_inverted = 0;
-    if (have_mv) {
-        p->Get("DLSSG.MvecScaleX", &mv_scale_x);
-        p->Get("DLSSG.MvecScaleY", &mv_scale_y);
-    }
-    FgInputReadU(p, "DLSSG.DepthInverted", &depth_inverted);
+    const VkmRes &mv = guides.mv.resource, &depth = guides.depth.resource;
     if (!VkmEnsureEvents()) return;
     const bool probe = PresentAdapterPipeline() == 1;
     if (probe) {
@@ -502,20 +609,17 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
 
     SynthBuild(&g_vkm.sp, back.w, back.h, fmt, reshade::api::resource{0}, reshade::api::resource{0},
                reshade::api::resource{0}, 0, -1);
-    g_vkm.sp.Set("DLSS.Feature.Create.Flags", depth_inverted != 0 ? 0x08u : 0u);
-    if (have_mv) {
-        g_vkm.sp.Set("MV.Scale.X", mv_scale_x);
-        g_vkm.sp.Set("MV.Scale.Y", mv_scale_y);
-    }
+    g_vkm.sp.Set("DLSS.Feature.Create.Flags", guides.inverted != 0 ? 0x08u : 0u);
     const bool rebuild = g_s12.feature == nullptr || g_s12.w != back.w || g_s12.h != back.h ||
-                         g_s12.fmt != fmt || !g_s12.out_b || g_fg_input.vk_fmt != back.fmt;
+                         g_s12.fmt != fmt || !g_s12.out_b || g_fg_input.vk_fmt != back.fmt ||
+                         FgInputShapeChanged(back, guides);
     if (rebuild) {
         // The FG evaluate runs on Streamline's present thread while the render thread
         // keeps submitting; a device-wide wait here deadlocks (measured2026-09-28). Only
-        // a first build, with nothing imported yet, is safe; a later shape change refuses.
+        // a first build, with nothing imported yet, is safe; later changes request
+        // the render thread's existing drained release before trying a new build.
         if (g_s12.feature != nullptr || g_svk.img[SLOT_COLOR] != 0 || g_svk.img[kOutB] != 0) {
-            if (PresentAdapterFollow()) { g_fg_input.want_release = true; return; }
-            FgInputRefuse("the frame-generation input changed shape; rebuilding here would need a device-wide wait on the present thread");
+            FgInputRequestRebuild();
             return;
         }
         Log("[fg-input] building the private feature and its Vulkan import for %ux%u %s", back.w, back.h, FormatName(fmt));
@@ -527,17 +631,16 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
             FgInputRefuse("the private D3D12 feature or its second carrier could not be built"); return;
         }
         if (!SynthVkImport()) { SynthVkReleaseImages(); g_svk.ready = false; FgInputRefuse("import into the game's VkDevice failed"); return; }
-        if (!PresentAdapterCarrier()) { FgInputRefuse("private SR carrier hook unavailable"); return; }
-        PresentAdapterWitness();
-        if (!FgCompositeMake(g_s12.dev, g_s12.tex[SLOT_COLOR], g_s12.tex[SLOT_OUTPUT], g_s12.tex[kOutB])) {
-            FgInputRefuse("composite pass unavailable"); return;
-        }
+        // Owned from here, so a shape change or runtime loss while the carrier
+        // is pending releases the session through the normal drained path.
         g_fg_input.vk_fmt = back.fmt; g_fg_input.w = back.w; g_fg_input.h = back.h;
+        g_fg_input.depth_inverted = guides.inverted;
         g_s12.need_reset = true;
         InterlockedExchange(&g_adapter_owner, OWNER_FG);
-        Log("[fg-input] ready: HUD-less -> linear sRGB carrier -> Generic NR -> UI-preserving composite; FG interpolates processed frames. guides: mv=%s (scale %.3f,%.3f) depth=%s inverted=%u",
-            have_mv ? "game" : "zero", mv_scale_x, mv_scale_y, have_depth ? "game" : "zero", depth_inverted);
+        g_fg_input.carrier = {};
+        g_fg_input.carrier_pending = true;
     }
+    if (g_fg_input.carrier_pending && !FgInputCarrierStep(guides)) return;
 
     SVkCommandBuffer cb = reinterpret_cast<SVkCommandBuffer>(cmd_raw);
     const LONG drain = InterlockedCompareExchange(&g_vkm.drain, 0, 0);
@@ -555,34 +658,21 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
     const uint32_t first = g_svk.laid_out ? kSVkLayoutGeneral : kSVkLayoutUndefined;
     SynthVkBarrier(cb, hud.image, kSVkLayoutGeneral, kSVkLayoutTransferSrc);
     SynthVkBarrier(cb, back.image, kSVkLayoutGeneral, kSVkLayoutTransferSrc);
-    if (have_mv) SynthVkBarrier(cb, mv.image, kSVkLayoutGeneral, kSVkLayoutTransferSrc);
-    if (have_depth) SynthVkBarrier(cb, depth.image, kSVkLayoutGeneral, kSVkLayoutTransferSrc);
+    SynthVkBarrier(cb, mv.image, kSVkLayoutGeneral, kSVkLayoutTransferSrc);
+    SynthVkBarrier(cb, depth.image, kSVkLayoutGeneral, kSVkLayoutTransferSrc);
     for (int i = 0; i < SLOT_COUNT; ++i) SynthVkBarrier(cb, g_svk.img[i], first, kSVkLayoutGeneral);
     SynthVkBarrier(cb, g_svk.img[kOutB], first, kSVkLayoutGeneral);
-    const bool clear_guides = !g_svk.laid_out;
     g_svk.laid_out = true;
-    SynthVkCopyImage(cb, hud.image, kSVkLayoutTransferSrc, g_svk.img[SLOT_COLOR], kSVkLayoutGeneral, back.w, back.h);
-    SynthVkCopyImage(cb, back.image, kSVkLayoutTransferSrc, g_svk.img[kOutB], kSVkLayoutGeneral, back.w, back.h);
-    if (have_mv)
-        SynthVkCopyImage(cb, mv.image, kSVkLayoutTransferSrc, g_svk.img[SLOT_MV], kSVkLayoutGeneral, back.w, back.h);
-    if (have_depth)
-        SynthVkCopyImage(cb, depth.image, kSVkLayoutTransferSrc, g_svk.img[SLOT_DEPTH], kSVkLayoutGeneral, back.w, back.h);
-    if (clear_guides && (!have_mv || !have_depth)) {
-        using ClearImage = void(*)(SVkCommandBuffer, SVkHandle, uint32_t, const void*, uint32_t, const SVkSubresourceRange*);
-        auto get_proc = reinterpret_cast<PFN_SVkGetDeviceProcAddr>(GetProcAddress(g_svk.lib, "vkGetDeviceProcAddr"));
-        auto clear = get_proc != nullptr ? reinterpret_cast<ClearImage>(get_proc(g_svk.dev, "vkCmdClearColorImage")) : nullptr;
-        const float zero[4] = {};
-        const SVkSubresourceRange range = {1, 0, 1, 0, 1};
-        if (clear != nullptr) {
-            if (!have_mv) clear(cb, g_svk.img[SLOT_MV], kSVkLayoutGeneral, zero, 1, &range);
-            if (!have_depth) clear(cb, g_svk.img[SLOT_DEPTH], kSVkLayoutGeneral, zero, 1, &range);
-        }
-    }
+    FgColorCopy(cb, hud.image, kSVkLayoutTransferSrc, g_svk.img[SLOT_COLOR], kSVkLayoutGeneral, hud.fg_x, hud.fg_y, 0, 0, back.w, back.h);
+    FgColorCopy(cb, back.image, kSVkLayoutTransferSrc, g_svk.img[kOutB], kSVkLayoutGeneral, back.fg_x, back.fg_y, 0, 0, back.w, back.h);
+    FgGuideRecord(cb, guides.mv, g_svk.img[SLOT_MV], back.w, back.h);
+    FgGuideRecord(cb, guides.depth, g_svk.img[SLOT_DEPTH], back.w, back.h);
     SynthVkBarrier(cb, hud.image, kSVkLayoutTransferSrc, kSVkLayoutGeneral);
     SynthVkBarrier(cb, back.image, kSVkLayoutTransferSrc, kSVkLayoutGeneral);
-    if (have_mv) SynthVkBarrier(cb, mv.image, kSVkLayoutTransferSrc, kSVkLayoutGeneral);
-    if (have_depth) SynthVkBarrier(cb, depth.image, kSVkLayoutTransferSrc, kSVkLayoutGeneral);
+    SynthVkBarrier(cb, mv.image, kSVkLayoutTransferSrc, kSVkLayoutGeneral);
+    SynthVkBarrier(cb, depth.image, kSVkLayoutTransferSrc, kSVkLayoutGeneral);
 
+    FgGuideApply(&g_vkm.sp, guides);
     g_svk.CmdSetEvent(cb, g_vkm.ev_in[pair], kSVkStageAllCommands);
     g_vkm.cur = pair;
     g_vkm.fg_arm = true;
@@ -604,8 +694,8 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
         SynthVkBarrier(cb, g_svk.img[kOutB], kSVkLayoutGeneral, kSVkLayoutTransferSrc);
         SynthVkBarrier(cb, hud.image, kSVkLayoutGeneral, kSVkLayoutTransferDst);
         SynthVkBarrier(cb, back.image, kSVkLayoutGeneral, kSVkLayoutTransferDst);
-        SynthVkCopyImage(cb, g_svk.img[SLOT_OUTPUT], kSVkLayoutTransferSrc, hud.image, kSVkLayoutTransferDst, back.w, back.h);
-        SynthVkCopyImage(cb, g_svk.img[kOutB], kSVkLayoutTransferSrc, back.image, kSVkLayoutTransferDst, back.w, back.h);
+        FgColorCopy(cb, g_svk.img[SLOT_OUTPUT], kSVkLayoutTransferSrc, hud.image, kSVkLayoutTransferDst, 0, 0, hud.fg_x, hud.fg_y, back.w, back.h);
+        FgColorCopy(cb, g_svk.img[kOutB], kSVkLayoutTransferSrc, back.image, kSVkLayoutTransferDst, 0, 0, back.fg_x, back.fg_y, back.w, back.h);
         SynthVkBarrier(cb, hud.image, kSVkLayoutTransferDst, kSVkLayoutGeneral);
         SynthVkBarrier(cb, back.image, kSVkLayoutTransferDst, kSVkLayoutGeneral);
         SynthVkBarrier(cb, g_svk.img[SLOT_OUTPUT], kSVkLayoutTransferSrc, kSVkLayoutGeneral);

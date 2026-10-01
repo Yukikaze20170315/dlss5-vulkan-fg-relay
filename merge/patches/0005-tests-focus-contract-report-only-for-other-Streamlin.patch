@@ -1,0 +1,49 @@
+From 80628aa6f188655d1c3707a00e6c82862dcad4c8 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E7=9B=97=E7=89=88=E3=81=AE=E9=9B=AA=E9=A2=A8=E9=85=B1?=
+ <50561019+Yukikaze20170315@users.noreply.github.com>
+Date: Thu, 1 Oct 2026 23:36:47 +0800
+Subject: [PATCH 05/10] tests: focus contract --report-only for other
+ Streamline builds
+
+---
+ tests/vulkan-fg-quality/test-focus.cpp | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/tests/vulkan-fg-quality/test-focus.cpp b/tests/vulkan-fg-quality/test-focus.cpp
+index 2f1d986..842fc59 100644
+--- a/tests/vulkan-fg-quality/test-focus.cpp
++++ b/tests/vulkan-fg-quality/test-focus.cpp
+@@ -140,7 +140,7 @@ static std::vector<uint8_t> MapDisk(const wchar_t *path)
+     return image;
+ }
+ 
+-static void TestRuntimeContract(const wchar_t *path)
++static void TestRuntimeContract(const wchar_t *path, bool report_only)
+ {
+     auto image = MapDisk(path);
+     const auto *dos = reinterpret_cast<const IMAGE_DOS_HEADER *>(image.data());
+@@ -157,6 +157,9 @@ static void TestRuntimeContract(const wchar_t *path)
+             size = sections[i].Misc.VirtualSize;
+         }
+     }
++    printf("disk contract search: matches=%u return RVA=0x%zx object slot RVA=0x%zx\n", found,
++           found ? site.return_address : static_cast<size_t>(0), found ? site.object_slot : static_cast<size_t>(0));
++    if (report_only) return;
+     assert(found == 1 && site.return_address == 0x4c0a7 && site.object_slot == 0x94450);
+     printf("disk contract: unique return RVA=0x%zx object slot RVA=0x%zx PASS (no DLL load)\n", site.return_address, site.object_slot);
+     const size_t call = site.return_address - 13;
+@@ -185,8 +188,12 @@ static void TestRuntimeContract(const wchar_t *path)
+ 
+ int wmain(int argc, wchar_t **argv)
+ {
+-    assert(argc == 2);
++    // --report-only prints the contract search for another sl.dlss_g.dll without
++    // asserting the RVAs of the Streamline 2.14.1 build this test was written for.
++    const bool report_only = argc == 3 && wcscmp(argv[2], L"--report-only") == 0;
++    assert(argc == 2 || report_only);
+     TestPolicy();
+-    TestRuntimeContract(argv[1]);
++    TestRuntimeContract(argv[1], report_only);
++    if (report_only) { puts("report only"); return 0; }
+     puts("focus FG tests PASS");
+ }

@@ -1,0 +1,112 @@
+GPU NVIDIA GeForce RTX 5090 validation=0 exact-integer-nearest
+queue family=0 flags=0xf count=16
+queue family=1 flags=0xc count=2
+queue family=2 flags=0xe count=8
+queue family=3 flags=0x2c count=2
+queue family=4 flags=0x4c count=2
+queue family=5 flags=0x10c count=1
+PASS R32F frame=0 family=0 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=1 family=0 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=2 family=2 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=3 family=2 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=4 family=0 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=5 family=0 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=6 family=2 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=7 family=2 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=0 family=0 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=1 family=0 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=2 family=2 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=3 family=2 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=4 family=0 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=5 family=0 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=6 family=2 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=7 family=2 texture=2x2 rect=0,0+2x2 output=4x4 pixels=16 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=0 family=0 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=1 family=0 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=2 family=2 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=3 family=2 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=4 family=0 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=5 family=0 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=6 family=2 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=7 family=2 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=0 family=0 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=1 family=0 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=2 family=2 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=3 family=2 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=4 family=0 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=5 family=0 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=6 family=2 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=7 family=2 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=0 family=0 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=1 family=0 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=2 family=2 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=3 family=2 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=4 family=0 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=5 family=0 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=6 family=2 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=7 family=2 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=0 family=0 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=1 family=0 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=2 family=2 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=3 family=2 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=4 family=0 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=5 family=0 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=6 family=2 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=7 family=2 texture=7x5 rect=2,1+4x3 output=4x3 pixels=12 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=0 family=0 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=1 family=0 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=2 family=2 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=3 family=2 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=4 family=0 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=5 family=0 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=6 family=2 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=7 family=2 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=0 family=0 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=1 family=0 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=2 family=2 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=3 family=2 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=4 family=0 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=5 family=0 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=6 family=2 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=7 family=2 texture=3413x1440 rect=0,0+3413x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=0 family=0 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=1 family=0 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=2 family=2 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=3 family=2 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=4 family=0 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=5 family=0 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=6 family=2 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=7 family=2 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=0 family=0 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=1 family=0 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=2 family=2 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=3 family=2 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=4 family=0 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=5 family=0 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=6 family=2 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=7 family=2 texture=3420x1444 rect=3,2+3414x1440 output=5120x2160 pixels=11059200 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=0 family=0 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=1 family=0 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=2 family=2 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=3 family=2 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=4 family=0 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=5 family=0 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=6 family=2 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=7 family=2 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=0 family=0 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=1 family=0 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=2 family=2 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=3 family=2 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=4 family=0 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=5 family=0 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=6 family=2 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS RG16F frame=7 family=2 texture=63x51 rect=1,3+61x47 output=17x19 pixels=323 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=0 family=0 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=1 family=0 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=2 family=2 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS R32F frame=3 family=2 texture=9x7 rect=2,1+4x3 output=11x8 pixels=88 mismatch=0 nearest-boundary-rounding=0
+PASS D3D12-shared CONCURRENT format=28 flags=0x20 families=0,2 mismatch=0
+PASS D3D12-shared CONCURRENT format=28 flags=0x24 families=0,2 mismatch=0
+PASS D3D12-shared CONCURRENT format=41 flags=0x20 families=0,2 mismatch=0
+PASS D3D12-shared CONCURRENT format=34 flags=0x20 families=0,2 mismatch=0
+PASS GPU guide compute/readback checks=402 failures=0 validation_errors=0 fixture_peak=129592256 total_peak=218065856 compute_allocations=6

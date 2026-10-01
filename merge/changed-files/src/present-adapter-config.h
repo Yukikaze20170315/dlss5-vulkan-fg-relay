@@ -136,6 +136,19 @@ static bool PresentAdapterTrace()
     return PresentAdapterFgInput() && trace;
 }
 
+// Keep the DLSS-G plugin's internal focus check active for a drawable NR
+// window. This never changes the game's explicit FG mode or OS input focus.
+// Unknown Streamline focus-gate contracts retain native behaviour.
+static bool PresentAdapterFocusKeepFG()
+{
+    static const bool keep = [] {
+        wchar_t path[1024] = {};
+        PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
+        return path[0] != 0 && GetPrivateProfileIntW(L"Adapter", L"FocusKeepFG", 1, path) == 1;
+    }();
+    return PresentAdapterFgInput() && keep;
+}
+
 static int PresentAdapterHookPoint()
 {
     static ULONGLONG next_read;

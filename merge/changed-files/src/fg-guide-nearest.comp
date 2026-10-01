@@ -1,0 +1,14 @@
+#version 450
+layout(local_size_x=16, local_size_y=8, local_size_z=1) in;
+layout(set=0,binding=0,std430) readonly buffer Source { uint words[]; } src;
+layout(set=0,binding=1,std430) writeonly buffer Destination { uint words[]; } dst;
+layout(push_constant) uniform Dimensions { uint src_w; uint src_h; uint dst_w; uint dst_h; } dims;
+void main() {
+    uvec2 p = gl_GlobalInvocationID.xy;
+    if (p.x >= dims.dst_w || p.y >= dims.dst_h) return;
+    // Host caps each axis at 32768 and each buffer at 128 MiB. These products
+    // fit uint32 and preserve the source's raw float/half bit patterns.
+    uint sx = min(((2u*p.x+1u)*dims.src_w)/(2u*dims.dst_w), dims.src_w-1u);
+    uint sy = min(((2u*p.y+1u)*dims.src_h)/(2u*dims.dst_h), dims.src_h-1u);
+    dst.words[p.y*dims.dst_w+p.x] = src.words[sy*dims.src_w+sx];
+}

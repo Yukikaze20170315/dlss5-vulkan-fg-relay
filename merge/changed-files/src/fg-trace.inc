@@ -163,7 +163,7 @@ static bool FgtEnabled() { return PresentAdapterTrace(); }
 // each frame's copy from inside the interposer's vkQueuePresentKHR, and the relay
 // needs the family of the queues it submits on. Everything else this file
 // observes stays trace-only.
-static bool FgtHooksWanted() { return PresentAdapterTrace() || PresentAdapterRelay(); }
+static bool FgtHooksWanted() { return PresentAdapterTrace() || PresentAdapterRelay() || PresentAdapterFocusKeepFG(); }
 
 static SRWLOCK g_fgt_log_lock = SRWLOCK_INIT;
 static char g_fgt_logs[256][1536];
@@ -210,6 +210,8 @@ static const char *FgtLifecycleName(unsigned l)
     return l == 0 ? "OnlyValidNow" : l == 1 ? "ValidUntilPresent" : l == 2 ? "ValidUntilEvaluate" : "?";
 }
 
+#include "focus-fg.inc"
+
 // ---------------------------------------------------------------------------
 // Game-side vkQueuePresentKHR: the interposer's export, which is also what its
 // vkGetDeviceProcAddr hands out (SL_INTERCEPT). The DLSS-G before-hook runs
@@ -249,6 +251,7 @@ static void FgtNotePresent(void *queue, const FgtPresentInfo *info, LONGLONG now
 
 static uint32_t FgtPresentDetour(void *queue, const FgtPresentInfo *info)
 {
+    FocusFgOnPresent();
     if (PresentAdapterTrace()) FgtNotePresent(queue, info, FgtNow());
     // The GPU relay arms its copy here (Pipeline=3), before the original runs, so
     // the copy is in the present queue ahead of the present operation itself.
@@ -505,7 +508,7 @@ static void FgtGetDeviceQueueDetour(void *dev, uint32_t family, uint32_t index, 
 {
     reinterpret_cast<PFN_FgtGetDeviceQueue>(g_fgt_control.get_queue_hook.original)(dev, family, index, queue);
     void *q = queue != nullptr ? *queue : nullptr;
-    FgRelayNoteQueue(q, family);
+    FgRelayNoteQueue(dev, q, family);
     FgtNoteQueueId(q, family, index, "vkGetDeviceQueue");
 }
 
@@ -514,7 +517,7 @@ static void FgtGetDeviceQueue2Detour(void *dev, const void *info, void **queue)
     reinterpret_cast<PFN_FgtGetDeviceQueue2>(g_fgt_control.get_queue2_hook.original)(dev, info, queue);
     const uint32_t *u = static_cast<const uint32_t *>(info);
     void *q = queue != nullptr ? *queue : nullptr;
-    FgRelayNoteQueue(q, u != nullptr ? u[5] : 0xFFFFFFFFu);
+    FgRelayNoteQueue(dev, q, u != nullptr ? u[5] : 0xFFFFFFFFu);
     FgtNoteQueueId(q, u != nullptr ? u[5] : 0xFFFFFFFFu, u != nullptr ? u[6] : 0xFFFFFFFFu, "vkGetDeviceQueue2");
 }
 
@@ -522,7 +525,7 @@ static void FgtGetDeviceQueueLayerDetour(void *dev, uint32_t family, uint32_t in
 {
     reinterpret_cast<PFN_FgtGetDeviceQueue>(g_fgt_control.get_queue_layer_hook.original)(dev, family, index, queue);
     void *q = queue != nullptr ? *queue : nullptr;
-    FgRelayNoteQueue(q, family);
+    FgRelayNoteQueue(dev, q, family);
     FgtNoteQueueId(q, family, index, "vkGetDeviceQueue(layer)");
 }
 
@@ -549,6 +552,7 @@ static void FgtOnRuntime(reshade::api::effect_runtime *rt)
     if (!FgtHooksWanted() || rt == nullptr) return;
     auto *dev = rt->get_device();
     if (dev == nullptr || dev->get_api() != reshade::api::device_api::vulkan) return;
+    FocusFgSetRuntime(rt);
     // The queue-discovery target is what gives the relay the family of the queues
     // it submits on, so it is published whether or not the trace is on.
     OnFgtInitDevice(dev);
@@ -597,6 +601,7 @@ static void FgtRegisterEvents(PFN_ReShadeRegisterEvent reg)
 // Only HookWorkerProc calls this; rendering callbacks publish pinned code addresses, never device objects.
 static void FgtMaintenance()
 {
+    PresentCompatibilityPoll();
     if (!FgtHooksWanted() || !g_fgt_control.cs_ready) return;
     const bool trace = FgtEnabled();
     FgtControl &t = g_fgt_control;
@@ -654,6 +659,7 @@ static void FgtMaintenance()
         // decision as the observers above -- a patch on a process-wide entry
         // point -- and belongs behind the same lock.
         FgRelayInstallDeviceHook();
+        FocusFgMaintenance();
         LeaveCriticalSection(&g_hook_cs);
     } else InterlockedExchange(&g_scan_pending, 1);
     FgtFlushLog();
@@ -720,9 +726,66 @@ static void FgtSummary()
     if (t.queue_overflow != 0) FgtLog("[fg-trace] %u submits to queues beyond the table", t.queue_overflow);
 }
 
+// Bounded CPU metadata around queue/focus/reset transitions. No texture readback
+// or GPU commands are added. Logs describe recorded work, not displayed pixels.
+struct FgtTransitionSample {
+    bool active;
+    unsigned index, reset, count, enabled, recording, not_rendering, metering, fullscreen, mode, known;
+    void *queue, *frame_id;
+    uint64_t hud, back, real, interp;
+    LONGLONG begin;
+};
+static FgtTransitionSample FgtTransitionBegin(const NVSDK_NGX_Parameter *p)
+{
+    FgtTransitionSample s = {};
+    if (g_cfg.stage < 2 || !PresentAdapterFocusKeepFG()) return s;
+    static thread_local void *last_queue;
+    static thread_local bool have, last_focus;
+    static thread_local unsigned last_reset, remaining, bursts;
+    p->Get("DLSSG.CmdQueue", &s.queue);
+    if (FgInputReadU(p, "DLSSG.Reset", &s.reset)) s.known |= 1u;
+    const bool focus = ForegroundIsThisProcess();
+    const bool changed = (have && (last_queue != s.queue || last_focus != focus)) || (s.reset && !last_reset);
+    if (changed && bursts < 128) { remaining = 12; ++bursts; }
+    have = true; last_queue = s.queue; last_focus = focus; last_reset = s.reset;
+    if (remaining == 0) return s;
+    --remaining; s.active = true; s.begin = FgtNow();
+    const char *keys[] = {"DLSSG.MultiFrameIndex", "DLSSG.MultiFrameCount", "DLSSG.EnableInterp",
+        "DLSSG.IsRecording", "DLSSG.NotRenderingGameFrames", "DLSSG.FlipMetering", "DLSSG.FullscreenMode", "DLSSG.StreamlineMode"};
+    unsigned *values[] = {&s.index, &s.count, &s.enabled, &s.recording, &s.not_rendering, &s.metering, &s.fullscreen, &s.mode};
+    for (unsigned i = 0; i < _countof(keys); ++i)
+        if (FgInputReadU(p, keys[i], values[i])) s.known |= 2u << i;
+    p->Get("DLSSG.BackbufferFrameID", &s.frame_id);
+    const char *why = nullptr;
+    VkmRes r = {};
+    if (VkmGetRes(p, "DLSSG.HUDLess", &r, &why)) s.hud = r.image;
+    if (VkmGetRes(p, "DLSSG.Backbuffer", &r, &why)) s.back = r.image;
+    if (VkmGetRes(p, "DLSSG.OutputReal", &r, &why)) s.real = r.image;
+    if (VkmGetRes(p, "DLSSG.OutputInterpolated", &r, &why)) s.interp = r.image;
+    return s;
+}
+static void FgtTransitionEnd(const FgtTransitionSample &s, const NVSDK_NGX_Parameter *p,
+    NVSDK_NGX_Result result, bool entered, LONG armed_before, LONG armed_after)
+{
+    if (!s.active) return;
+    unsigned disable = 0;
+    const bool disable_known = FgInputReadU(p, "DLSSG.OutputDisableInterpolation", &disable);
+    const FocusFgWindow window = FocusFgWindowSnapshot();
+    const HMONITOR game_monitor = MonitorFromWindow(window.window, MONITOR_DEFAULTTONULL);
+    const HMONITOR focus_monitor = MonitorFromWindow(GetForegroundWindow(), MONITOR_DEFAULTTONULL);
+    FgtLog("[fg-transition] start=%lld frame=%p idx=%u/%u queue=%p reset=%u enable=%u recording=%u not-rendering=%u "
+        "metering=%u fullscreen=%u slmode=%u known=0x%x hud=%llx back=%llx real=%llx interp=%llx "
+        "bridge-lock=%u arm=%ld->%ld result=%d disable-interp=%u(known=%u) foreground=%u monitors=%p/%p cpu=%.3fms",
+        s.begin, s.frame_id, s.index, s.count, s.queue, s.reset, s.enabled, s.recording, s.not_rendering,
+        s.metering, s.fullscreen, s.mode, s.known, s.hud, s.back, s.real, s.interp,
+        entered ? 1u : 0u, armed_before, armed_after, result, disable, disable_known ? 1u : 0u,
+        ForegroundIsThisProcess() ? 1u : 0u, game_monitor, focus_monitor, FgtMs(s.begin, FgtNow()));
+}
+
 // Every FG evaluate, on Streamline's thread, before the input feed looks at it.
 static void FgTraceEvaluate(void *cmd, const NVSDK_NGX_Parameter *p)
 {
+    InterlockedIncrement(&g_focus_fg_evaluates);
     if (!FgtEnabled() || !g_fgt_control.cs_ready) return;
     FgTrace &t = g_fgt;
     const LONGLONG now = FgtNow();

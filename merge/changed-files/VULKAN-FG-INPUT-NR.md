@@ -1,9 +1,12 @@
 # Vulkan: neural rendering of the final frame at the Frame Generation input
 
-Status: verified in one title (Arknights: Endfield, Vulkan, 5120x2160, RTX 5090,
-Generic 8.5.0-rc10 with two NR passes, native DLSS-G fixed 6x, 120 Hz display).
-Not yet tested with other Vulkan games, HDR swapchains, or without native Frame
-Generation.
+Status: verified in one title (Arknights: Endfield, Vulkan, RTX 5090, Generic
+8.5.0-rc10 with two NR passes). The 2026-09-29 measurements below used
+5120x2160, native DLSS-G fixed 6x and DLAA; the 2026-10-01 update was verified
+with the game's own 4x, every DLSS Super Resolution mode, several output
+resolutions, fullscreen and windowed; the 2026-10-02 build was run with
+Streamline 2.14.1 and with the game's own Streamline 2.10.3. Not yet tested
+with other Vulkan games, HDR swapchains, or without native Frame Generation.
 
 Two stages are described here:
 
@@ -14,6 +17,129 @@ Two stages are described here:
   batch and every wait between Vulkan and the private D3D12 session happens on
   the GPU; the game is held at the start of its frame so frames do not queue in
   front of the neural pass.
+
+## Update 2026-10-01
+
+Six problems found after the 2026-09-29 release, all in the bridge:
+
+1. **DLSS modes other than DLAA.** With Quality, Balanced or Performance the FG
+   depth and motion vectors are smaller than the back buffer (for example
+   3414x1440 for a 5120x2160 output). The relay required equal sizes, so after
+   120 refused frames it fell back to the serial feed for the rest of the
+   process (`fell_back` was never cleared), and the serial feed then ran NR with
+   `mv=zero depth=zero`. Turning the camera showed a flicker on surfaces, and
+   the frame pacing stayed uneven even after switching back to DLAA. Now
+   `fg-guides.inc` reads each guide's own sub-rectangle and scales it to the
+   output grid with a nearest-neighbour compute shader on the FG queue
+   (`fg-guide-compute.inc`, `fg-guide-nearest.comp`; raw 32-bit texels, so R32F
+   depth and RG16F motion vectors are copied bit-exactly). The motion-vector
+   scale is multiplied by output size / motion-vector size; the unit was
+   confirmed by disassembling the game's Streamline 2.14.1 DLL. A compute shader
+   is used because `vkCmdBlitImage` needs a graphics queue, and in this game FG
+   runs on a compute-only queue family while the window is focused. No image is
+   read back to the CPU and no CPU wait is added.
+2. **Fullscreen at a resolution smaller than the monitor.** On a 5120x2160
+   monitor, fullscreen 3840x2160 gives a 5120-wide back buffer whose real image
+   is the sub-rectangle x=640, w=3840, while the HUD-less image is 3840 wide at
+   x=0. The old check compared whole-image sizes and refused every frame. Each
+   input now carries its own origin; only the valid regions must have equal size
+   and format. Copies read and write each region at its own origin and leave the
+   outside untouched. Size changes rebuild the private resources safely.
+3. **NR stopping for good during normal play.** FG handles were kept in an
+   8-entry table that was never cleaned on release. The game recreates its FG
+   feature from time to time; from the ninth new handle on, the relay no longer
+   recognised the evaluate and NR silently stopped until restart.
+   `fg-handle-registry.h` now tracks create/release with generations, has no
+   fixed capacity and survives address reuse. Transient input problems pause
+   and retry instead of refusing for the rest of the process.
+4. **Loss of GPU completion.** If the private D3D12 queue stops signalling for
+   1.5 s, the relay releases every park (unchanged). New: once the CPU worker
+   and recording have stopped, a marker on the D3D12 queue proves that earlier
+   work has finished, and the Vulkan copy/release fences and parks are checked;
+   only then is the session rebuilt automatically. If completion cannot be
+   proven, resources stay alive and NR stays paused.
+5. **Frame generation while the window is not focused.** Streamline stops
+   DLSS-G when its internal `IKeyboard::hasFocus()` returns false. `focus-fg.inc`
+   locates that one call site in `sl.dlss_g.dll` by an instruction/branch/log
+   string contract (not by hash or fixed RVA) and returns true for that caller
+   only, while NR is at the FG input and the window is visible, not minimised
+   and not resizing. Every other caller, the OS focus, an explicit FG Off and
+   resource release are untouched. `FocusKeepFG=0` turns it off. If the contract
+   is not found, native behaviour is kept.
+6. **A flash of the unprocessed picture about 1-2 s after switching to another
+   window.** With nothing else on the game's monitor, Windows promotes the game
+   from composed flip to independent flip, and back when the window returns. At
+   each switch Streamline changes DLSS-G pacing (`FlipMetering` 0 <-> 2) and its
+   present queue, and for 9-15 real frames it presents the game's frames without
+   calling DLSS-G. NR runs only inside the FG evaluate, so those frames have no
+   NR. Evidence: in the `[fg-transition]` log the game's frame ID jumps by 9-15
+   with no evaluate at every one of 29 switches, and PresentMon shows 12-15
+   frames with one present per real frame after every present-mode change.
+   `composition-guard.inc` keeps DWM composing the game's monitor: a 2x2, alpha
+   1/255, click-through, non-activating, topmost tool window of the game process
+   at the monitor's top-left corner, excluded from screen capture, shown while NR
+   is at the FG input, FG was evaluated in the last 1.5 s and the window is
+   shown. The game is already composed while focused, so focused behaviour does
+   not change. `HoldComposition=0` removes it.
+
+Also: the Generic hash whitelist is gone. Any Generic build is tried; a missing
+module, disabled hooks, an unsupported hook point, source overrides, a missing
+NR/SR entry point or a carrier mismatch are logged and shown in the panel with
+the reason, together with the build that is known to work (8.5.0-rc10). The
+three source-interpretation overrides (encoding, primaries, linear unit) now
+pause NR and it resumes when they are back on Auto, instead of stopping it until
+restart. `[fg-transition]` logs bounded CPU metadata (queue, reset, metering,
+frame ID, handles) for the first 12 FG calls after a queue, focus or reset
+change, at most 128 windows per thread.
+
+## Update 2026-10-02: SR carrier retry
+
+**Symptom.** In some game sessions NR never starts. Frame generation runs
+normally on the game's own frames, and changing the resolution once brings NR
+back. The bridge log shows:
+
+```
+[present-adapter] multiple SR modules found; refusing ambiguous carrier hook.
+[fg-input] refused: private SR carrier hook unavailable. Frame generation continues on the game's own frames.
+```
+
+**Cause.** The private carrier is the D3D12 evaluate export of the one loaded
+module whose version resource says DLSS Super Resolution. With a driver-side
+DLSS override, that module is the driver's model (`...\NGX\models\dlss\...\*.bin`).
+While the bridge creates its private NGX feature, NGX also maps the game
+folder's `nvngx_dlss.dll` and releases it shortly afterwards. The bridge's own
+NGX module scanner holds a reference to each NGX module while it installs its
+hooks there, so the DLL stays mapped until that scan has finished. In 28 saved
+sessions where NR started, the scan took 0.40-0.91 s and finished 120-441 ms
+before the carrier search. In the failing session it took 1.26 s, the search
+ran 190 ms before it finished, and both modules were visible. Refusing an ambiguous carrier is correct, but the refusal lasted
+for the whole session. A resolution change recovered only because it rebuilds
+the private session and searches again.
+
+**Change.** A carrier failure that can clear by itself no longer refuses for the
+session: no unique SR module (none yet, or two at once), an SR module that
+could not be retained, and MinHook status 9 (no free memory within +-1 GB of the
+target). The private session stays built and owned, no frame is armed or
+processed, and the search is repeated once per second, up to 30 attempts.
+While the carrier is pending, evaluates are not handed to the relay: the relay
+ends every unarmed evaluate itself, so the retry step would never run.
+Any other failure, and the 30th failed attempt, refuse as before. An ambiguous
+carrier is still never hooked. The module list is logged on the first and last
+attempt only. When the hook is installed, the log names the module and the
+panel's SR/hook diagnostic is cleared. A size change or runtime loss while the
+carrier is pending releases the session through the normal drained path,
+because the session is owned from the moment it is imported. Sessions where
+the first attempt succeeds behave exactly as before.
+
+Files: `src/present-carrier-retry.h` (new, policy), `src/present-adapter.inc`
+(result classification), `src/fg-input.inc` (retry step; relay skipped while
+pending), `src/fg-relay.inc` (no arm while pending). Tests:
+`tests/vulkan-fg-quality/run.cmd carrier` (production search, MinHook install,
+retry step and relay hand-off against fixture DLLs), and the test-only add-on
+`carrier-race-helper.cpp` (`run.cmd racehelper`), which recreates the race in
+the game: when the first D3D12 device is created (the bridge's private device),
+it loads the game folder's `nvngx_dlss.dll` and holds it for 3 s, so the first
+carrier search sees two SR modules.
 
 ## Problem
 
@@ -198,6 +324,9 @@ bridge build unregisters Generic in the race; this build never references it.
 
 ## Colour and configuration
 
+(The "known issue" below describes the 2026-09-29 build. Since 2026-10-01 the
+three overrides pause NR and it resumes when they are back on Auto.)
+
 * UNORM8 swapchains (sRGB, the only FG inputs handled): decode to normalized
   linear FP16 for the carrier, encode back after NR. Generic then sees
   `encoding=linear units=relative`.
@@ -239,6 +368,7 @@ Pipeline=2
 Import=1
 Trace=0
 ; Throttle=1 is the default
+; FocusKeepFG=1 and HoldComposition=1 are the defaults (2026-10-01)
 ```
 
 With `Follow=1`, Generic's own hook-point control is the switch: **Present** runs
@@ -260,8 +390,15 @@ handed over on the render thread.
 | `src/vkmirror.inc` | Worker dispatch (relay first, then `fg_arm`), FG handle tracking, mirror/feed arbitration. |
 | `src/synth.inc`, `src/bridge.inc`, `src/bridge.h` | sRGB path in the colour pass, submission without a CPU completion wait for the relay, fence-completion proofs, resource retention when completion is unproven. |
 | `src/dlss5-bridge.cpp` | Module-scan integration, NGX worker maintenance call. |
+| `src/fg-guides.inc`, `src/fg-guide-compute.inc`, `src/fg-guide-math.h`, `src/fg-guide-nearest.comp`, `src/fg-guide-nearest-spv.h` | Guide sub-rectangles, motion-vector scale, GPU nearest-neighbour scaling (2026-10-01). |
+| `src/fg-handle-registry.h` | FG/NGX handle lifetime with generations (2026-10-01). |
+| `src/fg-history-policy.h` | History-reset decisions used by `fg-guides.inc`. |
+| `src/focus-fg.inc`, `src/focus-fg-contract.h` | Scoped Streamline focus gate (2026-10-01). |
+| `src/composition-guard.inc` | Keeps the game's monitor composed (2026-10-01). |
+| `src/present-compatibility.h` | Compatibility codes and messages instead of a hash whitelist (2026-10-01). |
+| `src/present-carrier-retry.h` | Which SR carrier failures are retried, how often and how many times (2026-10-02). |
 | `src/vk-present-adapter.ini.example` | Documented configuration. |
-| `tests/vulkan-fg-input/`, `tests/vulkan-fg-relay/` | Offline tests (below). |
+| `tests/vulkan-fg-input/`, `tests/vulkan-fg-relay/`, `tests/vulkan-fg-quality/` | Offline tests (below). |
 
 ## Tests
 
@@ -274,6 +411,7 @@ handed over on the render thread.
 | `tests/vulkan-fg-relay/scan/` | 20705 assertions of `ngx-module-scan.h` against the real Windows loader: non-candidates, near-miss names, every interface pairing, 20 unload/reload cycles, loader-lock contention, forwarded exports. |
 | `tests/vulkan-fg-relay/lifetime/` | Real ReShade 6.8 + real Generic, two Vulkan instances: `race` reproduces the Generic unregistration with an older bridge, `stable` / `control` pass, `late-ref` must fail with exit 12. |
 | `tests/vulkan-fg-relay/inject/` | A device created without the extension gets it through the hook; D3D12 Signal -> Vulkan timeline value, and D3D12 Signal -> `vkWaitSemaphores`, both pass. |
+| `tests/vulkan-fg-quality/run.cmd SUITE <new-dir>` | 2026-10-01 suites: `registry` (handle table, 188780 checks), `guides` (57), `hooks` (production NGX wrappers, 535), `colour` (sub-rectangle copies, 39), `recovery` (real D3D12 marker, 34), `compatibility` (26), `guard` (real Win32 windows, 28), `focus <sl.dlss_g.dll>` (512 guard combinations and the disk contract), `gpu` (real Vulkan compute scaling; needs `VULKAN_SDK`). 2026-10-02: `carrier` (49), and `racehelper`, which only builds the test-only in-game race add-on. |
 
 The relay's arm/copy/park/release chain has no offline host: it needs a real
 DLSS-G evaluate. It was validated in the game (below).
@@ -307,23 +445,30 @@ scenes are not guaranteed to be identical.
 
 ## Known limits
 
-* UNORM8 sRGB FG inputs only; other formats and non-full-image subrects are
-  refused with a log line and the game keeps its own image. The game must supply
-  `DLSSG.HUDLess`.
-* The adapter accepts only the unmodified Generic 8.5.0-rc10 (the SHA-256 above;
-  `PresentAdapterConsumer` in `present-adapter.inc`). Other Generic builds are
-  refused with a log line.
+* UNORM8 sRGB FG inputs only; other formats are refused with a log line and the
+  game keeps its own image. The valid regions of the HUD-less image and the back
+  buffer must have the same size. The game must supply `DLSSG.HUDLess`.
+* Any Generic build is tried; only 8.5.0-rc10 has been verified.
 * Only `Pipeline=2` with `Import=1` is validated in the game. `Pipeline=3` keeps
   the older CPU gate and ran with about two thirds of the FG groups unarmed and
   occasional release-submit failures (host fallback). `Import=0` keeps the CPU
   gate as well; in the game it left roughly a quarter to a half of the frames
   unarmed.
+* The focus gate (update item 5) depends on the Streamline build. Its contract
+  was found in `sl.dlss_g.dll` 2.14.1. The 2.10.3 build that Arknights: Endfield
+  ships has no matching call site (`run.cmd focus` reports `matches=0`), so the
+  bridge logs `[focus-fg] unavailable: unique Streamline focus-gate contract was
+  not found; native focus behaviour retained` and Streamline stops DLSS-G, and
+  NR with it, while the window is not focused. The composition guard (item 6)
+  only shows while FG is evaluated, so it stays hidden then. Both builds were
+  run in the game on 2026-10-02; NR worked with both while focused.
 * One effect runtime / one swapchain.
 * Generic's layer count and per-layer parameters are global, so the mirror
   (Upscaled) and this feed (Present) cannot run different layer configurations.
-* The three source-interpretation settings stop NR until restart (above).
-* Long sessions, alt-tab, swapchain recreation and other Vulkan games are not
-  covered.
+* Other Vulkan games are not covered. The automatic rebuild after a lost GPU
+  completion (update item 4) has not been triggered in the game yet. One 1.5 s
+  completion stall was seen once in the game during repeated resolution
+  switches, before that rebuild existed; its cause is not known.
 
 ## Minimal integration for maintainers
 

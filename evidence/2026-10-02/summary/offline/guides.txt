@@ -1,0 +1,1 @@
+PASS: 57 checks; production rectangle/scale/read/record/reset/capability helpers.

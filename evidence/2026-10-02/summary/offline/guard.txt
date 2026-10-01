@@ -1,0 +1,29 @@
+ok: stand-in game window created
+ok: guard window exists in this process
+ok: hidden while the game window is not shown
+ok: shown once the game window is visible, NR is at the FG input and FG evaluates
+ok: first monitor: guard is 2x2 at the game monitor's top-left (0,0)
+ok: tool window without APPWINDOW: no taskbar or Alt+Tab entry
+ok: non-activating style
+ok: layered and mouse-transparent
+ok: topmost
+ok: no owner window
+ok: empty title
+ok: opacity 1/255
+ok: excluded from screen capture
+ok: foreground window unchanged
+ok: hit testing passes through the guard pixel
+ok: runs on its own thread
+ok: opacity follows HoldCompositionAlpha live
+ok: after the game window moves to the second monitor: guard is 2x2 at the game monitor's top-left (3840,0)
+ok: hidden after FG evaluates stop
+ok: shown again when FG evaluates resume
+ok: hidden while the game window is minimized
+ok: shown after restore
+ok: hidden when NR is not at the FG input
+ok: shown when NR returns to the FG input
+ok: HoldComposition=0 removes it live
+ok: HoldComposition=1 restores it live
+ok: foreground window still unchanged at the end
+ok: hidden once the game window is gone
+guard: 28 checks, 0 failures

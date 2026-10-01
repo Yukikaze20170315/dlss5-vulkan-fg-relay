@@ -1,0 +1,3 @@
+ Assembling: ..\..\src\present-nr-witness.asm
+test-witness.cpp
+PASS NR tail forwarding; SR identity-return gate, four arguments, caller address and thread-local isolation

@@ -1,0 +1,30 @@
+From 54ca269abe106d56657415afef75bc2a3550700b Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E7=9B=97=E7=89=88=E3=81=AE=E9=9B=AA=E9=A2=A8=E9=85=B1?=
+ <50561019+Yukikaze20170315@users.noreply.github.com>
+Date: Thu, 1 Oct 2026 23:46:40 +0800
+Subject: [PATCH 08/10] docs: carrier race timing over all saved sessions
+
+---
+ VULKAN-FG-INPUT-NR.md | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
+
+diff --git a/VULKAN-FG-INPUT-NR.md b/VULKAN-FG-INPUT-NR.md
+index 5a35ca1..f79c8e8 100644
+--- a/VULKAN-FG-INPUT-NR.md
++++ b/VULKAN-FG-INPUT-NR.md
+@@ -108,11 +108,10 @@ DLSS override, that module is the driver's model (`...\NGX\models\dlss\...\*.bin
+ While the bridge creates its private NGX feature, NGX also maps the game
+ folder's `nvngx_dlss.dll` and releases it shortly afterwards. The bridge's own
+ NGX module scanner holds a reference to each NGX module while it installs its
+-hooks there, so the DLL stays mapped until that scan has finished. In every
+-session where NR started, the scan finished 28-296 ms before the private
+-feature was ready. In the failing session it took 1.26 s instead of the usual
+-0.43-0.77 s, the carrier search ran 190 ms before it finished, and both modules
+-were visible. Refusing an ambiguous carrier is correct, but the refusal lasted
++hooks there, so the DLL stays mapped until that scan has finished. In 28 saved
++sessions where NR started, the scan took 0.40-0.91 s and finished 120-441 ms
++before the carrier search. In the failing session it took 1.26 s, the search
++ran 190 ms before it finished, and both modules were visible. Refusing an ambiguous carrier is correct, but the refusal lasted
+ for the whole session. A resolution change recovered only because it rebuilds
+ the private session and searches again.
+ 

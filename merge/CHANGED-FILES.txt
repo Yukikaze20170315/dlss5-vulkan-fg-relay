@@ -1,4 +1,4 @@
-Files changed from NIGos/dlss5-bridge d1cc508 to d1ef16f (full copies under changed-files/):
+Files changed from NIGos/dlss5-bridge d1cc508 to 0a4af91 (full copies under changed-files/):
 .gitignore
 README.md
 VULKAN-FG-INPUT-NR.md
@@ -7,14 +7,26 @@ src/bounded-report.h
 src/bridge.h
 src/bridge.inc
 src/build.cmd
+src/composition-guard.inc
 src/dlss5-bridge.cpp
 src/fg-composite-shader.h
+src/fg-guide-compute.inc
+src/fg-guide-math.h
+src/fg-guide-nearest-spv.h
+src/fg-guide-nearest.comp
+src/fg-guides.inc
+src/fg-handle-registry.h
+src/fg-history-policy.h
 src/fg-input.inc
 src/fg-relay.inc
 src/fg-trace.inc
+src/focus-fg-contract.h
+src/focus-fg.inc
 src/ngx-module-scan.h
 src/present-adapter-config.h
 src/present-adapter.inc
+src/present-carrier-retry.h
+src/present-compatibility.h
 src/present-config-gate.h
 src/present-nr-witness.asm
 src/synth.inc
@@ -33,6 +45,22 @@ tests/vulkan-fg-input/test-witness.cmd
 tests/vulkan-fg-input/test-witness.cpp
 tests/vulkan-fg-input/validate-roundtrip.py
 tests/vulkan-fg-input/vcvars.cmd
+tests/vulkan-fg-quality/README.md
+tests/vulkan-fg-quality/carrier-race-helper.cpp
+tests/vulkan-fg-quality/dummy-generic.cpp
+tests/vulkan-fg-quality/run.cmd
+tests/vulkan-fg-quality/sr-fixture.cpp
+tests/vulkan-fg-quality/sr-fixture.rc
+tests/vulkan-fg-quality/test-carrier.cpp
+tests/vulkan-fg-quality/test-color.cpp
+tests/vulkan-fg-quality/test-compatibility.cpp
+tests/vulkan-fg-quality/test-focus.cpp
+tests/vulkan-fg-quality/test-gpu.cpp
+tests/vulkan-fg-quality/test-guard.cpp
+tests/vulkan-fg-quality/test-guides-contract.cpp
+tests/vulkan-fg-quality/test-hooks.cpp
+tests/vulkan-fg-quality/test-recovery.cpp
+tests/vulkan-fg-quality/test-registry.cpp
 tests/vulkan-fg-relay/README.md
 tests/vulkan-fg-relay/inject/build.cmd
 tests/vulkan-fg-relay/inject/host.cpp

@@ -1,0 +1,97 @@
+From 0a4af915ed6af4f3fd8b291e898d7f45508a4d97 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E7=9B=97=E7=89=88=E3=81=AE=E9=9B=AA=E9=A2=A8=E9=85=B1?=
+ <50561019+Yukikaze20170315@users.noreply.github.com>
+Date: Fri, 2 Oct 2026 03:41:08 +0800
+Subject: [PATCH 10/10] docs: carrier retry hand-off order, checks=49, focus
+ gate on Streamline 2.10.3
+
+Documentation only; the add-on source is unchanged from 82908fb.
+---
+ VULKAN-FG-INPUT-NR.md             | 32 +++++++++++++++++++++----------
+ tests/vulkan-fg-quality/README.md |  2 +-
+ 2 files changed, 23 insertions(+), 11 deletions(-)
+
+diff --git a/VULKAN-FG-INPUT-NR.md b/VULKAN-FG-INPUT-NR.md
+index f79c8e8..6cb8b8e 100644
+--- a/VULKAN-FG-INPUT-NR.md
++++ b/VULKAN-FG-INPUT-NR.md
+@@ -4,8 +4,9 @@ Status: verified in one title (Arknights: Endfield, Vulkan, RTX 5090, Generic
+ 8.5.0-rc10 with two NR passes). The 2026-09-29 measurements below used
+ 5120x2160, native DLSS-G fixed 6x and DLAA; the 2026-10-01 update was verified
+ with the game's own 4x, every DLSS Super Resolution mode, several output
+-resolutions, fullscreen and windowed. Not yet tested with other Vulkan games,
+-HDR swapchains, or without native Frame Generation.
++resolutions, fullscreen and windowed; the 2026-10-02 build was run with
++Streamline 2.14.1 and with the game's own Streamline 2.10.3. Not yet tested
++with other Vulkan games, HDR swapchains, or without native Frame Generation.
+ 
+ Two stages are described here:
+ 
+@@ -120,6 +121,8 @@ session: no unique SR module (none yet, or two at once), an SR module that
+ could not be retained, and MinHook status 9 (no free memory within +-1 GB of the
+ target). The private session stays built and owned, no frame is armed or
+ processed, and the search is repeated once per second, up to 30 attempts.
++While the carrier is pending, evaluates are not handed to the relay: the relay
++ends every unarmed evaluate itself, so the retry step would never run.
+ Any other failure, and the 30th failed attempt, refuse as before. An ambiguous
+ carrier is still never hooked. The module list is logged on the first and last
+ attempt only. When the hook is installed, the log names the module and the
+@@ -129,12 +132,14 @@ because the session is owned from the moment it is imported. Sessions where
+ the first attempt succeeds behave exactly as before.
+ 
+ Files: `src/present-carrier-retry.h` (new, policy), `src/present-adapter.inc`
+-(result classification), `src/fg-input.inc` (retry step), `src/fg-relay.inc`
+-(no arm while pending). Tests: `tests/vulkan-fg-quality/run.cmd carrier`
+-(production search, MinHook install and retry step against fixture DLLs), and
+-the test-only add-on `carrier-race-helper.cpp` (`run.cmd racehelper`), which
+-recreates the race in the game by holding `nvngx_dlss.dll` until the bridge has
+-seen two SR modules.
++(result classification), `src/fg-input.inc` (retry step; relay skipped while
++pending), `src/fg-relay.inc` (no arm while pending). Tests:
++`tests/vulkan-fg-quality/run.cmd carrier` (production search, MinHook install,
++retry step and relay hand-off against fixture DLLs), and the test-only add-on
++`carrier-race-helper.cpp` (`run.cmd racehelper`), which recreates the race in
++the game: when the first D3D12 device is created (the bridge's private device),
++it loads the game folder's `nvngx_dlss.dll` and holds it for 3 s, so the first
++carrier search sees two SR modules.
+ 
+ ## Problem
+ 
+@@ -406,8 +411,7 @@ handed over on the render thread.
+ | `tests/vulkan-fg-relay/scan/` | 20705 assertions of `ngx-module-scan.h` against the real Windows loader: non-candidates, near-miss names, every interface pairing, 20 unload/reload cycles, loader-lock contention, forwarded exports. |
+ | `tests/vulkan-fg-relay/lifetime/` | Real ReShade 6.8 + real Generic, two Vulkan instances: `race` reproduces the Generic unregistration with an older bridge, `stable` / `control` pass, `late-ref` must fail with exit 12. |
+ | `tests/vulkan-fg-relay/inject/` | A device created without the extension gets it through the hook; D3D12 Signal -> Vulkan timeline value, and D3D12 Signal -> `vkWaitSemaphores`, both pass. |
+-
+-| `tests/vulkan-fg-quality/run.cmd SUITE <new-dir>` | 2026-10-01 suites: `registry` (handle table, 188780 checks), `guides` (57), `hooks` (production NGX wrappers, 535), `colour` (sub-rectangle copies, 39), `recovery` (real D3D12 marker, 34), `compatibility` (26), `guard` (real Win32 windows, 28), `focus <sl.dlss_g.dll>` (512 guard combinations and the disk contract), `gpu` (real Vulkan compute scaling; needs `VULKAN_SDK`). 2026-10-02: `carrier` (46), and `racehelper`, which only builds the test-only in-game race add-on. |
++| `tests/vulkan-fg-quality/run.cmd SUITE <new-dir>` | 2026-10-01 suites: `registry` (handle table, 188780 checks), `guides` (57), `hooks` (production NGX wrappers, 535), `colour` (sub-rectangle copies, 39), `recovery` (real D3D12 marker, 34), `compatibility` (26), `guard` (real Win32 windows, 28), `focus <sl.dlss_g.dll>` (512 guard combinations and the disk contract), `gpu` (real Vulkan compute scaling; needs `VULKAN_SDK`). 2026-10-02: `carrier` (49), and `racehelper`, which only builds the test-only in-game race add-on. |
+ 
+ The relay's arm/copy/park/release chain has no offline host: it needs a real
+ DLSS-G evaluate. It was validated in the game (below).
+@@ -450,6 +454,14 @@ scenes are not guaranteed to be identical.
+   occasional release-submit failures (host fallback). `Import=0` keeps the CPU
+   gate as well; in the game it left roughly a quarter to a half of the frames
+   unarmed.
++* The focus gate (update item 5) depends on the Streamline build. Its contract
++  was found in `sl.dlss_g.dll` 2.14.1. The 2.10.3 build that Arknights: Endfield
++  ships has no matching call site (`run.cmd focus` reports `matches=0`), so the
++  bridge logs `[focus-fg] unavailable: unique Streamline focus-gate contract was
++  not found; native focus behaviour retained` and Streamline stops DLSS-G, and
++  NR with it, while the window is not focused. The composition guard (item 6)
++  only shows while FG is evaluated, so it stays hidden then. Both builds were
++  run in the game on 2026-10-02; NR worked with both while focused.
+ * One effect runtime / one swapchain.
+ * Generic's layer count and per-layer parameters are global, so the mirror
+   (Upscaled) and this feed (Present) cannot run different layer configurations.
+diff --git a/tests/vulkan-fg-quality/README.md b/tests/vulkan-fg-quality/README.md
+index 2888d06..e62cee2 100644
+--- a/tests/vulkan-fg-quality/README.md
++++ b/tests/vulkan-fg-quality/README.md
+@@ -18,7 +18,7 @@ started and nothing is installed.
+ | `colour` | FG input sub-rectangles (fullscreen below monitor resolution, non-zero origins) and the recorded production copies | MSVC | `colour regions: 39 checks, 0 failures, ...` |
+ | `recovery` | Automatic rebuild after lost completion, with a real D3D12 queue marker (Vulkan completion is simulated) | MSVC, a D3D12 GPU | `recovery/history: 34 checks, 0 failures` |
+ | `compatibility` | No hash whitelist: an unknown Generic build is tried, configuration problems pause and resume, NR off is not reported as incompatible | MSVC | `PASS compatibility: checks=26 failures=0` |
+-| `carrier` | SR carrier retry: production carrier search and MinHook install against fixture DLLs (no SR module, Ray Reconstruction only, two SR modules at once, one again), retry interval and limit, immediate refusal for a non-transient MinHook status, no relay arm while pending, session release clears the state | MSVC | `PASS carrier: checks=46 failures=0` |
++| `carrier` | SR carrier retry: production carrier search and MinHook install against fixture DLLs (no SR module, Ray Reconstruction only, two SR modules at once, one again), retry interval and limit, immediate refusal for a non-transient MinHook status, no relay arm while pending, frames reach the retry instead of the relay while pending, session release clears the state | MSVC | `PASS carrier: checks=49 failures=0` |
+ | `racehelper` | Builds only: `carrier-race-helper.addon64`, a test-only ReShade add-on that recreates the SR carrier race in a game (see its source header). Remove it from the game folder after the test | MSVC | `built carrier-race-helper.addon64 ...` |
+ | `guard` | Composition guard with real Win32 windows: styles, alpha 1/255, capture exclusion, foreground unchanged, click-through, follows the monitor, hides on FG stop / minimise / NR off / `HoldComposition=0` | MSVC, a desktop session | `guard: 28 checks, 0 failures` |
+ | `focus` | Focus gate: 512 guard combinations, exact return-address scope, explicit Off/free pass-through, and the instruction contract found in the given `sl.dlss_g.dll` (read from disk, not loaded) | MSVC, the game's `sl.dlss_g.dll` path as ARGUMENT | `focus FG tests PASS` |

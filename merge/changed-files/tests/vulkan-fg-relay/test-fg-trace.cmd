@@ -20,7 +20,7 @@ mkdir "%OUT%\build"
 pushd "%OUT%\build"
 ml64 /nologo /c /Fo present-nr-witness.obj "%SRC%\present-nr-witness.asm" > "%OUT%\build.log" 2>&1
 if errorlevel 1 goto failed
-cl /nologo /W4 /WX /O2 /MT /EHsc /std:c++17 /I"%SRC%\reshade" /I"%SRC%\minhook\include" /I"%SRC%\minhook\src" ^
+cl /nologo /W4 /WX /O2 /MT /EHsc /std:c++17 /utf-8 /I"%SRC%\reshade" /I"%SRC%\minhook\include" /I"%SRC%\minhook\src" ^
   "%~dp0test-fg-trace.cpp" "%SRC%\minhook.c" present-nr-witness.obj ^
   /Fe:test-fg-trace.exe /link user32.lib advapi32.lib bcrypt.lib >> "%OUT%\build.log" 2>&1
 if errorlevel 1 goto failed

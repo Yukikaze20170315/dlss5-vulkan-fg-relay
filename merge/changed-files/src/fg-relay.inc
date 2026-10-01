@@ -116,6 +116,8 @@ struct FgrArm
     uint64_t hud, back, depth, mv;
     uint64_t copy_val, nr_val;
     uint32_t w, h, vk_fmt;
+    uint32_t hud_x, hud_y, back_x, back_y;
+    FgGuideContract guides;
     unsigned slot;
     LONG64   tick;
 };
@@ -131,6 +133,9 @@ struct FgrState
 {
     CRITICAL_SECTION cs;
     bool     cs_ready, tried, ready, import_ok, fell_back;
+    bool     recovery_pending, recovery_marker_submitted;
+    ID3D12Fence *recovery_marker;
+    volatile LONG releasing, arm_active;
     const char *why;
 
     // True while a batch submitted from here is the only proof its fence is
@@ -146,10 +151,10 @@ struct FgrState
     // through the map below -- learned at the evaluate, where both the index and
     // the handle are known.
     bool     have_last;
-    uint64_t last_hud, last_depth, last_mv;
+    uint64_t last_hud;
     uint32_t last_w, last_h, last_fmt;
-    unsigned last_depth_inverted;
-    float    last_mv_scale_x, last_mv_scale_y;
+    uint32_t last_hud_x, last_hud_y, last_back_x, last_back_y;
+    FgGuideContract last_guides;
 
     uint64_t idx_map[8];
     bool     have_present;
@@ -266,30 +271,25 @@ static void FgRelayInit()
 // command buffer submitted to a queue whose family its pool does not belong to is
 // undefined behaviour, so the relay refuses rather than guesses when it has not
 // seen the queue.
-struct FgrQueueId { void *queue; uint32_t family; };
-static FgrQueueId g_fgr_queue_ids[8];
-static unsigned g_fgr_queue_id_count;
-static volatile LONG g_fgr_queue_lock;
+struct FgrQueueId { void *device; uint32_t family; };
+static std::unordered_map<void *, FgrQueueId> g_fgr_queue_ids;
+static std::mutex g_fgr_queue_lock;
 
-static void FgRelayNoteQueue(void *queue, uint32_t family)
+static void FgRelayNoteQueue(void *device, void *queue, uint32_t family)
 {
-    if (queue == nullptr) return;
-    while (InterlockedCompareExchange(&g_fgr_queue_lock, 1, 0) != 0) Sleep(0);
-    bool known = false;
-    for (unsigned i = 0; i < g_fgr_queue_id_count; ++i)
-        if (g_fgr_queue_ids[i].queue == queue) { known = true; break; }
-    if (!known && g_fgr_queue_id_count < _countof(g_fgr_queue_ids)) {
-        g_fgr_queue_ids[g_fgr_queue_id_count].queue = queue;
-        g_fgr_queue_ids[g_fgr_queue_id_count].family = family;
-        ++g_fgr_queue_id_count;
-    }
-    InterlockedExchange(&g_fgr_queue_lock, 0);
+    if (device == nullptr || queue == nullptr || family == UINT_MAX) return;
+    std::lock_guard<std::mutex> lock(g_fgr_queue_lock);
+    // A new device may reuse an old queue address with a different family.
+    g_fgr_queue_ids[queue] = {device, family};
 }
 
 static bool FgRelayQueueFamily(void *queue, uint32_t *family)
 {
-    for (unsigned i = 0; i < g_fgr_queue_id_count; ++i)
-        if (g_fgr_queue_ids[i].queue == queue) { *family = g_fgr_queue_ids[i].family; return true; }
+    std::lock_guard<std::mutex> lock(g_fgr_queue_lock);
+    const auto found = g_fgr_queue_ids.find(queue);
+    if (found != g_fgr_queue_ids.end() && found->second.device == g_svk.dev) {
+        *family = found->second.family; return true;
+    }
     return false;
 }
 
@@ -298,8 +298,9 @@ static bool FgRelayFallback(const char *why)
     if (!g_fgr.fell_back) {
         g_fgr.fell_back = true;
         g_fgr.why = why;
-        Log("[fg-relay] %s. The serial feed at the frame-generation input is what runs, so the "
-            "picture keeps its NR and the present is unaffected.", why);
+        PresentCompatibilityIssue(PC_PROCESSING_FAILED, why);
+        Log("[fg-relay] %s. The GPU relay is unavailable; the serial FG-input feed may run. "
+            "This is a degraded path and does not guarantee the same frame pacing.", why);
     }
     return false;
 }
@@ -357,22 +358,40 @@ static const uint32_t kFgrErrorInitFailed = 0xFFFFFFFDu;   // VK_ERROR_INITIALIZ
 static const uint32_t kFgrMaxCallerExtensions = 256;
 
 static Hook g_fgr_create_device_hook;
+static Hook g_fgr_layer_gipa_hook;
+static std::unordered_map<void *, void *> g_fgr_instances_by_dispatch;
+static std::mutex g_fgr_instance_lock;
+
+static void *FgrLayerGipaDetour(void *instance, const char *name)
+{
+    if (instance != nullptr) {
+        // Vulkan layer dispatch keys pair an instance with its physical devices.
+        // The loader asks the layer for vkCreateDevice again when building each
+        // device chain, so this also captures instances made before our hook.
+        std::lock_guard<std::mutex> lock(g_fgr_instance_lock);
+        g_fgr_instances_by_dispatch[*static_cast<void **>(instance)] = instance;
+    }
+    auto next = reinterpret_cast<PFN_FgrLayerGipa>(g_fgr_layer_gipa_hook.original);
+    return next != nullptr ? next(instance, name) : nullptr;
+}
+
+static void *FgrInstanceForPhysical(void *physical)
+{
+    if (physical == nullptr) return nullptr;
+    std::lock_guard<std::mutex> lock(g_fgr_instance_lock);
+    const auto found = g_fgr_instances_by_dispatch.find(*static_cast<void **>(physical));
+    return found != g_fgr_instances_by_dispatch.end() ? found->second : nullptr;
+}
 static volatile LONG g_fgr_inject_state;    // 0 none, 1 installing, 2 hooked, -1 refused
 static const char *volatile g_fgr_inject_note = "the injection path has not run";
-static void *g_fgr_injected_devices[8];
-static volatile LONG g_fgr_injected_count;
-static volatile LONG g_fgr_injected_lock;
+static std::unordered_map<void *, bool> g_fgr_injected_devices;
+static std::mutex g_fgr_injected_lock;
 
 static void FgrRememberInjectedDevice(void *device)
 {
     if (device == nullptr) return;
-    while (InterlockedCompareExchange(&g_fgr_injected_lock, 1, 0) != 0) Sleep(0);
-    bool known = false;
-    for (LONG i = 0; i < g_fgr_injected_count; ++i)
-        if (g_fgr_injected_devices[i] == device) { known = true; break; }
-    if (!known && g_fgr_injected_count < static_cast<LONG>(_countof(g_fgr_injected_devices)))
-        g_fgr_injected_devices[g_fgr_injected_count++] = device;
-    InterlockedExchange(&g_fgr_injected_lock, 0);
+    std::lock_guard<std::mutex> lock(g_fgr_injected_lock);
+    g_fgr_injected_devices[device] = true;
 }
 
 // A device whose create was retried without the extension must not stay in the
@@ -380,25 +399,24 @@ static void FgrRememberInjectedDevice(void *device)
 static void FgrForgetInjectedDevice(void *device)
 {
     if (device == nullptr) return;
-    while (InterlockedCompareExchange(&g_fgr_injected_lock, 1, 0) != 0) Sleep(0);
-    for (LONG i = 0; i < g_fgr_injected_count; ++i)
-        if (g_fgr_injected_devices[i] == device)
-        {
-            g_fgr_injected_devices[i] = g_fgr_injected_devices[--g_fgr_injected_count];
-            break;
-        }
-    InterlockedExchange(&g_fgr_injected_lock, 0);
+    std::lock_guard<std::mutex> lock(g_fgr_injected_lock);
+    g_fgr_injected_devices.erase(device);
 }
 
 static bool FgrDeviceWasInjected(void *device)
 {
     if (device == nullptr) return false;
-    bool found = false;
-    while (InterlockedCompareExchange(&g_fgr_injected_lock, 1, 0) != 0) Sleep(0);
-    for (LONG i = 0; i < g_fgr_injected_count; ++i)
-        if (g_fgr_injected_devices[i] == device) { found = true; break; }
-    InterlockedExchange(&g_fgr_injected_lock, 0);
-    return found;
+    std::lock_guard<std::mutex> lock(g_fgr_injected_lock);
+    return g_fgr_injected_devices.find(device) != g_fgr_injected_devices.end();
+}
+
+static void FgRelayForgetDevice(void *device)
+{
+    FgrForgetInjectedDevice(device);
+    std::lock_guard<std::mutex> lock(g_fgr_queue_lock);
+    for (auto i = g_fgr_queue_ids.begin(); i != g_fgr_queue_ids.end(); )
+        if (i->second.device == device) i = g_fgr_queue_ids.erase(i);
+        else ++i;
 }
 
 static const char *FgrInjectionNote()
@@ -411,6 +429,8 @@ static uint32_t FgrCreateDeviceDetour(void *physical, const void *info, const vo
 {
     auto next = reinterpret_cast<PFN_FgrLayerCreateDevice>(g_fgr_create_device_hook.original);
     if (next == nullptr) return kFgrErrorInitFailed;
+    void *const instance = FgrInstanceForPhysical(physical);
+    auto layer_gipa = reinterpret_cast<PFN_FgGuideGipa>(g_fgr_layer_gipa_hook.original);
 
     static volatile LONG logged_accept, logged_retry, logged_present;
 
@@ -452,8 +472,10 @@ static uint32_t FgrCreateDeviceDetour(void *physical, const void *info, const vo
         // what it would have gotten without this add-on -- and the device is not
         // recorded, so the relay stays on its host paths for it.
         const uint32_t retry = next(physical, info, allocator, out);
-        if (retry == kSVkSuccess && out != nullptr && *out != nullptr)
+        if (retry == kSVkSuccess && out != nullptr && *out != nullptr) {
             FgrForgetInjectedDevice(*out);
+            FgGuideNoteDevice(instance, physical, *out, layer_gipa);
+        }
         g_fgr_inject_note = "device creation refused VK_KHR_external_semaphore_win32 and "
                             "went through again with the caller's own list";
         if (InterlockedCompareExchange(&logged_retry, 1, 0) == 0)
@@ -462,6 +484,7 @@ static uint32_t FgrCreateDeviceDetour(void *physical, const void *info, const vo
                 "The import stays off for this device.", result, retry);
         return retry;
     }
+    if (result == kSVkSuccess && out != nullptr && *out != nullptr) FgGuideNoteDevice(instance, physical, *out, layer_gipa);
     if (result == kSVkSuccess && out != nullptr && *out != nullptr && (added || present))
     {
         FgrRememberInjectedDevice(*out);
@@ -493,6 +516,9 @@ static void FgRelayInstallDeviceHook()
         // ReShade version, to see the game's device creation.
         auto gipa = reinterpret_cast<PFN_FgrLayerGipa>(GetProcAddress(layer, "vkGetInstanceProcAddr"));
         if (gipa != nullptr) create = gipa(nullptr, "vkCreateDevice");
+        if (gipa != nullptr && !HookInstall(g_fgr_layer_gipa_hook, reinterpret_cast<void *>(gipa),
+                                           reinterpret_cast<void *>(&FgrLayerGipaDetour)))
+            Log("[fg-guides] the layer instance-context hook is unavailable; scaled guides require a captured capability query.");
         if (create == nullptr) create = reinterpret_cast<void *>(GetProcAddress(layer, "vkCreateDevice"));
     }
     if (create == nullptr)
@@ -780,10 +806,10 @@ static void FgRelayRecordCopy(SVkCommandBuffer cb, const FgrArm &a)
     for (int i = 0; i < SLOT_COUNT; ++i) SynthVkBarrier(cb, g_svk.img[i], first, kSVkLayoutGeneral);
     SynthVkBarrier(cb, g_svk.img[kOutB], first, kSVkLayoutGeneral);
     g_svk.laid_out = true;
-    SynthVkCopyImage(cb, a.hud,   kSVkLayoutTransferSrc, g_svk.img[SLOT_COLOR], kSVkLayoutGeneral, a.w, a.h);
-    SynthVkCopyImage(cb, a.back,  kSVkLayoutTransferSrc, g_svk.img[kOutB],      kSVkLayoutGeneral, a.w, a.h);
-    SynthVkCopyImage(cb, a.mv,    kSVkLayoutTransferSrc, g_svk.img[SLOT_MV],    kSVkLayoutGeneral, a.w, a.h);
-    SynthVkCopyImage(cb, a.depth, kSVkLayoutTransferSrc, g_svk.img[SLOT_DEPTH], kSVkLayoutGeneral, a.w, a.h);
+    FgColorCopy(cb, a.hud, kSVkLayoutTransferSrc, g_svk.img[SLOT_COLOR], kSVkLayoutGeneral, a.hud_x, a.hud_y, 0, 0, a.w, a.h);
+    FgColorCopy(cb, a.back, kSVkLayoutTransferSrc, g_svk.img[kOutB], kSVkLayoutGeneral, a.back_x, a.back_y, 0, 0, a.w, a.h);
+    FgGuideRecord(cb, a.guides.mv, g_svk.img[SLOT_MV], a.w, a.h);
+    FgGuideRecord(cb, a.guides.depth, g_svk.img[SLOT_DEPTH], a.w, a.h);
     SynthVkBarrier(cb, a.hud,   kSVkLayoutTransferSrc, kSVkLayoutGeneral);
     SynthVkBarrier(cb, a.back,  kSVkLayoutTransferSrc, kSVkLayoutGeneral);
     SynthVkBarrier(cb, a.depth, kSVkLayoutTransferSrc, kSVkLayoutGeneral);
@@ -802,19 +828,33 @@ static void FgRelayRecordCopy(SVkCommandBuffer cb, const FgrArm &a)
 // command buffer parked on an event nothing sets. The contract the worker reads
 // is also written here, while the worker is provably idle.
 static bool FgRelayArmCopy(void *queue, const char *who, const VkmRes &hud, const VkmRes &back,
-                           const VkmRes &depth, const VkmRes &mv,
-                           unsigned depth_inverted, float mv_scale_x, float mv_scale_y)
+                           const FgGuideContract &guides)
 {
     FgrState &f = g_fgr;
+    struct ArmScope {
+        volatile LONG *count;
+        explicit ArmScope(volatile LONG *p) : count(p) { InterlockedIncrement(count); }
+        ~ArmScope() { InterlockedDecrement(count); }
+    } arm_scope(&f.arm_active);
+    if (InterlockedCompareExchange(&f.releasing, 0, 0) != 0) { FgrCount(f.arm_stopping); return false; }
+    const VkmRes &depth = guides.depth.resource, &mv = guides.mv.resource;
     if (!f.ready || f.fell_back || !f.cs_ready) { FgrCount(f.arm_guard); return false; }
     if (!g_present_adapter.run_nr || g_present_adapter.remaining == 0) { FgrCount(f.arm_noreq); return false; }
     if (g_present_adapter.refused || g_fg_input.refused || g_vkm.refused) { FgrCount(f.arm_refused); return false; }
-    if (g_vkm.stopping) { FgrCount(f.arm_stopping); return false; }
+    if (g_fg_input.carrier_pending) { FgrCount(f.arm_guard); return false; }
+    if (g_vkm.stopping || g_fg_input.want_release) { FgrCount(f.arm_stopping); return false; }
     if (g_svk.dev == nullptr || hud.image == 0 || back.image == 0 || depth.image == 0 || mv.image == 0)
     { FgrCount(f.arm_badres); return false; }
-    if (hud.w != back.w || hud.h != back.h || depth.w != back.w || depth.h != back.h ||
-        mv.w != back.w || mv.h != back.h || back.w == 0 || back.h == 0)
+    if (hud.w != back.w || hud.h != back.h || hud.fmt != back.fmt ||
+        FgInputShapeChanged(back, guides) || back.w == 0 || back.h == 0)
     { FgrCount(f.arm_badsize); return false; }
+    uint32_t family = UINT_MAX;
+    if (!FgRelayQueueFamily(queue, &family) || !FgGuidePrepareTransport(guides, family)) {
+        FgrCount(f.arm_badres);
+        if (g_fgc.growth_pending) FgInputRequestRebuild();
+        FgGuidePause("GPU nearest compute is unavailable for this queue, dimensions, or allocation");
+        return false;
+    }
     FgrCount(f.attempts);
 
     // Each slot's copy batch is re-recorded when the slot comes round again, so
@@ -869,6 +909,8 @@ static bool FgRelayArmCopy(void *queue, const char *who, const VkmRes &hud, cons
             prev_nr = f.nr_val;
             a.hud = hud.image; a.back = back.image; a.depth = depth.image; a.mv = mv.image;
             a.w = back.w; a.h = back.h; a.vk_fmt = back.fmt;
+            a.hud_x = hud.fg_x; a.hud_y = hud.fg_y; a.back_x = back.fg_x; a.back_y = back.fg_y;
+            a.guides = guides;
             a.copy_val = f.copy_val + 1;
             a.nr_val   = f.nr_val + 1;
             g_svk.EvReset(g_svk.dev, f.ev_out[slot]);
@@ -888,14 +930,14 @@ static bool FgRelayArmCopy(void *queue, const char *who, const VkmRes &hud, cons
     FgrPool *pool = FgRelayPoolFor(queue, false);
     if (pool == nullptr || pool->cb_copy[a.slot] == nullptr) { drop_slot(); return false; }
     const SVkCommandBuffer cb = pool->cb_copy[a.slot];
-    if (f.ResetFences(g_svk.dev, 1, &f.copy_fence[a.slot]) != kSVkSuccess) { FgrCount(f.drop_fence); drop_slot(); return false; }
-    if (f.ResetCommandBuffer(cb, 0) != kSVkSuccess) { FgrCount(f.drop_resetcb); drop_slot(); return false; }
+    if (f.ResetFences(g_svk.dev, 1, &f.copy_fence[a.slot]) != kSVkSuccess) { FgrCount(f.drop_fence); drop_slot(); return FgRelayFallback("resetting a copy fence failed"); }
+    if (f.ResetCommandBuffer(cb, 0) != kSVkSuccess) { FgrCount(f.drop_resetcb); drop_slot(); return FgRelayFallback("resetting a copy command buffer failed"); }
     FgrCommandBufferBeginInfo bi = {};
     bi.sType = kFgrStCommandBufferBegin;
     bi.flags = kFgrCbOneTimeSubmit;
-    if (f.BeginCommandBuffer(cb, &bi) != kSVkSuccess) { FgrCount(f.drop_begin); drop_slot(); return false; }
+    if (f.BeginCommandBuffer(cb, &bi) != kSVkSuccess) { FgrCount(f.drop_begin); drop_slot(); return FgRelayFallback("beginning a copy command buffer failed"); }
     FgRelayRecordCopy(cb, a);
-    if (f.EndCommandBuffer(cb) != kSVkSuccess) { FgrCount(f.drop_end); drop_slot(); return false; }
+    if (f.EndCommandBuffer(cb) != kSVkSuccess) { FgrCount(f.drop_end); drop_slot(); return FgRelayFallback("ending a copy command buffer failed"); }
 
     // The worker queued the Signal for prev_nr before it went idle (checked
     // above), so this wait always names a signal already in the D3D12 queue.
@@ -924,7 +966,7 @@ static bool FgRelayArmCopy(void *queue, const char *who, const VkmRes &hud, cons
         FgrCount(f.copies_failed);
         FgrCount(f.drop_submit);
         drop_slot();
-        return false;
+        return FgRelayFallback("submitting the Vulkan guide/copy batch failed");
     }
     f.copy_in_flight[a.slot] = true;
     InterlockedExchange64(&f.copy_submit_qpc[a.slot], FgrQpcNow());
@@ -934,9 +976,7 @@ static bool FgRelayArmCopy(void *queue, const char *who, const VkmRes &hud, cons
     // the contract while the relay owns the frames, so this is the only writer.
     SynthBuild(&g_vkm.sp, a.w, a.h, MapVkColor(a.vk_fmt), reshade::api::resource{0}, reshade::api::resource{0},
                reshade::api::resource{0}, 0, -1);
-    g_vkm.sp.Set("DLSS.Feature.Create.Flags", depth_inverted != 0 ? 0x08u : 0u);
-    g_vkm.sp.Set("MV.Scale.X", mv_scale_x);
-    g_vkm.sp.Set("MV.Scale.Y", mv_scale_y);
+    FgGuideApply(&g_vkm.sp, guides);
 
     FgrLock();
     f.copy_val = a.copy_val;
@@ -1276,12 +1316,11 @@ static void FgRelayOnPresent(void *queue, const void *info_raw)
     const uint64_t back = f.present_idx < _countof(f.idx_map) ? f.idx_map[f.present_idx] : 0;
     const bool have_last = f.have_last;
     const DWORD age = static_cast<DWORD>(GetTickCount()) - static_cast<DWORD>(f.last_eval_tick);
-    VkmRes hud = {}, dep = {}, mvv = {};
+    VkmRes hud = {};
     hud.image = f.last_hud; hud.w = f.last_w; hud.h = f.last_h; hud.fmt = f.last_fmt;
-    dep.image = f.last_depth; dep.w = f.last_w; dep.h = f.last_h;
-    mvv.image = f.last_mv;   mvv.w = f.last_w;  mvv.h = f.last_h;
-    const unsigned depth_inverted = f.last_depth_inverted;
-    const float msx = f.last_mv_scale_x, msy = f.last_mv_scale_y;
+    hud.fg_x = f.last_hud_x; hud.fg_y = f.last_hud_y;
+    const unsigned bx = f.last_back_x, by = f.last_back_y;
+    const FgGuideContract guides = f.last_guides;
     FgrUnlock();
 
     // Only while the game is actually evaluating frames. During menus and loads
@@ -1290,7 +1329,8 @@ static void FgRelayOnPresent(void *queue, const void *info_raw)
     if (!have_last || age > 400) { FgrCount(f.p_stale); return; }
     if (back == 0) { FgrCount(f.unarmed); FgrCount(f.p_unlearned); return; }      // this index is not learned yet
     VkmRes bk = {}; bk.image = back; bk.w = hud.w; bk.h = hud.h; bk.fmt = hud.fmt;
-    FgRelayArmCopy(queue, "present", hud, bk, dep, mvv, depth_inverted, msx, msy);
+    bk.fg_x = bx; bk.fg_y = by;
+    FgRelayArmCopy(queue, "present", hud, bk, guides);
 }
 
 // ---------------------------------------------------------------------------
@@ -1397,42 +1437,57 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
         } else nr_stalled = static_cast<DWORD>(now - f.nr_progress_tick) > 1500;
     }
     if (nr_stalled) {
+        Log("[fg-recovery] stall snapshot: queue=%p nr-done=%llu nr-target=%llu copy-done=%llu copy-target=%llu "
+            "arm=%ld worker=%ld eval=%ld worker-idle=%u.", f.cmd_queue,
+            f.nr_fence12 != nullptr ? f.nr_fence12->GetCompletedValue() : 0, f.last_release_nr,
+            f.copy_fence12 != nullptr ? f.copy_fence12->GetCompletedValue() : 0, f.copy_val,
+            f.arm_seq, f.worker_seq, f.eval_seq,
+            g_vkm.idle == nullptr || WaitForSingleObject(g_vkm.idle, 0) == WAIT_OBJECT_0 ? 1u : 0u);
         FgrLock();
         for (unsigned i = 0; i < kFgrSlots; ++i)
             if (f.ev_out[i] != 0 && g_svk.EvSet != nullptr) g_svk.EvSet(g_svk.dev, f.ev_out[i]);
         FgrUnlock();
         FgRelayReleaseNrWaits();
         FgrCount(f.eval_watchdog);
+        // This is loss of completion proof, not a transient input shape. Do not
+        // resume the serial writer over resources the private GPU may still use.
         FgRelayFallback("a relay frame's release did not arrive within 1.5 s");
+        FgInputRefuse("the relay GPU completion fence stopped advancing; NR is paused and in-flight resources remain protected");
+        f.recovery_pending = true;
+        g_fg_input.want_release = true;
+        Log("[fg-recovery] automatic retirement requested; GPU completion must be proven before rebuilding.");
         return -1;
     }
 
     const char *why = nullptr;
-    VkmRes hud = {}, back = {}, dep = {}, mvv = {};
-    const bool have = VkmGetRes(p, "DLSSG.HUDLess", &hud, &why) &&
-                      VkmGetRes(p, "DLSSG.Backbuffer", &back, &why) &&
-                      VkmGetRes(p, "DLSSG.Depth", &dep, &why) &&
-                      VkmGetRes(p, "DLSSG.MVecs", &mvv, &why);
-    unsigned depth_inverted = 0;
-    float mv_scale_x = 1.0f, mv_scale_y = 1.0f;
+    VkmRes hud = {}, back = {};
+    FgGuideContract guides = {};
+    const bool have = FgInputReadColor(p, &hud, &back, &why) && FgGuideRead(p, back, &guides, &why);
+    const VkmRes &dep = guides.depth.resource, &mvv = guides.mv.resource;
     if (have) {
-        FgInputReadU(p, "DLSSG.DepthInverted", &depth_inverted);
-        p->Get("DLSSG.MvecScaleX", &mv_scale_x);
-        p->Get("DLSSG.MvecScaleY", &mv_scale_y);
+        // FG can pause while the window is minimized without destroying its
+        // feature. A resumed frame must not inherit a history from seconds ago.
+        if (f.last_eval_tick != 0 && static_cast<DWORD>(GetTickCount() - f.last_eval_tick) > 250)
+            FgGuideRequestReset();
+        if (FgInputShapeChanged(back, guides)) FgInputRequestRebuild();
         // Learned on every evaluate, armed or not: the present hook needs the
         // handles and the image-index map before it can arm the first frame.
         FgrLock();
         f.have_last = true;
-        f.last_hud = hud.image; f.last_depth = dep.image; f.last_mv = mvv.image;
+        f.last_hud = hud.image;
+        f.last_hud_x = hud.fg_x; f.last_hud_y = hud.fg_y;
+        f.last_back_x = back.fg_x; f.last_back_y = back.fg_y;
         f.last_w = back.w; f.last_h = back.h; f.last_fmt = back.fmt;
-        f.last_depth_inverted = depth_inverted;
-        f.last_mv_scale_x = mv_scale_x; f.last_mv_scale_y = mv_scale_y;
+        f.last_guides = guides;
         f.last_eval_tick = static_cast<LONG>(GetTickCount());
         if (f.have_present && f.present_idx < _countof(f.idx_map)) {
             if (f.idx_map[f.present_idx] != 0 && f.idx_map[f.present_idx] != back.image) FgrCount(f.idx_conflicts);
             f.idx_map[f.present_idx] = back.image;
         }
         FgrUnlock();
+    } else {
+        FgGuidePause(why != nullptr ? why : "FG inputs unavailable");
+        FgrLock(); f.have_last = false; FgrUnlock();
     }
 
     LONG arm_seq = InterlockedCompareExchange(&f.arm_seq, 0, 0);
@@ -1464,7 +1519,7 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
             // Pipeline=2: the copy happens here, on the queue this thread owns, and
             // the frame is armed with the handles the evaluate itself carries.
             FgrCount(f.eval_inplace);
-            if (FgRelayArmCopy(f.cmd_queue, "evaluate", hud, back, dep, mvv, depth_inverted, mv_scale_x, mv_scale_y)) {
+            if (FgRelayArmCopy(f.cmd_queue, "evaluate", hud, back, guides)) {
                 FgrCount(f.eval_inplace_ok);
                 arm_seq = InterlockedCompareExchange(&f.arm_seq, 0, 0);
                 FgrLock();
@@ -1490,8 +1545,8 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
         // Once the relay is open it owns every frame: the serial feed writes the
         // same contract and staging images the worker may be using for an armed
         // frame, so it must not run alongside. A frame the relay could not arm
-        // is frame generation's own image for one group, and is counted. A relay
-        // that keeps failing to arm stands down so the serial feed's NR returns.
+        // is frame generation's own image for one group, and is counted. Missing
+        // or transitioning inputs never turn this into a permanent serial path.
         note_group(false);
         const LONG unarmed = FgrCount(f.unarmed);
         FgrCount(f.eval_unarmed);
@@ -1499,8 +1554,8 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
             Log("[fg-relay] frame not armed (unarmed=%u skipped=%u busy=%u): FG runs on the game's own image this group.",
                 static_cast<unsigned>(unarmed), static_cast<unsigned>(FgrCountRead(f.skipped)),
                 static_cast<unsigned>(FgrCountRead(f.busy)));
-        if (++f.unarmed_streak >= 120)
-            FgRelayFallback("120 consecutive frames could not be armed");
+        ++f.unarmed_streak;
+        FgGuideRequestReset();
         return -1;
     }
     f.unarmed_streak = 0;
@@ -1510,16 +1565,18 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
     const unsigned slot = a.slot;
     auto drop_slot = [&]() { FgrLock(); f.slot_used[slot] = false; FgrUnlock(); };
 
-    if (!have || hud.image != a.hud || back.image != a.back || dep.image != a.depth ||
-        mvv.image != a.mv || back.w != a.w || back.h != a.h || back.fmt != a.vk_fmt) {
+    if (!have || g_fg_input.want_release || hud.image != a.hud || back.image != a.back || dep.image != a.depth ||
+        mvv.image != a.mv || back.w != a.w || back.h != a.h || back.fmt != a.vk_fmt ||
+        hud.fg_x != a.hud_x || hud.fg_y != a.hud_y || back.fg_x != a.back_x || back.fg_y != a.back_y ||
+        !FgGuideSameContract(a.guides, guides)) {
         note_group(false);
         const LONG mismatched = FgrCount(f.mismatched);
         drop_slot();
         if (mismatched <= 3)
             Log("[fg-relay] armed copy does not match this evaluate: hud %llx/%llx back %llx/%llx depth %llx/%llx mv %llx/%llx.",
                 a.hud, hud.image, a.back, back.image, a.depth, dep.image, a.mv, mvv.image);
-        if (++f.mismatch_streak >= 8)
-            FgRelayFallback("the armed copy's inputs and the evaluate's inputs kept disagreeing");
+        ++f.mismatch_streak;
+        FgGuideRequestReset();
         return -1;
     }
     f.mismatch_streak = 0;
@@ -1558,8 +1615,8 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
         SynthVkBarrier(cb, g_svk.img[kOutB], kSVkLayoutGeneral, kSVkLayoutTransferSrc);
         SynthVkBarrier(cb, hud.image, kSVkLayoutGeneral, kSVkLayoutTransferDst);
         SynthVkBarrier(cb, back.image, kSVkLayoutGeneral, kSVkLayoutTransferDst);
-        SynthVkCopyImage(cb, g_svk.img[SLOT_OUTPUT], kSVkLayoutTransferSrc, hud.image, kSVkLayoutTransferDst, back.w, back.h);
-        SynthVkCopyImage(cb, g_svk.img[kOutB], kSVkLayoutTransferSrc, back.image, kSVkLayoutTransferDst, back.w, back.h);
+        FgColorCopy(cb, g_svk.img[SLOT_OUTPUT], kSVkLayoutTransferSrc, hud.image, kSVkLayoutTransferDst, 0, 0, hud.fg_x, hud.fg_y, back.w, back.h);
+        FgColorCopy(cb, g_svk.img[kOutB], kSVkLayoutTransferSrc, back.image, kSVkLayoutTransferDst, 0, 0, back.fg_x, back.fg_y, back.w, back.h);
         SynthVkBarrier(cb, hud.image, kSVkLayoutTransferDst, kSVkLayoutGeneral);
         SynthVkBarrier(cb, back.image, kSVkLayoutTransferDst, kSVkLayoutGeneral);
         SynthVkBarrier(cb, g_svk.img[SLOT_OUTPUT], kSVkLayoutTransferSrc, kSVkLayoutGeneral);
@@ -1671,15 +1728,17 @@ static bool FgRelayWorker()
         if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
         g_present_nr_scope = false;
         nr_entries = g_present_nr_entries; sr_entries = g_present_sr_entries; sr_copies = g_present_sr_copies;
+        PresentCompatibilityFrame(ok, nr_entries, sr_entries, sr_copies);
         if (ok && (sr_entries != 1 || sr_copies != 1)) {
             Log("[fg-relay] carrier contract mismatch: sr_entries=%u sr_copies=%u; frame not written.", sr_entries, sr_copies);
             ok = false;
         }
-        if (ok && nr_entries == 0) { nr_absent = true; ++g_fg_input.skipped_nr; FgrCount(f.w_nr_absent); }
+        if (ok && nr_entries == 0) { nr_absent = true; ++g_fg_input.skipped_nr; FgrCount(f.w_nr_absent); FgGuideRequestReset(); }
         if (ok && !nr_absent) ok = FgCompositeRun(g_s12.queue, kVkmEvaluateMs, false);
     } else ok = PresentAdapterCopy12();
     ok = ok && g_s12.dev->GetDeviceRemovedReason() == S_OK;
     if (!ok) {
+        FgGuideRequestReset();
         // Keep the carriers equal to their inputs so the copy back already
         // recorded in the game's command buffer is a no-op.
         FgIdentityCopy(kVkmEvaluateMs);
@@ -1726,13 +1785,116 @@ static bool FgRelayWorker()
 // armed or still being consumed owns images and a parked command buffer, so the
 // release has to refuse rather than race it. Same answer the serial feed gives
 // when its own park has not cleared.
+static bool FgRelayPrepareRelease()
+{
+    FgrState &f = g_fgr;
+    if (!f.cs_ready) return true;
+    InterlockedExchange(&f.releasing, 1);
+    if (InterlockedCompareExchange(&f.arm_active, 0, 0) != 0) return false;
+    FgrLock();
+    if (f.arm_seq != f.eval_seq) {
+        // The arm has a submitted copy and may have queued NR, but no evaluate
+        // has recorded a park. Its worker still consumes/signals normally.
+        const unsigned slot = static_cast<unsigned>(f.pending_slot);
+        if (slot < kFgrSlots) f.slot_used[slot] = false;
+        f.eval_seq = f.arm_seq;
+    }
+    FgrUnlock();
+    return true;
+}
+
+// Runtime teardown may stop the worker before it consumes an armed copy. Stop
+// the producers first, so its fence value cannot change after the worker joins.
+static bool FgRelayStopArmingForShutdown()
+{
+    FgrState &f = g_fgr;
+    if (!f.cs_ready) return true;
+    InterlockedExchange(&f.releasing, 1);
+    const ULONGLONG deadline = GetTickCount64() + 2000;
+    while (InterlockedCompareExchange(&f.arm_active, 0, 0) != 0) {
+        if (GetTickCount64() >= deadline) {
+            Log("[fg-relay] shutdown could not retire an active copy recorder; shared resources must remain alive.");
+            return false;
+        }
+        Sleep(1);
+    }
+    // ReShade can destroy several startup runtimes before the bridge has ever
+    // opened a Vulkan transport. That teardown returns early on a null device
+    // and therefore cannot run OnSessionRelease. Do not leave its arm gate
+    // latched over a future first session. Partial creates and real objects
+    // keep the gate until the normal, proven-idle resource release.
+    FgrLock();
+    bool empty = !f.ready && !f.tried && f.dev == nullptr && f.npools == 0 &&
+        f.copy_sem == 0 && f.nr_sem == 0 && f.copy_fence12 == nullptr && f.nr_fence12 == nullptr &&
+        f.copy_sem_handle == nullptr && f.nr_fence_handle == nullptr && f.nr_ev == nullptr &&
+        f.arm_seq == 0 && f.worker_seq == 0 && f.eval_seq == 0;
+    for (unsigned i = 0; empty && i < kFgrSlots; ++i)
+        empty = f.copy_fence[i] == 0 && f.release_fence[i] == 0 && f.ev_out[i] == 0 && f.ev_mark[i] == 0 &&
+            !f.copy_in_flight[i] && !f.release_in_flight[i] && !f.slot_used[i];
+    if (empty) InterlockedExchange(&f.releasing, 0);
+    FgrUnlock();
+    if (empty) Log("[fg-relay] shutdown has no relay session or GPU objects; the next runtime can open its first relay.");
+    return true;
+}
+
+// The worker has joined before this is called. A queued NR may still execute on
+// D3D12; drain it before host-signalling a value for an arm the stopped worker
+// never consumed. Otherwise releasing the game can race a live composite.
+static bool FgRelayFinishWorkerShutdown()
+{
+    FgrState &f = g_fgr;
+    if (!f.cs_ready) return true;
+    if (InterlockedCompareExchange(&f.arm_active, 0, 0) != 0) return false;
+    if (!FgCompositeWait(4000) || !Synth12Drain(4000)) {
+        Log("[fg-relay] shutdown could not drain private GPU work; outstanding GPU dependencies and resources are retained.");
+        return false;
+    }
+    FgRelayReleaseNrWaits();
+    FgRelayForceReleaseParks();
+    return true;
+}
+
 static bool FgRelayIdleForRelease()
 {
     FgrState &f = g_fgr;
     if (!f.cs_ready || !f.ready) return true;
     const LONG armed = InterlockedCompareExchange(&f.arm_seq, 0, 0);
-    return armed == InterlockedCompareExchange(&f.worker_seq, 0, 0) &&
-           armed == InterlockedCompareExchange(&f.eval_seq, 0, 0);
+    if (armed != InterlockedCompareExchange(&f.worker_seq, 0, 0) ||
+        armed != InterlockedCompareExchange(&f.eval_seq, 0, 0)) return false;
+    for (unsigned i = 0; i < kFgrSlots; ++i)
+        if (f.slot_used[i] && (g_svk.EvStatus == nullptr ||
+            g_svk.EvStatus(g_svk.dev, f.ev_mark[i]) != kSVkEventSet)) return false;
+    return true;
+}
+
+// Render-thread poll under g_bridge_cs. The completion marker is submitted
+// after the CPU worker has finished enqueueing all work. Unlike nr_fence12,
+// this fence is never signalled by the host, so emergency park release cannot
+// make it look complete while D3D12 still owns the shared images.
+static bool FgRelayRecoveryReady()
+{
+    FgrState &f = g_fgr;
+    if (!f.recovery_pending) return true;
+    if (InterlockedCompareExchange(&f.arm_active, 0, 0) != 0 ||
+        f.arm_seq != f.worker_seq || f.arm_seq != f.eval_seq ||
+        (g_vkm.idle != nullptr && WaitForSingleObject(g_vkm.idle, 0) != WAIT_OBJECT_0)) return false;
+    if (g_s12.dev == nullptr || g_s12.queue == nullptr ||
+        g_s12.dev->GetDeviceRemovedReason() != S_OK || g_s12.resources_retained) return false;
+    if (f.recovery_marker == nullptr && FAILED(g_s12.dev->CreateFence(0, D3D12_FENCE_FLAG_NONE,
+        __uuidof(ID3D12Fence), reinterpret_cast<void **>(&f.recovery_marker)))) return false;
+    if (!f.recovery_marker_submitted) {
+        if (FAILED(g_s12.queue->Signal(f.recovery_marker, 1))) return false;
+        f.recovery_marker_submitted = true;
+        return false;
+    }
+    const UINT64 done = f.recovery_marker->GetCompletedValue();
+    if (done == UINT64_MAX || done < 1) return false;
+    if (!FgRelayIdleForRelease()) return false;
+    for (unsigned i = 0; i < kFgrSlots; ++i) {
+        if ((f.copy_in_flight[i] && (f.GetFenceStatus == nullptr || f.GetFenceStatus(g_svk.dev, f.copy_fence[i]) != kSVkSuccess)) ||
+            (f.release_in_flight[i] && (f.GetFenceStatus == nullptr || f.GetFenceStatus(g_svk.dev, f.release_fence[i]) != kSVkSuccess))) return false;
+    }
+    return true;
 }
 
 // Every relay park released by hand. Only for the shutdown path, where the worker
@@ -1752,16 +1914,44 @@ static void FgRelayOnSessionRelease()
 {
     FgrState &f = g_fgr;
     if (!f.cs_ready) return;
-    // The objects this state names -- semaphores, fences, events, pools -- belong
-    // to the session that is going away, and are left standing rather than
-    // destroyed under work that may still name them. A session opened again on
-    // the same device makes new ones; the old ones are a bounded leak on a path
-    // the user walks by hand. The value counters restart with the new objects:
-    // a fresh fence starts at zero, and a stale last_release_nr against it would
-    // read as a release that never arrived.
+    // FgInputRelease has observed worker idle, proved each recorded park was
+    // submitted, drained D3D12, and idled the VkDevice on the render thread. All
+    // parks/copies are now retired, so
+    // destroy their objects instead of leaking another ring after each resize.
     FgrLock();
     f.ready = false;
+    auto get_proc = g_svk.lib != nullptr ? reinterpret_cast<PFN_SVkGetDeviceProcAddr>(
+        GetProcAddress(g_svk.lib, "vkGetDeviceProcAddr")) : nullptr;
+    using Destroy = void (*)(SVkDevice, SVkHandle, const void *);
+    if (get_proc != nullptr && g_svk.dev != nullptr) {
+        auto destroy_semaphore = reinterpret_cast<Destroy>(get_proc(g_svk.dev, "vkDestroySemaphore"));
+        auto destroy_fence = reinterpret_cast<Destroy>(get_proc(g_svk.dev, "vkDestroyFence"));
+        auto destroy_event = reinterpret_cast<Destroy>(get_proc(g_svk.dev, "vkDestroyEvent"));
+        auto destroy_pool = reinterpret_cast<Destroy>(get_proc(g_svk.dev, "vkDestroyCommandPool"));
+        for (unsigned i = 0; i < kFgrSlots; ++i) {
+            if (destroy_fence != nullptr && f.copy_fence[i]) destroy_fence(g_svk.dev, f.copy_fence[i], nullptr);
+            if (destroy_fence != nullptr && f.release_fence[i]) destroy_fence(g_svk.dev, f.release_fence[i], nullptr);
+            if (destroy_event != nullptr && f.ev_out[i]) destroy_event(g_svk.dev, f.ev_out[i], nullptr);
+            if (destroy_event != nullptr && f.ev_mark[i]) destroy_event(g_svk.dev, f.ev_mark[i], nullptr);
+            f.copy_fence[i] = f.release_fence[i] = f.ev_out[i] = f.ev_mark[i] = 0;
+        }
+        for (unsigned i = 0; i < f.npools; ++i)
+            if (destroy_pool != nullptr && f.pools[i].pool) destroy_pool(g_svk.dev, f.pools[i].pool, nullptr);
+        if (destroy_semaphore != nullptr && f.copy_sem) destroy_semaphore(g_svk.dev, f.copy_sem, nullptr);
+        if (destroy_semaphore != nullptr && f.nr_sem) destroy_semaphore(g_svk.dev, f.nr_sem, nullptr);
+    }
+    f.copy_sem = f.nr_sem = 0;
+    if (f.copy_sem_handle != nullptr) { CloseHandle(f.copy_sem_handle); f.copy_sem_handle = nullptr; }
+    if (f.nr_fence_handle != nullptr) { CloseHandle(f.nr_fence_handle); f.nr_fence_handle = nullptr; }
+    if (f.nr_ev != nullptr) { CloseHandle(f.nr_ev); f.nr_ev = nullptr; }
     f.tried = false;
+    InterlockedExchange(&f.releasing, 0);
+    f.fell_back = false;
+    if (f.recovery_pending) Log("[fg-recovery] old GPU work retired; the next valid FG input rebuilds NR automatically.");
+    f.recovery_pending = f.recovery_marker_submitted = false;
+    if (f.recovery_marker != nullptr) { f.recovery_marker->Release(); f.recovery_marker = nullptr; }
+    f.import_ok = false;
+    f.why = nullptr;
     f.have_last = false;
     f.have_present = false;
     memset(f.idx_map, 0, sizeof(f.idx_map));
@@ -1777,9 +1967,13 @@ static void FgRelayOnSessionRelease()
     }
     f.have_last_group = false;
     f.mismatch_streak = 0;
-    // The caller has drained the D3D12 session and idled the VkDevice, so the
-    // D3D12 views can go; the Vulkan objects stay (see above).
+    f.unarmed_streak = 0;
+    f.last_eval_tick = 0;
+    InterlockedExchange(&f.thr_off, 0);
+    InterlockedExchange(&f.thr_streak, 0);
+    FgGuideRequestReset();
     if (f.copy_fence12 != nullptr) { f.copy_fence12->Release(); f.copy_fence12 = nullptr; }
     if (f.nr_fence12 != nullptr) { f.nr_fence12->Release(); f.nr_fence12 = nullptr; }
+    f.dev = nullptr;
     FgrUnlock();
 }

@@ -1,0 +1,308 @@
+From 82908fbd7c09074a847d214511c5c99fb045caba Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E7=9B=97=E7=89=88=E3=81=AE=E9=9B=AA=E9=A2=A8=E9=85=B1?=
+ <50561019+Yukikaze20170315@users.noreply.github.com>
+Date: Fri, 2 Oct 2026 00:28:19 +0800
+Subject: [PATCH 09/10] Vulkan FG input: let a pending carrier reach its retry
+ past the relay
+
+With the relay on, an unarmed evaluate ends inside FgRelayEvaluate, and the
+relay arms nothing while the carrier is pending, so the retry never ran after
+a failed first attempt. The race helper now triggers on ReShade's D3D12
+init_device instead of polling dlss5-bridge.log, whose exclusive appends
+dropped lines while the helper held the file open. File version 1.4.13.20.
+---
+ src/fg-input.inc                              |   9 +-
+ src/version.rc                                |   4 +-
+ .../vulkan-fg-quality/carrier-race-helper.cpp | 150 +++++++-----------
+ tests/vulkan-fg-quality/run.cmd               |   2 +-
+ tests/vulkan-fg-quality/test-carrier.cpp      |  23 +++
+ 5 files changed, 89 insertions(+), 99 deletions(-)
+
+diff --git a/src/fg-input.inc b/src/fg-input.inc
+index 7dc4890..823423a 100644
+--- a/src/fg-input.inc
++++ b/src/fg-input.inc
+@@ -474,6 +474,13 @@ static bool MirrorReleaseForFgInput()
+     return true;
+ }
+ 
++// The relay arms nothing while the carrier is pending and ends every unarmed
++// evaluate itself, so those evaluates must reach the carrier retry instead.
++static bool FgInputRelayTakesFrame()
++{
++    return PresentAdapterRelay() && !g_fg_input.carrier_pending;
++}
++
+ // Called with the private session built and owned. Returns true once the SR
+ // carrier hook and the composite pass exist; false while a retry is pending or
+ // after a refusal. A transient failure keeps the session and retries later.
+@@ -559,7 +566,7 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
+     }
+     if (!PresentAdapterConfiguration()) { FgGuidePause("Generic configuration is temporarily unsuitable for the FG carrier"); return; }
+     if (g_cfg.mode != 2) { FgInputRefuse("the experiment requires Bridge mode=2"); return; }
+-    if (PresentAdapterRelay())
++    if (FgInputRelayTakesFrame())
+     {
+         // The relay owns the frames it arms: it records the park and the copy
+         // back against the copy the present (Pipeline=3) or this evaluate
+diff --git a/src/version.rc b/src/version.rc
+index 8d96c34..1684139 100644
+--- a/src/version.rc
++++ b/src/version.rc
+@@ -3,8 +3,8 @@
+ // ReShade reads the add-on's version from here and shows it in its overlay, so
+ // a bug report can name the exact build instead of describing it.
+ VS_VERSION_INFO VERSIONINFO
+- FILEVERSION    1,4,13,19
+- PRODUCTVERSION 1,4,13,19
++ FILEVERSION    1,4,13,20
++ PRODUCTVERSION 1,4,13,20
+  FILEOS         VOS_NT_WINDOWS32
+  FILETYPE       VFT_DLL
+ BEGIN
+diff --git a/tests/vulkan-fg-quality/carrier-race-helper.cpp b/tests/vulkan-fg-quality/carrier-race-helper.cpp
+index d9510f7..4b89805 100644
+--- a/tests/vulkan-fg-quality/carrier-race-helper.cpp
++++ b/tests/vulkan-fg-quality/carrier-race-helper.cpp
+@@ -1,22 +1,31 @@
+ // TEST ONLY. A ReShade add-on that recreates, on demand, the start-up race the
+-// SR carrier retry handles: it holds an extra reference on the game folder's
+-// nvngx_dlss.dll from the moment dlss5-bridge opens its private D3D12 session
+-// until 1.5 s after the bridge has logged the ambiguity, so the carrier search
+-// sees two SR modules (the driver's DLSS model and nvngx_dlss.dll).
++// SR carrier retry handles: when the first D3D12 device is created (in a Vulkan
++// game that is dlss5-bridge's private device, about 1 s before its carrier
++// search), it loads the game folder's nvngx_dlss.dll and holds that reference
++// for 3 s, so the first carrier search sees two SR modules (the driver's DLSS
++// model and nvngx_dlss.dll).
+ // Expected: a bridge without the retry refuses NR for the session; a bridge
+-// with it logs "SR carrier hook installed on attempt N" and NR runs.
+-// Remove it from the game folder after the test.
++// with it logs "SR carrier hook not installed (attempt 1 of 30)", later
++// "SR carrier hook installed on attempt N", and NR runs.
++// It never opens dlss5-bridge.log: the bridge appends with exclusive access and
++// drops a line whenever another handle is open. Remove it after the test.
+ #include <windows.h>
+ #include <cstdio>
+-#include <cstring>
+-#include <string>
++#include "reshade_api.hpp"
++#include "reshade_events.hpp"
+ 
+ extern "C" __declspec(dllexport) const char *NAME = "carrier-race-helper (test only)";
+ extern "C" __declspec(dllexport) const char *DESCRIPTION =
+     "Holds nvngx_dlss.dll during dlss5-bridge's SR carrier search to reproduce the start-up race. Remove after testing.";
+ 
+ typedef bool (*PFN_Register)(HMODULE, uint32_t);
++typedef void (*PFN_Unregister)(HMODULE);
++typedef void (*PFN_RegisterEvent)(reshade::addon_event, void *);
++static const DWORD kHoldMs = 3000;
++static HMODULE g_self;
+ static wchar_t g_dir[MAX_PATH];
++static PFN_Unregister g_unregister;
++static volatile LONG g_fired;
+ 
+ static void Note(const char *text)
+ {
+@@ -30,108 +39,59 @@ static void Note(const char *text)
+     fclose(file);
+ }
+ 
+-// Reads the bridge log from `offset`, appends to `seen`; the log only grows.
+-static void ReadLog(long long &offset, std::string &seen)
++static DWORD WINAPI Release(void *held)
+ {
+-    wchar_t path[MAX_PATH];
+-    swprintf_s(path, L"%ls\\dlss5-bridge.log", g_dir);
+-    HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+-                              nullptr, OPEN_EXISTING, 0, nullptr);
+-    if (file == INVALID_HANDLE_VALUE) return;
+-    LARGE_INTEGER size = {};
+-    if (GetFileSizeEx(file, &size) && size.QuadPart < offset) { offset = 0; seen.clear(); }
+-    LARGE_INTEGER at = {};
+-    at.QuadPart = offset;
+-    SetFilePointerEx(file, at, nullptr, FILE_BEGIN);
+-    char buffer[65536];
+-    DWORD got = 0;
+-    while (ReadFile(file, buffer, sizeof(buffer), &got, nullptr) && got != 0) {
+-        seen.append(buffer, got);
+-        offset += got;
+-    }
+-    CloseHandle(file);
+-    if (seen.size() > (1u << 20)) seen.erase(0, seen.size() - (1u << 16));
+-}
+-
+-static long MsOfDay(const SYSTEMTIME &t)
+-{
+-    return ((t.wHour * 60L + t.wMinute) * 60L + t.wSecond) * 1000L + t.wMilliseconds;
++    Sleep(kHoldMs);
++    FreeLibrary(static_cast<HMODULE>(held));
++    Note("released nvngx_dlss.dll; compare with the bridge log (multiple SR modules found / attempt N)");
++    return 0;
+ }
+ 
+-// The bridge recreates its log when it attaches and the log has no process id,
+-// so a log is taken as this session's when its first time stamp is within a
+-// minute of this add-on's start. Until then an older session's log is ignored.
+-static bool LogIsThisSession(const std::string &seen, long started)
++static void OnInitDevice(reshade::api::device *device)
+ {
+-    unsigned h = 0, m = 0, s = 0, ms = 0;
+-    if (seen.size() < 12 || sscanf_s(seen.c_str(), "%2u:%2u:%2u.%3u", &h, &m, &s, &ms) != 4) return false;
+-    const long stamp = ((h * 60L + m) * 60L + s) * 1000L + ms;
+-    return labs(stamp - started) <= 60000;
++    if (device == nullptr || device->get_api() != reshade::api::device_api::d3d12) return;
++    if (InterlockedExchange(&g_fired, 1) != 0) return;
++    // From here a thread runs in this module, so it must outlive ReShade's
++    // add-on unload cycles.
++    HMODULE pinned = nullptr;
++    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN | GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
++                       reinterpret_cast<LPCWSTR>(&OnInitDevice), &pinned);
++    wchar_t dll[MAX_PATH];
++    swprintf_s(dll, L"%ls\\nvngx_dlss.dll", g_dir);
++    const HMODULE held = LoadLibraryW(dll);
++    if (held == nullptr) { Note("a D3D12 device was created, but nvngx_dlss.dll could not be loaded"); return; }
++    Note("a D3D12 device was created; holding the game folder's nvngx_dlss.dll for 3000 ms");
++    HANDLE thread = CreateThread(nullptr, 0, Release, held, 0, nullptr);
++    if (thread != nullptr) CloseHandle(thread);
++    else { FreeLibrary(held); Note("no release thread; released at once"); }
+ }
+ 
+-static DWORD WINAPI Worker(void *)
++BOOL APIENTRY DllMain(HMODULE self, DWORD reason, LPVOID reserved)
+ {
+-    Note("started; waiting for the bridge to open its private D3D12 session");
+-    SYSTEMTIME now;
+-    GetLocalTime(&now);
+-    const long started = MsOfDay(now);
+-    long long offset = 0;
+-    std::string seen;
+-    HMODULE held = nullptr;
+-    const ULONGLONG deadline = GetTickCount64() + 15ull * 60ull * 1000ull;
+-    while (GetTickCount64() < deadline) {
+-        ReadLog(offset, seen);
+-        if (!LogIsThisSession(seen, started)) { offset = 0; seen.clear(); Sleep(50); continue; }
+-        if (held == nullptr && seen.find("synth: opening on this add-on's own D3D12 device") != std::string::npos) {
+-            wchar_t dll[MAX_PATH];
+-            swprintf_s(dll, L"%ls\\nvngx_dlss.dll", g_dir);
+-            held = LoadLibraryW(dll);
+-            Note(held != nullptr ? "holding the game folder's nvngx_dlss.dll" : "nvngx_dlss.dll could not be loaded");
+-            if (held == nullptr) return 0;
+-        }
+-        if (held != nullptr && seen.find("multiple SR modules found") != std::string::npos) {
+-            Note("bridge reported two SR modules; releasing nvngx_dlss.dll in 1.5 s");
+-            Sleep(1500);
+-            FreeLibrary(held);
+-            Note("released; the bridge's next carrier attempt should find one SR module");
+-            return 0;
+-        }
+-        if (held != nullptr && seen.find("private SR carrier copy ready") != std::string::npos) {
+-            Note("the carrier installed without seeing the race (timing missed); releasing");
+-            FreeLibrary(held);
+-            return 0;
+-        }
+-        Sleep(10);
++    if (reason == DLL_PROCESS_DETACH) {
++        if (reserved == nullptr && g_unregister != nullptr) g_unregister(self);
++        return TRUE;
+     }
+-    if (held != nullptr) FreeLibrary(held);
+-    Note("timed out");
+-    return 0;
+-}
+-
+-BOOL APIENTRY DllMain(HMODULE self, DWORD reason, LPVOID)
+-{
+     if (reason != DLL_PROCESS_ATTACH) return TRUE;
+-    // ReShade loads and unloads add-ons several times at start-up; the worker
+-    // must outlive that, so this module stays mapped until the process exits.
+-    HMODULE pinned = nullptr;
+-    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN | GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+-                       reinterpret_cast<LPCWSTR>(&DllMain), &pinned);
+-    static bool started = false;
+-    if (started) return TRUE;
+-    started = true;
++    g_self = self;
+     GetModuleFileNameW(self, g_dir, MAX_PATH);
+     if (wchar_t *slash = wcsrchr(g_dir, L'\\')) *slash = L'\0';
+     HMODULE reshade = nullptr;
+-    for (const wchar_t *name : {L"ReShade64.dll", L"dxgi.dll", L"d3d12.dll", L"d3d11.dll"}) {
++    static const wchar_t *const hosts[] = {L"ReShade64.dll", L"dxgi.dll", L"d3d12.dll", L"d3d11.dll", L"opengl32.dll"};
++    for (const wchar_t *name : hosts) {
+         reshade = GetModuleHandleW(name);
+         if (reshade != nullptr && GetProcAddress(reshade, "ReShadeRegisterAddon") != nullptr) break;
+         reshade = nullptr;
+     }
+-    if (reshade != nullptr) {
+-        auto reg = reinterpret_cast<PFN_Register>(GetProcAddress(reshade, "ReShadeRegisterAddon"));
+-        for (uint32_t version = 18; version >= 5 && !reg(self, version); --version) {}
+-    }
+-    HANDLE thread = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr);
+-    if (thread != nullptr) CloseHandle(thread);
++    if (reshade == nullptr) return TRUE;
++    auto reg = reinterpret_cast<PFN_Register>(GetProcAddress(reshade, "ReShadeRegisterAddon"));
++    auto reg_event = reinterpret_cast<PFN_RegisterEvent>(GetProcAddress(reshade, "ReShadeRegisterEvent"));
++    if (reg == nullptr || reg_event == nullptr) return TRUE;
++    bool registered = false;
++    for (uint32_t version = 18; version >= 5 && !registered; --version) registered = reg(self, version);
++    if (!registered) return TRUE;
++    g_unregister = reinterpret_cast<PFN_Unregister>(GetProcAddress(reshade, "ReShadeUnregisterAddon"));
++    reg_event(reshade::addon_event::init_device, reinterpret_cast<void *>(&OnInitDevice));
++    Note("registered; waiting for the first D3D12 device");
+     return TRUE;
+ }
+diff --git a/tests/vulkan-fg-quality/run.cmd b/tests/vulkan-fg-quality/run.cmd
+index b76a5b2..9b4d000 100644
+--- a/tests/vulkan-fg-quality/run.cmd
++++ b/tests/vulkan-fg-quality/run.cmd
+@@ -64,7 +64,7 @@ goto run
+ 
+ :suite_racehelper
+ rem Builds only. carrier-race-helper.addon64 is a test-only ReShade add-on; see its source header.
+-cl /nologo /W4 /WX /O2 /MT /EHsc /std:c++17 /LD "%HERE%carrier-race-helper.cpp" /Fe:carrier-race-helper.addon64 > build.log 2>&1 || goto failed
++cl /nologo /W4 /WX /O2 /MT /EHsc /std:c++17 /I"%SRC%\reshade" /LD "%HERE%carrier-race-helper.cpp" /Fe:carrier-race-helper.addon64 > build.log 2>&1 || goto failed
+ echo built carrier-race-helper.addon64 (test only; put it next to the game executable and remove it after the test)
+ popd
+ exit /b 0
+diff --git a/tests/vulkan-fg-quality/test-carrier.cpp b/tests/vulkan-fg-quality/test-carrier.cpp
+index 44efbaa..849c9f1 100644
+--- a/tests/vulkan-fg-quality/test-carrier.cpp
++++ b/tests/vulkan-fg-quality/test-carrier.cpp
+@@ -74,14 +74,37 @@ static void CheckRelayGuard()
+     g_fg_input = {};
+ }
+ 
++// An unarmed evaluate ends inside the relay, so while the carrier is pending the
++// feed must keep the frame and reach its retry (a game session stalled here).
++static void CheckRelayYieldsWhilePending()
++{
++    Check(PresentAdapterRelay(), "fixture configuration selects the relay (Pipeline=2)");
++    g_fg_input = {};
++    g_fg_input.carrier_pending = true;
++    Check(!FgInputRelayTakesFrame(), "relay does not take frames while the carrier is pending");
++    g_fg_input.carrier_pending = false;
++    Check(FgInputRelayTakesFrame(), "relay takes frames once the carrier is installed");
++    g_fg_input = {};
++}
++
+ int main()
+ {
+     InitializeCriticalSection(&g_log_cs);
+     strcpy_s(g_log_path, "carrier.log");
+     g_self = GetModuleHandleW(nullptr);
++    {
++        wchar_t ini[1024] = {};
++        PresentAdapterPath(ini, _countof(ini), L"vk-present-adapter.ini");
++        FILE *file = nullptr;
++        if (_wfopen_s(&file, ini, L"wb") == 0 && file != nullptr) {
++            fputs("[Adapter]\r\nEnabled=1\r\nSource=fg-input\r\nPipeline=2\r\n", file);
++            fclose(file);
++        }
++    }
+     Check(MH_Initialize() == MH_OK, "MinHook initialised");
+     CheckPolicy();
+     CheckRelayGuard();
++    CheckRelayYieldsWhilePending();
+ 
+     Check(PresentAdapterCarrier() == PCR_TRANSIENT, "no SR module yet is transient");
+     Check(PresentCompatibilitySnapshot().code[1] == PC_SR_ENTRY_UNAVAILABLE, "missing SR module is reported");

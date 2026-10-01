@@ -1,0 +1,29 @@
+#include <windows.h>
+
+#ifdef RR_FIXTURE
+#define FIXTURE_PRODUCT "NVIDIA DLSS Ray Reconstruction"
+#else
+#define FIXTURE_PRODUCT "NVIDIA Deep Learning SuperSampling"
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION    310,5,2,0
+ PRODUCTVERSION 310,5,2,0
+ FILEOS         VOS_NT_WINDOWS32
+ FILETYPE       VFT_DLL
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "FileDescription", "carrier test fixture"
+            VALUE "FileVersion",     "310.5.2.0"
+            VALUE "InternalName",    "DLSS"
+            VALUE "ProductName",     FIXTURE_PRODUCT
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

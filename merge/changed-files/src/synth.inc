@@ -3088,6 +3088,15 @@ struct SVkImageCopy
     SVkExtent3D          extent;
 };
 
+struct SVkImageBlit
+{
+    SVkSubresourceLayers srcSubresource;
+    SVkOffset3D          srcOffsets[2];
+    SVkSubresourceLayers dstSubresource;
+    SVkOffset3D          dstOffsets[2];
+};
+static_assert(sizeof(SVkImageBlit) == 80, "VkImageBlit ABI");
+
 struct SVkBufferImageCopy
 {
     uint64_t             bufferOffset;
@@ -3116,6 +3125,8 @@ typedef void    (*PFN_SVkCmdPipelineBarrier)(SVkCommandBuffer, uint32_t, uint32_
                                              uint32_t, const SVkImageMemoryBarrier *);
 typedef void    (*PFN_SVkCmdCopyImage)(SVkCommandBuffer, SVkHandle, uint32_t, SVkHandle, uint32_t,
                                        uint32_t, const SVkImageCopy *);
+typedef void    (*PFN_SVkCmdBlitImage)(SVkCommandBuffer, SVkHandle, uint32_t, SVkHandle, uint32_t,
+                                       uint32_t, const SVkImageBlit *, uint32_t);
 typedef void    (*PFN_SVkCmdCopyImageToBuffer)(SVkCommandBuffer, SVkHandle, uint32_t, SVkHandle,
                                                uint32_t, const SVkBufferImageCopy *);
 typedef void    (*PFN_SVkCmdCopyBufferToImage)(SVkCommandBuffer, SVkHandle, SVkHandle, uint32_t,
@@ -3168,6 +3179,7 @@ struct SynthVk
     PFN_SVkBindBufferMemory            BindBufferMemory;
     PFN_SVkCmdPipelineBarrier          CmdPipelineBarrier;
     PFN_SVkCmdCopyImage                CmdCopyImage;
+    PFN_SVkCmdBlitImage                CmdBlitImage;
     PFN_SVkCmdCopyImageToBuffer        CmdCopyImageToBuffer;
     PFN_SVkCmdCopyBufferToImage        CmdCopyBufferToImage;
     PFN_SVkEvCreate                    EvCreate;
@@ -3377,6 +3389,7 @@ static bool SynthVkOpen(reshade::api::effect_runtime *rt)
     SYNTH_VK_GET(BindBufferMemory,            "vkBindBufferMemory")
     SYNTH_VK_GET(CmdPipelineBarrier,          "vkCmdPipelineBarrier")
     SYNTH_VK_GET(CmdCopyImage,                "vkCmdCopyImage")
+    SYNTH_VK_GET(CmdBlitImage,                "vkCmdBlitImage")
     SYNTH_VK_GET(CmdCopyImageToBuffer,        "vkCmdCopyImageToBuffer")
     SYNTH_VK_GET(CmdCopyBufferToImage,        "vkCmdCopyBufferToImage")
     // The Vulkan mirror's park, and the one wait its rebuild needs. Resolved on
@@ -3450,9 +3463,16 @@ static bool SynthVkOpen(reshade::api::effect_runtime *rt)
 // Every size comes off the D3D12 texture that was actually created, not off a
 // pair of arguments: Synth12Build sizes Output on its own now, so one w,h could
 // only ever be right for three of the four slots.
+static uint32_t FgGuideSharingFamilies(void *device, uint32_t *families, uint32_t capacity);
 static bool SynthVkImport()
 {
     bool said_memory = false;
+    // Foreground and unfocused DLSS-G can use different queue families. The
+    // private FG carriers are shared across those queues without ownership
+    // transfers; game-owned inputs keep their existing lifecycle unchanged.
+    uint32_t fg_families[64] = {};
+    const uint32_t fg_family_count = FgInputActive()
+        ? FgGuideSharingFamilies(g_svk.dev, fg_families, _countof(fg_families)) : 0;
     // The list of slots rather than a count, because the two optional textures
     // are independent: the exposure mirror belongs to the Vulkan mirror and the
     // second Output to the substitute's pipelined transport, and a count would
@@ -3507,7 +3527,9 @@ static bool SynthVkImport()
         // failure on drivers that do not support that pairing -- a refusal
         // earned by a usage flag nothing needs.
         ici.usage         = kSVkUsageTransferSrc | kSVkUsageTransferDst;
-        ici.sharingMode   = kSVkSharingExclusive;
+        ici.sharingMode   = fg_family_count > 1 ? 1u /* VK_SHARING_MODE_CONCURRENT */ : kSVkSharingExclusive;
+        ici.queueFamilyIndexCount = fg_family_count > 1 ? fg_family_count : 0;
+        ici.pQueueFamilyIndices = fg_family_count > 1 ? fg_families : nullptr;
         ici.initialLayout = kSVkLayoutUndefined;
 
         uint32_t r = g_svk.CreateImage(g_svk.dev, &ici, nullptr, &g_svk.img[i]);
@@ -7417,6 +7439,9 @@ static void SynthOfaVkClose()
 //
 // dev is cleared LAST, and deliberately: every release above is gated on it, so a
 // second call becomes a no-op rather than a use-after-free.
+static void FgRelayOnSessionRelease();
+static void FgInputOnSessionRelease();
+static void VkmDestroyRetiredEvents();
 static void SynthVkShutdownForDevice()
 {
     if (g_svk.dev == nullptr) return;
@@ -7466,6 +7491,12 @@ static void SynthVkShutdownForDevice()
         Log("[synth] shutdown completion unproven; retaining imported images and private resources.");
         return;
     }
+
+    // Runtime/device retirement uses the same proven-complete boundary as an
+    // output-size rebuild. Do not retain an old relay ring across swap chains.
+    FgRelayOnSessionRelease();
+    FgInputOnSessionRelease();
+    VkmDestroyRetiredEvents();
 
     // And only now the four park events, for the reason SynthVkParkStop's header
     // gives: setting an event does not retire the queued vkCmdWaitEvents that
@@ -9350,6 +9381,16 @@ static void OnPanelDraw(reshade::api::effect_runtime *rt)
                           (dev_api == static_cast<uint32_t>(reshade::api::device_api::d3d11) ||
                            dev_api == static_cast<uint32_t>(reshade::api::device_api::vulkan));
 
+    if (PresentAdapterFgInput()) {
+        const auto compatibility = PresentCompatibilitySnapshot();
+        if (compatibility.unknown_build || compatibility.code[0] != 0 || compatibility.code[1] != 0) {
+            ui->SeparatorText("NR compatibility");
+            if (compatibility.unknown_build) PanelLine("Generic build not previously verified; allowed to run.");
+            for (unsigned i = 0; i < 2; ++i)
+                if (compatibility.code[i] != 0) PanelLine("%s", compatibility.reason[i]);
+            PanelLine("%s", kPresentCompatibleGeneric);
+        }
+    }
     ui->SeparatorText("DLSS");
     if (src == SRC_MIRROR)
     {
