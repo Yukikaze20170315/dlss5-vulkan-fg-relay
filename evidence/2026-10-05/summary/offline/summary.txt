@@ -1,0 +1,18 @@
+registry               exit=0      2s  registry: 188780 checks, 0 failures
+guides                 exit=0      3s  PASS: 57 checks; production rectangle/scale/read/record/reset/capability helpers.
+hooks                  exit=0      3s  hooks: 545 checks, 0 failures
+colour                 exit=0      3s  colour regions: 39 checks, 0 failures, 8 recorded production copies
+compatibility          exit=0      4s  PASS compatibility: checks=26 failures=0
+carrier                exit=0      4s  PASS carrier: checks=49 failures=0
+carrier-range          exit=0      4s  PASS crowded carrier: checks=19 failures=0
+minhook-range          exit=0      2s  PASS MinHook range safety: checks=34 failures=0
+focus-2.14.1           exit=0      2s  focus FG tests PASS
+focus-2.10.3-report    exit=0      2s  report only
+trace                  exit=0      4s  PASS: checks=7382 failures=0; CPU synthetic contracts only, NOT game/GPU validation
+scan                   exit=0      3s  PASS scan-test: 20705 assertions; no game, NGX runtime or module API mocks
+witness                exit=0      2s  PASS NR tail forwarding; SR identity-return gate, four arguments, caller address and thread-local isolation
+composite              exit=0      2s  COMPOSITE scene_pixels=2868 opaque_ui_kept=192 translucent_blended=12 mismatches=0
+recovery               exit=0      4s  recovery/history: 34 checks, 0 failures
+stage-protocol         exit=0      3s  4 of 4 PASS lines
+guard                  exit=0     14s  guard: 30 checks, 0 failures
+gpu                    exit=0     68s  PASS GPU guide compute/readback checks=402 failures=0 validation_errors=0 fixture_peak=129592256 total_peak=218065856 compute_allocations=6

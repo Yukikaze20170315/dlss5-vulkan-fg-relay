@@ -23,6 +23,8 @@ static void Log(const char *, ...) {}
 static HANDLE StartModuleWorker(LPTHREAD_START_ROUTINE) { return nullptr; }
 static bool PresentAdapterFocusKeepFG() { return false; }
 static void PresentAdapterPath(wchar_t *path, size_t, const wchar_t *) { path[0] = 0; }
+// No stage-protocol Generic in this test: the gate keeps its NRHookPoint reading.
+static bool PresentAdapterStagePlan(uint32_t *) { return false; }
 static bool PinHookModule(const void *) { return true; }
 static bool HookInstall(Hook &, void *, void *) { return false; }
 #include "focus-fg.inc"

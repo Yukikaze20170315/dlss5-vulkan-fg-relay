@@ -1,0 +1,901 @@
+// CPU-only test scaffold. The runner inserts verbatim production definitions
+// and marked statement ranges at @...@ tokens; no Vulkan/D3D device is created.
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <bit>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <mutex>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+#include "@SERIAL_HEADER@"
+namespace ngx_serial = renodx::addons::dlss5::ngx_serial;
+
+#define CHECK(expr) do { if (!(expr)) throw std::runtime_error( \
+  std::string(__FILE__) + ":" + std::to_string(__LINE__) + ": " #expr); } while (false)
+
+inline int64_t fake_now_ns = 10'000'000'000;
+inline int64_t SteadyNowNs() { return fake_now_ns; }
+inline std::vector<std::string> events;
+inline thread_local int runtime_depth = 0;
+inline std::mutex runtime_mutex;
+struct RuntimeLock {
+  std::unique_lock<std::mutex> lock;
+  explicit RuntimeLock(std::mutex& mutex) : lock(mutex, std::defer_lock) {
+    CHECK(ngx_serial::depth != 0 && runtime_depth == 0);
+    lock.lock();
+    ++runtime_depth;
+  }
+  ~RuntimeLock() { --runtime_depth; }
+};
+struct DirectCallScope {};
+namespace lastgasp { struct InsideCall { explicit InsideCall(const char*) {} }; }
+namespace reshade {
+namespace log { enum class level { info, warning, error }; }
+namespace api {
+struct resource { uint64_t handle = 0; };
+struct resource_view { uint64_t handle = 0; };
+enum class format { unknown };
+enum class resource_usage { shader_resource };
+struct command_list { uint32_t token = 0; };
+struct device {
+  void destroy_resource(resource value) { events.push_back("image:" + std::to_string(value.handle)); }
+  void destroy_resource_view(resource_view value) { events.push_back("view:" + std::to_string(value.handle)); }
+};
+}
+}
+inline void Log(reshade::log::level, const std::string&) {}
+using VkImage = void*;
+using VkDevice = void*;
+using VkCommandBuffer = void*;
+using NVSDK_NGX_Feature = int;
+using NVSDK_NGX_Result = int;
+using PFN_NVSDK_NGX_ProgressCallback = void*;
+#define NVSDK_CONV
+#define NVSDK_NGX_FAILED(result) ((result) < 0)
+inline constexpr int NVSDK_NGX_Result_FAIL_UnableToInitializeFeature = -1;
+inline constexpr int NVSDK_NGX_Feature_Reserved_Unknown = 0;
+inline constexpr int kFeatureDlss = 1, kFeatureDlssd = 13, kFeatureDlssNr = 18;
+inline constexpr uint32_t NVSDK_NGX_DLSS_Feature_Flags_DepthInverted = 1;
+inline constexpr const char* NVSDK_NGX_Parameter_Reset = "Reset";
+struct NVSDK_NGX_Parameter {
+  uint64_t id = 0;
+  bool destroyed = false;
+  mutable uint32_t reset_reads = 0;
+  std::unordered_map<std::string, int> ints;
+  std::unordered_map<std::string, float> floats;
+};
+struct NVSDK_NGX_Handle {
+  uint64_t id = 0;
+  bool released = false;
+  NVSDK_NGX_Parameter* parameters = nullptr;
+};
+inline int GetInt(const NVSDK_NGX_Parameter* parameters, const char* key, int fallback) {
+  CHECK(parameters != nullptr && !parameters->destroyed);
+  if (std::string(key) == NVSDK_NGX_Parameter_Reset) {
+    CHECK(ngx_serial::depth != 0 && runtime_depth != 0);
+    ++parameters->reset_reads;
+    events.push_back("read-reset");
+  }
+  const auto found = parameters->ints.find(key);
+  return found == parameters->ints.end() ? fallback : found->second;
+}
+inline void NVSDK_NGX_Parameter_SetI(NVSDK_NGX_Parameter* p, const char* key, int value) {
+  CHECK(p != nullptr && !p->destroyed);
+  p->ints[key] = value;
+}
+inline void NVSDK_NGX_Parameter_SetUI(NVSDK_NGX_Parameter* p, const char* key, uint32_t value) {
+  NVSDK_NGX_Parameter_SetI(p, key, static_cast<int>(value));
+}
+inline void NVSDK_NGX_Parameter_SetF(NVSDK_NGX_Parameter* p, const char* key, float value) {
+  CHECK(p != nullptr && !p->destroyed);
+  p->floats[key] = value;
+}
+inline uint64_t object_id = 1;
+inline std::vector<std::unique_ptr<NVSDK_NGX_Parameter>> parameter_pool;
+inline std::vector<std::unique_ptr<NVSDK_NGX_Handle>> handle_pool;
+inline NVSDK_NGX_Parameter* NewParameters() {
+  auto p = std::make_unique<NVSDK_NGX_Parameter>();
+  p->id = object_id++;
+  auto* result = p.get();
+  parameter_pool.push_back(std::move(p));
+  return result;
+}
+inline NVSDK_NGX_Handle* NewHandle(NVSDK_NGX_Parameter* p = nullptr) {
+  auto handle = std::make_unique<NVSDK_NGX_Handle>();
+  handle->id = object_id++;
+  handle->parameters = p;
+  auto* result = handle.get();
+  handle_pool.push_back(std::move(handle));
+  return result;
+}
+namespace bridge {
+inline void AllocateOwnedParameters(NVSDK_NGX_Parameter** p) { *p = NewParameters(); }
+inline void DestroyOwnedParameters(NVSDK_NGX_Parameter* p) {
+  CHECK(!p->destroyed);
+  p->destroyed = true;
+  events.push_back("parameters:" + std::to_string(p->id));
+}
+}
+struct ID3D12Resource {};
+struct ID3D12Device {};
+namespace codec {
+enum class Encoding { Linear };
+struct SourceUnits { Encoding encoding = Encoding::Linear; };
+}
+@CORE_TYPES@
+struct FeatureState { NormStream norm; };
+struct EvaluationContract { int32_t frame_reset = 0; FeedSource feed = FeedSource::kV1; };
+namespace look {
+@LOOK_TYPES@
+}
+namespace defaults {
+@DEFAULT_CONSTANTS@
+}
+namespace norm_trace {
+@SNAP_CONSTANTS@
+}
+namespace stages {
+enum class Point { Render, Upscaled, Present };
+inline Point current = Point::Upscaled;
+inline uint32_t counts[3] = {4, 4, 0};
+struct Scope {
+  Point before;
+  explicit Scope(Point point) : before(current) { current = point; }
+  ~Scope() { current = before; }
+};
+struct Plan {
+  bool Valid() const { return true; }
+  uint32_t Count(Point point) const { return counts[static_cast<unsigned>(point)]; }
+};
+inline Plan Current() { return {}; }
+inline uint32_t Count() { return Current().Count(current); }
+inline uint32_t Channel(uint32_t index) { return (current == Point::Render ? 0u : 4u) + index; }
+}
+inline std::atomic_uint64_t history_reset_epoch{77};
+inline void RequestHistoryReset() { ++history_reset_epoch; }
+inline std::atomic_uint32_t look_upsample{0}, look_area_input_applied{2};
+inline std::atomic_bool look_mode{false}, look_stabilize_detail{false};
+inline std::atomic_uint32_t look_stabilize{0}, detail_stability{0};
+inline std::atomic<float> look_strength{1.f}, look_brighten{1.f}, look_darken{1.f};
+inline std::atomic<float> look_max_brighten{0.f}, look_max_darken{0.f};
+inline std::atomic<float> look_colour{1.f}, look_hue{1.f}, look_max_colour{0.f};
+inline std::atomic<float> look_shadows{1.f}, look_midtones{1.f}, look_highlights{1.f};
+inline std::atomic<float> look_tone{1.f}, look_detail{1.f}, look_halo{0.f}, look_halo_bright{0.f};
+inline std::atomic<float> look_detail_radius{1.f}, look_stabilize_ms{60.f};
+inline std::atomic_uint32_t depth_mode{0}, style{0}, norm_governor{1}, feed_mode{0};
+inline std::atomic_bool chained_temporal_history{true}, skin_independent{true};
+inline std::atomic_bool use_auto_mask{false}, ui_correction{false}, norm_cut_aware{false};
+inline std::atomic<float> local_tone_strength{1.f}, local_structure_strength{1.f}, skin_structure_strength{-1.f};
+inline std::array<uint32_t, 12> pass_style{};
+inline std::array<float, 12> pass_local_tone{}, pass_local_structure{}, pass_skin_structure{};
+inline std::array<bool, 12> pass_auto_mask{}, pass_ui_correction{};
+inline bool style_tone_advisory_logged = false;
+inline float PassIntensity(uint32_t) { return 1.f; }
+template <typename T, size_t N>
+T PassModel(uint32_t, const std::atomic<T>& value, const std::array<T, N>&) { return value.load(); }
+inline std::atomic<float> norm_attack_stops{1.f}, norm_release_stops{1.f}, norm_slew_stops{1.f};
+inline std::atomic_uint64_t norm_snap_count{0}, norm_snap_prime{0}, norm_snap_epoch{0}, norm_snap_reset{0};
+inline std::atomic_uint64_t look_history_restarts{0}, look_stability_passes{0}, look_shaped_passes{0};
+@SHARED_FUNCTIONS@
+@VULKAN_TYPES@
+@TRACKING@
+inline std::unordered_map<const NVSDK_NGX_Handle*, Feature> features;
+inline std::atomic_uint32_t live_nr_features{0}, workset_free_policy{0};
+inline std::atomic_uint64_t configuration_generation{7}, nr_passes{0};
+inline std::atomic_bool nr_feature_ever_ready{false};
+inline uint32_t last_result = 0;
+inline int inject_evaluate = 0, inject_create = 0;
+inline uint32_t create_calls = 0, evaluate_calls = 0;
+struct FakeRuntime {
+  int create(VkDevice, VkCommandBuffer, int, NVSDK_NGX_Parameter* p, NVSDK_NGX_Handle** handle) {
+    CHECK(runtime_depth != 0 && ngx_serial::depth != 0);
+    ++create_calls;
+    events.push_back("create");
+    if (inject_create == 2) throw std::runtime_error("injected create exception");
+    if (inject_create == 1) return -1;
+    *handle = NewHandle(p);
+    return 1;
+  }
+  int evaluate(VkCommandBuffer, NVSDK_NGX_Handle* handle, NVSDK_NGX_Parameter* p, void*) {
+    CHECK(runtime_depth != 0 && ngx_serial::depth != 0);
+    CHECK(handle != nullptr && !handle->released && handle->parameters == p && !p->destroyed);
+    ++evaluate_calls;
+    events.push_back("evaluate");
+    if (inject_evaluate == 2) throw std::runtime_error("injected evaluate exception");
+    return inject_evaluate == 1 ? -1 : 1;
+  }
+  void release(NVSDK_NGX_Handle* handle) {
+    CHECK(handle != nullptr && !handle->released);
+    CHECK(handle->parameters == nullptr || !handle->parameters->destroyed);
+    handle->released = true;
+    events.push_back("release:" + std::to_string(handle->id));
+  }
+} runtime;
+inline void SetNrCreateParameters(NVSDK_NGX_Parameter* p, uint32_t, uint32_t, uint32_t,
+                                  uint32_t, uint32_t, bool) { CHECK(!p->destroyed); }
+enum class NrDeclineReason {
+  kCount, kFailureBackoff, kSlotWarmupMaturation, kGameEvaluateFailed,
+  kNrDisabledEvaluation, kMalformedEvaluate, kForeignNr, kSourceOther,
+  kNgxNotDlssEvaluation, kZeroStrengthPassthrough, kNgxMissingGuides,
+  kNgxOutputGeometry, kPreSrGeometry
+};
+@LIFETIME_FUNCTIONS@
+inline reshade::api::device fake_device;
+inline reshade::api::command_list list_a{1}, list_b{2};
+
+// The production contract-change, retry-expiry, create_slot lambda and
+// maturation statements are inserted unchanged. Only device/SDK I/O is fake.
+inline NrDeclineReason SelectSlots(StageFeature& feature, uint32_t stack, uint32_t* ready) {
+  const ngx_serial::Call ngx_turn;
+  RuntimeLock lock(runtime_mutex);
+  const uint32_t width = 320, height = 180, hdr_mode = 1;
+  const VkDevice device = &fake_device;
+  const VkCommandBuffer command_buffer = &list_a;
+  auto* cmd = &list_a;
+  struct { bool active = false; } restore;
+  (void)restore;
+@SLOT_SELECTION@
+  *ready = passes;
+  return NrDeclineReason::kCount;
+}
+
+// Actual SetModelParameters, use-ID tracking, runtime try/catch, failure
+// branch and success bookkeeping from ProcessNr; transition is recorded only.
+inline NrDeclineReason EvaluatePass(StageFeature& feature, uint32_t pass,
+                                   const NVSDK_NGX_Parameter* parameters) {
+  using namespace reshade::api;
+  const ngx_serial::Call ngx_turn;
+  RuntimeLock lock(runtime_mutex);
+  auto* cmd = &list_a;
+  const VkCommandBuffer command_buffer = &list_a;
+  auto& slot = feature.slots[pass];
+  auto* const nr = slot.parameters;
+  (void)parameters;
+@MODEL_FRAME_RESET@
+  const uint64_t chain_reset_epoch = history_reset_epoch.load();
+  uint32_t model_passes = 0;
+  const auto transition = [](Surface, reshade::api::resource_usage) { events.push_back("transition"); };
+@EVALUATE_BRANCH@
+  CHECK(model_passes == 1);
+  return NrDeclineReason::kCount;
+}
+inline look::Settings SettingsForStage(bool pre_sr) {
+  (void)pre_sr;
+@LOOK_CALL@
+  return look_settings;
+}
+inline bool NormPending(const StageFeature& feature) {
+#if OLD_SOURCE
+  (void)feature;
+  return false;
+#else
+  return feature.norm_pending_reset;
+#endif
+}
+
+// Normalization shaders are NOT run. The frame reset expression, CPU plan
+// call and latch-consumption statement come from production; dispatch order
+// relative to consumption is checked statically by the extraction runner.
+inline FrameScalePlan RecordNorm(StageFeature& feature, const NVSDK_NGX_Parameter* parameters) {
+  const ngx_serial::Call ngx_turn;
+  RuntimeLock lock(runtime_mutex);
+  (void)parameters;
+  EvaluationContract frame;
+@NORM_FRAME_RESET@
+  frame.feed = feature.ngx.norm.feed;
+  auto workset = feature.worksets.begin();
+@NORM_PLAN_CALL@
+  events.push_back("normalization-recorded");
+@NORM_CONSUMPTION@
+  return plan;
+}
+
+inline bool callback_active = true, direct_call = false, yields_foreign = false;
+inline bool protocol_supported = false, consume_stage = true;
+inline bool guides_present[2] = {true, true};
+inline int native_result = 1;
+inline uint32_t native_calls = 0, stage_calls[2] = {};
+inline uint32_t call_depth = 0;
+inline std::atomic_bool enabled{true}, foreign_dx11_tool_seen{false}, d3d12_present_seen{false};
+inline std::atomic_bool bridge_yielding{false};
+inline std::atomic_uint32_t bridge_yield_changes{0};
+inline std::atomic_int64_t nr_off_seen_ns{0}, d3d12_nr_success_ns{0};
+inline std::atomic_uint64_t intercepted_evaluations{0}, dlss_evaluates{0}, successful_evaluations{0};
+inline NrDeclineReason last_decline = NrDeclineReason::kCount;
+struct CallbackScope { explicit operator bool() const { return callback_active; } };
+struct NgxNesting {
+  uint32_t* depth;
+  bool outermost;
+  explicit NgxNesting(uint32_t* value) : depth(value), outermost((*value)++ == 0) {}
+  ~NgxNesting() { --*depth; }
+};
+struct EvaluateChainScope {};
+struct EvaluateInFlightScope { explicit EvaluateInFlightScope(bool) {} };
+struct RenderColorScope { explicit RenderColorScope(const NVSDK_NGX_Parameter*) {} };
+inline bool InsideDirectCall() { return direct_call; }
+inline void NgxLifecycleTick() {}
+inline void PrimeNgxLoaderSymbols(void*) { CHECK(runtime_depth == 0); }
+inline bool NrYieldsToForeign() { return yields_foreign; }
+inline bool BridgeStageProtocol() { CHECK(runtime_depth == 0); return protocol_supported; }
+inline void CountNrDecline(NrDeclineReason reason) { last_decline = reason; }
+enum Entry { kEvaluate };
+inline void Enter(Entry) {}
+template <typename Fn> void GuardHook(Fn&& fn) { fn(); }
+inline int NativeEvaluate(VkCommandBuffer, const NVSDK_NGX_Handle*,
+                          const NVSDK_NGX_Parameter*, PFN_NVSDK_NGX_ProgressCallback) {
+  CHECK(runtime_depth == 0);
+  ++native_calls;
+  events.push_back("native-sr");
+  return native_result;
+}
+using EvaluateFn = int(*)(VkCommandBuffer, const NVSDK_NGX_Handle*, const NVSDK_NGX_Parameter*,
+                         PFN_NVSDK_NGX_ProgressCallback);
+struct Real { void* evaluate = nullptr; };
+inline Real slot_real[1];
+
+// HookedEvaluate below is complete production code. This ProcessNr seam
+// executes its verbatim reconciliation and missing-guide gates, then fakes
+// image work using the separately extracted normalization/model functions.
+inline NrDeclineReason ProcessNr(VkCommandBuffer command_buffer,
+                                const NVSDK_NGX_Handle* handle,
+                                const NVSDK_NGX_Parameter* parameters,
+                                stages::Point stage,
+                                RenderColorScope* render_color = nullptr) {
+  (void)command_buffer;
+  (void)render_color;
+@PROCESS_ENTRY@
+  const uint32_t index = pre_sr ? 0u : 1u;
+  ++stage_calls[index];
+  events.push_back(pre_sr ? "render" : "upscaled");
+  const int token = 1;
+  const int* depth = guides_present[index] ? &token : nullptr;
+  const int* motion = guides_present[index] ? &token : nullptr;
+  struct { bool ReadWrite = true; } output_value;
+  auto* output = &output_value;
+@GUIDE_GATES@
+  if (!consume_stage) return NrDeclineReason::kCount;
+  auto& feature = features.at(handle).stages[index];
+  RecordNorm(feature, parameters);
+  RuntimeLock lock(runtime_mutex);
+  for (uint32_t pass = 0; pass < stack; ++pass) {
+    SetModelParameters(feature.slots[pass], pass, history_reset_epoch.load(), 0, 0, false);
+  }
+  return NrDeclineReason::kCount;
+}
+@HOOK_FUNCTIONS@
+
+inline void ResetHarness() {
+  CHECK(runtime_depth == 0 && ngx_serial::depth == 0);
+  features.clear(); parameter_pool.clear(); handle_pool.clear();
+  recorded_uses.clear(); live_recorded_uses.clear(); events.clear();
+  object_id = next_use_id = 1;
+  fake_now_ns = 10'000'000'000;
+  live_nr_features = 0; workset_free_policy = 0; configuration_generation = 7;
+  nr_passes = 0;
+  inject_evaluate = inject_create = 0; create_calls = evaluate_calls = 0;
+  history_reset_epoch = 77;
+  look_upsample = 0; look_area_input_applied = 2; look_mode = false;
+  look_stabilize = 0; look_stabilize_detail = false; detail_stability = 0;
+  look_stabilize_ms = 60.f; look_strength = 1.f; look_detail = 1.f;
+  norm_governor = 1; norm_cut_aware = false; feed_mode = 0;
+  chained_temporal_history = true; norm_snap_count = 0; norm_snap_reset = 0;
+  callback_active = true; direct_call = yields_foreign = protocol_supported = false;
+  consume_stage = true; guides_present[0] = guides_present[1] = true;
+  native_result = 1; native_calls = 0; stage_calls[0] = stage_calls[1] = 0;
+  call_depth = 0; enabled = true; foreign_dx11_tool_seen = d3d12_present_seen = false;
+  d3d12_nr_success_ns = nr_off_seen_ns = 0; bridge_yielding = false;
+  last_decline = NrDeclineReason::kCount;
+  stages::current = stages::Point::Upscaled;
+  stages::counts[0] = stages::counts[1] = 4; stages::counts[2] = 0;
+  slot_real[0].evaluate = reinterpret_cast<void*>(&NativeEvaluate);
+}
+inline Feature& AddFeature(const NVSDK_NGX_Handle** key, int id = kFeatureDlss) {
+  *key = NewHandle();
+  Feature& game = features[*key];
+  game.id = id; game.device = &fake_device;
+  for (uint32_t stage = 0; stage < 2; ++stage) {
+    auto& feature = game.stages[stage];
+    feature.device = &fake_device; feature.channel_offset = stage * 4;
+    feature.nr_width = 320; feature.nr_height = 180; feature.nr_hdr_mode = 1;
+    feature.configuration = configuration_generation.load();
+    feature.commit = {object_id++}; feature.commit_view = {object_id++};
+    feature.commit_use = next_use_id++; feature.commit_cleared = true;
+    Workset workset; workset.use_id = next_use_id++;
+    workset.images[0] = {object_id++}; workset.views[0] = {object_id++};
+    feature.worksets.push_back(workset);
+    feature.ngx.norm.primed = true; feature.ngx.norm.epoch = history_reset_epoch.load();
+    feature.ngx.norm.last_ns = fake_now_ns - 16'000'000;
+    for (uint32_t pass = 0; pass < kMaxNrPasses; ++pass) {
+      auto& slot = feature.slots[pass];
+      slot.parameters = NewParameters(); slot.handle = NewHandle(slot.parameters);
+      slot.acknowledged_reset_epoch = history_reset_epoch.load();
+      slot.configuration_generation = feature.configuration;
+      feature.nr_use[pass] = next_use_id++;
+      auto& history = feature.look_history[pass];
+      for (auto& half : history.buffers) { half.image = {object_id++}; half.view = {object_id++}; }
+      history.width = 320; history.height = 180; history.valid = true;
+      history.written = 1; history.whole_edit = true; history.epoch = 11;
+      history.last_ns = fake_now_ns - 16'000'000;
+      feature.look_history_use[pass] = next_use_id++;
+      ++live_nr_features;
+    }
+  }
+  return game;
+}
+struct Fixture {
+  const NVSDK_NGX_Handle* key = nullptr;
+  Feature* game = nullptr;
+  NVSDK_NGX_Parameter* parameters = nullptr;
+  explicit Fixture(int id = kFeatureDlss) {
+    ResetHarness();
+    game = &AddFeature(&key, id);
+    parameters = NewParameters();
+    parameters->ints[NVSDK_NGX_Parameter_Reset] = 0;
+  }
+  StageFeature& stage(uint32_t index = 0) { return game->stages[index]; }
+  int hook() { return HookedEvaluate<0>(&list_a, key, parameters, nullptr); }
+};
+inline void CheckHistory(const LookHistoryVk& actual, const LookHistoryVk& expected) {
+  for (uint32_t i = 0; i < 2; ++i) {
+    CHECK(actual.buffers[i].image.handle == expected.buffers[i].image.handle);
+    CHECK(actual.buffers[i].view.handle == expected.buffers[i].view.handle);
+  }
+  CHECK(actual.width == expected.width && actual.height == expected.height);
+  CHECK(actual.written == expected.written && actual.valid == expected.valid);
+  CHECK(actual.whole_edit == expected.whole_edit && actual.epoch == expected.epoch);
+  CHECK(actual.last_ns == expected.last_ns);
+}
+inline void CheckContract(const StageFeature& actual, const StageFeature& before) {
+  CHECK(actual.nr_width == before.nr_width && actual.nr_height == before.nr_height);
+  CHECK(actual.nr_hdr_mode == before.nr_hdr_mode && actual.configuration == before.configuration);
+  CHECK(actual.worksets.size() == before.worksets.size());
+  CHECK(actual.worksets[0].use_id == before.worksets[0].use_id);
+  CHECK(actual.commit.handle == before.commit.handle && actual.commit_view.handle == before.commit_view.handle);
+  CHECK(actual.commit_use == before.commit_use && actual.commit_cleared == before.commit_cleared);
+  CHECK(actual.ngx.norm.primed == before.ngx.norm.primed);
+  CHECK(actual.ngx.norm.epoch == before.ngx.norm.epoch && actual.ngx.norm.last_ns == before.ngx.norm.last_ns);
+}
+inline void CheckPending(const StageFeature& stage, bool expected) {
+  for (const auto& slot : stage.slots) CHECK(slot.pending_reset == expected);
+}
+inline void Drain(StageFeature& feature) {
+  const ngx_serial::Call ngx_turn;
+  RuntimeLock lock(runtime_mutex);
+  DrainRetiredFeature(&feature);
+}
+inline void RetireSuffix(StageFeature& feature, uint32_t first) {
+  const ngx_serial::Call ngx_turn;
+  RuntimeLock lock(runtime_mutex);
+  RetireStagePasses(&feature, first);
+}
+inline size_t EventIndex(const std::string& event) {
+  const auto found = std::find(events.begin(), events.end(), event);
+  CHECK(found != events.end());
+  return static_cast<size_t>(found - events.begin());
+}
+inline void FailureCase(uint32_t pass, bool throws) {
+  Fixture f;
+  auto& feature = f.stage();
+  feature.slots[pass].fail_count = 3;
+  for (uint32_t prefix = 0; prefix < pass; ++prefix) {
+    CHECK(EvaluatePass(feature, prefix, f.parameters) == NrDeclineReason::kCount);
+    FinishLookPass(&feature.look_history[prefix], true, true, fake_now_ns, look::Constants{},
+                   0, prefix, 320, 180);
+  }
+  const StageFeature before = feature, other = f.stage(1);
+  inject_evaluate = throws ? 2 : 1;
+  CHECK(EvaluatePass(feature, pass, f.parameters) == NrDeclineReason::kFailureBackoff);
+  CHECK(evaluate_calls == pass + 1 && nr_passes.load() == pass);
+  const auto& failed = feature.slots[pass];
+  CHECK(failed.handle == nullptr && failed.parameters == nullptr);
+  CHECK(failed.failed && failed.failed_ns == fake_now_ns && failed.fail_count == 3);
+  CHECK(live_nr_features.load() == 7);
+  CHECK(feature.retired_nr.size() == 1 && feature.retired_history.size() == 1);
+  CHECK(feature.retired_nr[0].handle == before.slots[pass].handle);
+  CHECK(feature.retired_nr[0].parameters == before.slots[pass].parameters);
+  CHECK(feature.retired_nr[0].use_id == before.nr_use[pass]);
+  CHECK(feature.retired_history[0].use_id == before.look_history_use[pass]);
+  CHECK(feature.nr_use[pass] == 0 && feature.look_history_use[pass] == 0);
+  CHECK(!feature.look_history[pass].valid);
+  CheckContract(feature, before);
+  CHECK(!before.slots[pass].handle->released && !before.slots[pass].parameters->destroyed);
+  CHECK(!RecordedUseComplete(before.nr_use[pass]));
+  for (uint32_t i = 0; i < kMaxNrPasses; ++i) {
+    if (i != pass) {
+      CHECK(feature.slots[i].handle == before.slots[i].handle);
+      CHECK(feature.slots[i].parameters == before.slots[i].parameters);
+      CHECK(feature.nr_use[i] == before.nr_use[i]);
+      CheckHistory(feature.look_history[i], before.look_history[i]);
+      CHECK(feature.look_history_use[i] == before.look_history_use[i]);
+      CHECK(feature.slots[i].pending_reset == (i > pass));
+    }
+    CHECK(f.stage(1).slots[i].handle == other.slots[i].handle);
+    CHECK(!f.stage(1).slots[i].pending_reset);
+    CheckHistory(f.stage(1).look_history[i], other.look_history[i]);
+  }
+  CHECK(history_reset_epoch.load() == 77);
+}
+inline void BackoffWarmupCase(uint32_t failed_pass) {
+  Fixture f;
+  auto& feature = f.stage();
+  auto* old_handle = feature.slots[failed_pass].handle;
+  const uint64_t old_use = feature.nr_use[failed_pass];
+  feature.slots[failed_pass].fail_count = 2;
+  inject_evaluate = 1;
+  CHECK(EvaluatePass(feature, failed_pass, f.parameters) == NrDeclineReason::kFailureBackoff);
+  const int64_t failed_ns = fake_now_ns;
+  uint32_t ready = 99;
+  const auto expected_wait = failed_pass == 0 ? NrDeclineReason::kFailureBackoff : NrDeclineReason::kCount;
+  CHECK(SelectSlots(feature, 4, &ready) == expected_wait);
+  CHECK(create_calls == 0 && feature.slots[failed_pass].failed);
+  if (failed_pass != 0) CHECK(ready == failed_pass);
+  fake_now_ns = failed_ns + 1'999'999'999;
+  CHECK(SelectSlots(feature, 4, &ready) == expected_wait && create_calls == 0);
+  fake_now_ns = failed_ns + 2'000'000'000;
+  const auto expected_create = failed_pass == 0 ? NrDeclineReason::kSlotWarmupMaturation : NrDeclineReason::kCount;
+  CHECK(SelectSlots(feature, 4, &ready) == expected_create);
+  CHECK(create_calls == 1 && evaluate_calls == 1);
+  CHECK(feature.slots[failed_pass].handle != nullptr && feature.slots[failed_pass].handle != old_handle);
+  CHECK(feature.slots[failed_pass].fail_count == 3 && !feature.slots[failed_pass].failed);
+  CHECK(feature.slots[failed_pass].pending_reset && feature.nr_use[failed_pass] != old_use);
+  CHECK(!old_handle->released && live_nr_features.load() == 8);
+  if (failed_pass != 0) CHECK(ready == failed_pass);
+  CHECK(SelectSlots(feature, 4, &ready) == NrDeclineReason::kCount && ready == 4);
+  inject_evaluate = 0;
+  CHECK(EvaluatePass(feature, failed_pass, f.parameters) == NrDeclineReason::kCount);
+  CHECK(feature.slots[failed_pass].fail_count == 0 && !feature.slots[failed_pass].pending_reset);
+  CHECK(feature.slots[failed_pass].model_reset);
+  CHECK(feature.slots[failed_pass].parameters->ints.at("DLSSNR.Reset") == 1);
+}
+
+using Test = std::pair<std::string, std::function<void()>>;
+int main(int argc, char** argv) {
+  const std::string filter = argc > 1 ? argv[1] : "";
+  std::vector<Test> tests;
+  const auto add = [&](const std::string& name, std::function<void()> test) {
+    tests.emplace_back(name, std::move(test));
+  };
+  add("runtime-lock-reentry-is-rejected", [] {
+    ResetHarness();
+    const ngx_serial::Call ngx_turn;
+    {
+      RuntimeLock outer(runtime_mutex);
+      bool rejected = false;
+      try { RuntimeLock nested(runtime_mutex); }
+      catch (const std::runtime_error&) { rejected = true; }
+      CHECK(rejected && runtime_depth == 1);
+    }
+    CHECK(runtime_depth == 0);
+    RuntimeLock next(runtime_mutex);
+    CHECK(runtime_depth == 1);
+  });
+  add("runtime-lock-requires-ngx-turn", [] {
+    ResetHarness();
+    bool rejected = false;
+    try { RuntimeLock lock(runtime_mutex); }
+    catch (const std::runtime_error&) { rejected = true; }
+    CHECK(rejected && runtime_depth == 0);
+    const ngx_serial::Call ngx_turn;
+    RuntimeLock next(runtime_mutex);
+    CHECK(runtime_depth == 1);
+  });
+  add("look-auto-render-off", [] { ResetHarness(); CHECK(SettingsForStage(true).stabilize == 0); });
+  add("look-auto-upscaled-on", [] {
+    ResetHarness(); const auto s = SettingsForStage(false);
+    CHECK(s.stabilize == 2 && s.stabilize_detail && s.stabilize_alpha == defaults::kDetailStabilityAlpha);
+  });
+  add("look-off-both-stages", [] {
+    ResetHarness(); detail_stability = 1;
+    CHECK(SettingsForStage(true).stabilize == 0 && SettingsForStage(false).stabilize == 0);
+  });
+  add("look-always-both-stages", [] {
+    ResetHarness(); detail_stability = 2;
+    for (bool pre : {true, false}) CHECK(SettingsForStage(pre).stabilize_alpha == defaults::kDetailStabilityAlpha);
+  });
+  for (uint32_t mode : {1u, 2u}) {
+    add("look-explicit-stabilize-" + std::to_string(mode), [mode] {
+      ResetHarness(); look_mode = true; look_stabilize = mode;
+      look_stabilize_ms = 91.f; look_stabilize_detail = true; detail_stability = 2;
+      for (bool pre : {true, false}) {
+        const auto s = SettingsForStage(pre);
+        CHECK(s.stabilize == mode && s.stabilize_ms == 91.f && s.stabilize_detail);
+        CHECK(s.stabilize_alpha == 0.f);
+      }
+    });
+  }
+  add("look-settings-and-area-reset-preserved", [] {
+    ResetHarness(); look_mode = true; look_strength = 0.4f; look_detail = 1.8f;
+    CHECK(SettingsForStage(true).strength == 0.4f && SettingsForStage(false).detail == 1.8f);
+    look_upsample = 3; SettingsForStage(true); CHECK(history_reset_epoch == 78);
+    SettingsForStage(false); CHECK(history_reset_epoch == 78);
+    look_upsample = 1; SettingsForStage(true); CHECK(history_reset_epoch == 79);
+  });
+  for (uint32_t pass : {0u, 2u}) {
+    for (bool throws : {false, true}) {
+      add("failure-pass-" + std::to_string(pass) + (throws ? "-exception" : "-result"),
+          [pass, throws] { ResetHarness(); nr_passes = 0; FailureCase(pass, throws); });
+    }
+    add("backoff-warmup-pass-" + std::to_string(pass), [pass] { BackoffWarmupCase(pass); });
+  }
+  add("first-failure-next-evaluate-retry", [] {
+    Fixture f; inject_evaluate = 1;
+    CHECK(EvaluatePass(f.stage(), 0, f.parameters) == NrDeclineReason::kFailureBackoff);
+    uint32_t ready = 0;
+    CHECK(SelectSlots(f.stage(), 4, &ready) == NrDeclineReason::kSlotWarmupMaturation);
+    CHECK(create_calls == 1 && f.stage().slots[0].fail_count == 1);
+  });
+  for (uint32_t count : {1u, 2u, 3u, 6u, 20u}) {
+    add("backoff-boundary-count-" + std::to_string(count), [count] {
+      ResetHarness(); NrFeatureSlot slot; slot.fail_count = count; slot.failed_ns = fake_now_ns;
+      const int64_t delay = count == 1 ? 1'000'000'000 : count == 2 ? 2'000'000'000 :
+                            count == 3 ? 4'000'000'000 : 30'000'000'000;
+      fake_now_ns += delay - 1; CHECK(!FeatureFailureExpired(slot));
+      ++fake_now_ns; CHECK(FeatureFailureExpired(slot));
+    });
+  }
+  for (int failure : {1, 2}) {
+    add("create-retry-retains-failure-count-" + std::to_string(failure), [failure] {
+      Fixture f; inject_evaluate = 1;
+      CHECK(EvaluatePass(f.stage(), 0, f.parameters) == NrDeclineReason::kFailureBackoff);
+      inject_create = failure; uint32_t ready = 0;
+      CHECK(SelectSlots(f.stage(), 4, &ready) == NrDeclineReason::kFailureBackoff);
+      CHECK(f.stage().slots[0].failed && f.stage().slots[0].fail_count == 1);
+      CHECK(SelectSlots(f.stage(), 4, &ready) == NrDeclineReason::kFailureBackoff && create_calls == 1);
+      fake_now_ns += 1'000'000'000; inject_create = 0;
+      CHECK(SelectSlots(f.stage(), 4, &ready) == NrDeclineReason::kSlotWarmupMaturation);
+      CHECK(f.stage().slots[0].fail_count == 2 && create_calls == 2);
+    });
+  }
+  add("recorded-use-two-command-buffers-no-early-release", [] {
+    Fixture f; auto& feature = f.stage();
+    auto* handle = feature.slots[0].handle; auto* parameters = feature.slots[0].parameters;
+    const auto history = feature.look_history[0];
+    const uint64_t use = feature.nr_use[0], history_use = feature.look_history_use[0];
+    TrackRecordedUse(&list_a, use); TrackRecordedUse(&list_a, use);
+    TrackRecordedUse(&list_b, use); TrackRecordedUse(&list_a, history_use); TrackRecordedUse(&list_b, history_use);
+    CHECK(live_recorded_uses.at(use) == 2);
+    inject_evaluate = 1; EvaluatePass(feature, 0, f.parameters);
+    fake_now_ns += 60'000'000'000; Drain(feature); Drain(feature);
+    CHECK(!handle->released && !parameters->destroyed && feature.retired_history.size() == 1);
+    ForgetRecordedUses(&list_a); Drain(feature);
+    CHECK(!handle->released && !parameters->destroyed && !RecordedUseComplete(use));
+    ForgetRecordedUses(&list_b); Drain(feature);
+    CHECK(handle->released && parameters->destroyed && feature.retired_nr.empty() && feature.retired_history.empty());
+    CHECK(EventIndex("release:" + std::to_string(handle->id)) < EventIndex("parameters:" + std::to_string(parameters->id)));
+    EventIndex("image:" + std::to_string(history.buffers[0].image.handle));
+    EventIndex("view:" + std::to_string(history.buffers[1].view.handle));
+    const auto size = events.size(); Drain(feature); CHECK(events.size() == size);
+  });
+  add("independent-look-history-use-id", [] {
+    Fixture f; auto& feature = f.stage();
+    auto* handle = feature.slots[2].handle; auto* p = feature.slots[2].parameters;
+    const auto history = feature.look_history[2];
+    TrackRecordedUse(&list_b, feature.look_history_use[2]);
+    inject_evaluate = 1; EvaluatePass(feature, 2, f.parameters);
+    ForgetRecordedUses(&list_a); Drain(feature);
+    CHECK(handle->released && p->destroyed && feature.retired_history.size() == 1);
+    CHECK(std::find(events.begin(), events.end(), "image:" + std::to_string(history.buffers[0].image.handle)) == events.end());
+    ForgetRecordedUses(&list_b); Drain(feature); CHECK(feature.retired_history.empty());
+  });
+  add("keep-policy-retains-complete-retirement", [] {
+    Fixture f; inject_evaluate = 1; EvaluatePass(f.stage(), 0, f.parameters);
+    ForgetRecordedUses(&list_a); workset_free_policy = 1; Drain(f.stage());
+    CHECK(f.stage().retired_nr.size() == 1 && f.stage().retired_history.size() == 1);
+    workset_free_policy = 0; Drain(f.stage()); CHECK(f.stage().retired_nr.empty());
+  });
+  add("suffix-retirement-preserves-prefix-and-contract", [] {
+    Fixture f; const StageFeature before = f.stage();
+    RetireSuffix(f.stage(), 2);
+    CHECK(live_nr_features == 6 && f.stage().retired_nr.size() == 2);
+    CheckContract(f.stage(), before);
+    for (uint32_t i = 0; i < 2; ++i) {
+      CHECK(f.stage().slots[i].handle == before.slots[i].handle);
+      CheckHistory(f.stage().look_history[i], before.look_history[i]);
+    }
+    RetireSuffix(f.stage(), 2); CHECK(live_nr_features == 6 && f.stage().retired_nr.size() == 2);
+  });
+  add("full-stage-retirement-packs-worksets-and-divisor", [] {
+    Fixture f; const uint64_t commit_use = f.stage().commit_use;
+    RetireSuffix(f.stage(), 0);
+    CHECK(f.stage().worksets.empty() && f.stage().retired_worksets.size() == 2);
+    CHECK(f.stage().retired_worksets[1].use_id == commit_use);
+    CHECK(f.stage().commit.handle == 0 && f.stage().nr_width == 0 && live_nr_features == 4);
+    CHECK(f.stage(1).nr_width == 320 && f.stage(1).worksets.size() == 1);
+  });
+  add("handleless-unrecorded-parameters-cleanup", [] {
+    Fixture f; auto& slot = f.stage().slots[3]; auto* p = slot.parameters;
+    slot.handle = nullptr; f.stage().nr_use[3] = 0; --live_nr_features;
+    RetireSuffix(f.stage(), 3);
+    CHECK(p->destroyed && f.stage().retired_nr.empty() && live_nr_features == 7);
+  });
+  add("reset-survives-missing-guides", [] {
+    Fixture f; guides_present[0] = guides_present[1] = false;
+    f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 1; CHECK(f.hook() == 1);
+    for (const auto& stage : f.game->stages) { CheckPending(stage, true); CHECK(NormPending(stage)); }
+    CHECK(f.parameters->reset_reads == 1 && native_calls == 1);
+    CHECK(history_reset_epoch == 77);
+    f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 0;
+    guides_present[0] = guides_present[1] = true; CHECK(f.hook() == 1);
+    CHECK(f.parameters->reset_reads == 2);
+    for (const auto& stage : f.game->stages) {
+      CheckPending(stage, false); CHECK(!NormPending(stage));
+      for (const auto& slot : stage.slots) CHECK(slot.model_reset && slot.parameters->ints.at("DLSSNR.Reset") == 1);
+    }
+  });
+  add("reset-survives-native-sr-failure-stage-isolation", [] {
+    Fixture f; f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 1; native_result = -1;
+    CHECK(f.hook() == -1 && stage_calls[0] == 1 && stage_calls[1] == 0);
+    CheckPending(f.stage(), false); CHECK(!NormPending(f.stage()));
+    CheckPending(f.stage(1), true); CHECK(NormPending(f.stage(1)));
+    CHECK(last_decline == NrDeclineReason::kGameEvaluateFailed && f.parameters->reset_reads == 1);
+    native_result = 1; f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 0;
+    CHECK(f.hook() == 1);
+    for (const auto& slot : f.stage().slots) CHECK(!slot.model_reset);
+    for (const auto& slot : f.stage(1).slots) CHECK(slot.model_reset);
+    CHECK(!NormPending(f.stage(1)) && history_reset_epoch == 77);
+  });
+  for (int bypass : {0, 1, 2}) {
+    add("reset-before-bypass-" + std::to_string(bypass), [bypass] {
+      Fixture f; f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 1;
+      if (bypass == 0) enabled = false;
+      if (bypass == 1) yields_foreign = true;
+      if (bypass == 2) { foreign_dx11_tool_seen = true; d3d12_nr_success_ns = fake_now_ns; }
+      CHECK(f.hook() == 1 && native_calls == 1 && stage_calls[0] == 0 && stage_calls[1] == 0);
+      CheckPending(f.stage(), true); CheckPending(f.stage(1), true);
+      CHECK(f.parameters->reset_reads == 1);
+      CHECK(NormPending(f.stage()) && NormPending(f.stage(1)));
+      CHECK(EventIndex("read-reset") < EventIndex("native-sr"));
+      f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 0; f.hook();
+      CheckPending(f.stage(), true); CHECK(NormPending(f.stage(1)));
+    });
+  }
+  add("reset-registered-rr-only", [] {
+    Fixture f(kFeatureDlssd); f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 1;
+    guides_present[1] = false; CHECK(f.hook() == 1);
+    CheckPending(f.stage(), true); CheckPending(f.stage(1), true);
+    CHECK(f.parameters->reset_reads == 1 && stage_calls[0] == 0);
+  });
+  add("reset-no-cross-feature-or-global-epoch", [] {
+    Fixture f; const NVSDK_NGX_Handle* other_key = nullptr;
+    Feature& other = AddFeature(&other_key); (void)other_key;
+    f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 1; enabled = false; f.hook();
+    CheckPending(f.stage(), true);
+    for (const auto& stage : other.stages) { CheckPending(stage, false); CHECK(!NormPending(stage)); }
+    CHECK(history_reset_epoch == 77);
+  });
+  add("reset-does-not-read-unregistered-or-non-sr-parameters", [] {
+    Fixture f(18); f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 1;
+    CHECK(f.hook() == 1 && f.parameters->reset_reads == 0);
+    CheckPending(f.stage(), false);
+    const NVSDK_NGX_Handle* unknown = NewHandle();
+    CHECK(HookedEvaluate<0>(&list_a, unknown, f.parameters, nullptr) == 1);
+    CHECK(f.parameters->reset_reads == 0);
+  });
+  add("reset-null-arguments-do-not-read", [] {
+    Fixture f;
+    HookedEvaluate<0>(nullptr, f.key, f.parameters, nullptr);
+    HookedEvaluate<0>(&list_a, nullptr, f.parameters, nullptr);
+    HookedEvaluate<0>(&list_a, f.key, nullptr, nullptr);
+    CHECK(f.parameters->reset_reads == 0 && native_calls == 3);
+  });
+  add("reset-direct-nested-disabled-callback-do-not-latch", [] {
+    Fixture f; f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 1;
+    direct_call = true; f.hook(); direct_call = false;
+    call_depth = 1; f.hook(); call_depth = 0;
+    callback_active = false; f.hook();
+    CHECK(f.parameters->reset_reads == 0 && native_calls == 3);
+    CheckPending(f.stage(), false);
+  });
+  add("reset-exact-one-zero-absent-do-not-clear-latch", [] {
+    Fixture f; enabled = false;
+    f.parameters->ints.erase(NVSDK_NGX_Parameter_Reset); f.hook(); CheckPending(f.stage(), false);
+    f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 2; f.hook(); CheckPending(f.stage(), false);
+    f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 1; f.hook(); CheckPending(f.stage(), true);
+    f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 0; f.hook(); CheckPending(f.stage(), true);
+    CHECK(NormPending(f.stage()));
+  });
+  add("reset-zero-stage-maturing-slots-restart", [] {
+    Fixture f; stages::counts[0] = 0; f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 1;
+    f.hook(); CHECK(f.stage().slots[0].handle == nullptr && NormPending(f.stage()));
+    f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 0;
+    uint32_t ready = 0;
+    CHECK(SelectSlots(f.stage(), 4, &ready) == NrDeclineReason::kSlotWarmupMaturation);
+    CHECK(f.stage().slots[0].pending_reset && NormPending(f.stage()));
+    const auto plan = RecordNorm(f.stage(), f.parameters);
+    CHECK((plan.snap_reasons & norm_trace::kSnapReset) != 0 && !NormPending(f.stage()));
+  });
+  for (uint32_t mode : {1u, 2u, 3u}) {
+    add("normalization-latch-policy-mode-" + std::to_string(mode), [mode] {
+      Fixture f; enabled = false; f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 1; f.hook();
+      norm_governor = mode == 3 ? 2u : mode; norm_cut_aware = mode == 3;
+      f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 0;
+      const auto plan = RecordNorm(f.stage(), f.parameters);
+      CHECK(((plan.snap_reasons & norm_trace::kSnapReset) != 0) == (mode != 2));
+      CHECK(!NormPending(f.stage()) && NormPending(f.stage(1)));
+      CheckPending(f.stage(), true); CHECK(history_reset_epoch == 77);
+      const auto next = RecordNorm(f.stage(), f.parameters);
+      CHECK((next.snap_reasons & norm_trace::kSnapReset) == 0);
+    });
+  }
+  add("normalization-cut-aware-reset-burst-preserved", [] {
+    Fixture f; enabled = false; norm_governor = 2; norm_cut_aware = true;
+    f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 1; f.hook();
+    CHECK((RecordNorm(f.stage(), f.parameters).snap_reasons & norm_trace::kSnapReset) != 0);
+    fake_now_ns += 16'000'000; f.hook();
+    CHECK((RecordNorm(f.stage(), f.parameters).snap_reasons & norm_trace::kSnapReset) == 0);
+    fake_now_ns += defaults::kNormResetQuietNs; f.hook();
+    CHECK((RecordNorm(f.stage(), f.parameters).snap_reasons & norm_trace::kSnapReset) != 0);
+  });
+  add("failure-upscaled-does-not-touch-render", [] {
+    Fixture f; const auto render = f.stage();
+    inject_evaluate = 1;
+    CHECK(EvaluatePass(f.stage(1), 1, f.parameters) == NrDeclineReason::kFailureBackoff);
+    CHECK(f.stage(1).slots[1].failed && f.stage(1).slots[2].pending_reset);
+    for (uint32_t pass = 0; pass < kMaxNrPasses; ++pass) {
+      CHECK(f.stage().slots[pass].handle == render.slots[pass].handle);
+      CHECK(!f.stage().slots[pass].pending_reset);
+      CheckHistory(f.stage().look_history[pass], render.look_history[pass]);
+    }
+  });
+  add("recovered-middle-pass-keeps-prefix-resets-suffix-once", [] {
+    Fixture f; inject_evaluate = 1;
+    CHECK(EvaluatePass(f.stage(), 1, f.parameters) == NrDeclineReason::kFailureBackoff);
+    uint32_t ready = 0;
+    CHECK(SelectSlots(f.stage(), 4, &ready) == NrDeclineReason::kCount && ready == 1);
+    CHECK(SelectSlots(f.stage(), 4, &ready) == NrDeclineReason::kCount && ready == 4);
+    inject_evaluate = 0;
+    for (uint32_t pass = 0; pass < kMaxNrPasses; ++pass) {
+      CHECK(EvaluatePass(f.stage(), pass, f.parameters) == NrDeclineReason::kCount);
+      CHECK(f.stage().slots[pass].model_reset == (pass >= 1));
+    }
+    for (uint32_t pass = 0; pass < kMaxNrPasses; ++pass) {
+      CHECK(EvaluatePass(f.stage(), pass, f.parameters) == NrDeclineReason::kCount);
+      CHECK(!f.stage().slots[pass].model_reset);
+    }
+  });
+  add("consumed-reset-evaluate-failure-recreated-slot-resets", [] {
+    Fixture f; enabled = false; f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 1; f.hook();
+    f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 0; inject_evaluate = 1;
+    CHECK(EvaluatePass(f.stage(), 0, f.parameters) == NrDeclineReason::kFailureBackoff);
+    uint32_t ready = 0;
+    CHECK(SelectSlots(f.stage(), 4, &ready) == NrDeclineReason::kSlotWarmupMaturation);
+    CHECK(f.stage().slots[0].pending_reset);
+    inject_evaluate = 0; CHECK(EvaluatePass(f.stage(), 0, f.parameters) == NrDeclineReason::kCount);
+    CHECK(f.stage().slots[0].model_reset && NormPending(f.stage()));
+    CheckPending(f.stage(1), true);
+  });
+  add("look-history-restarts-after-latched-reset-only", [] {
+    Fixture f; const auto before = f.stage().look_history[0];
+    enabled = false; f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 1; f.hook();
+    CheckHistory(f.stage().look_history[0], before);
+    f.parameters->ints[NVSDK_NGX_Parameter_Reset] = 0;
+    CHECK(EvaluatePass(f.stage(), 0, f.parameters) == NrDeclineReason::kCount);
+    look::Frame frame;
+    PlanLookHistory(f.stage().look_history[0], f.stage().slots[0].model_reset, true, fake_now_ns, &frame);
+    CHECK(!frame.history_valid);
+    CHECK(EvaluatePass(f.stage(), 0, f.parameters) == NrDeclineReason::kCount);
+    PlanLookHistory(before, f.stage().slots[0].model_reset, true, fake_now_ns, &frame);
+    CHECK(frame.history_valid);
+  });
+  uint32_t passed = 0, failed = 0;
+  for (const auto& [name, test] : tests) {
+    if (!filter.empty() && name != filter) continue;
+    try { test(); ++passed; std::cout << "PASS " << name << '\n'; }
+    catch (const std::exception& e) { ++failed; std::cout << "FAIL " << name << ": " << e.what() << '\n'; }
+  }
+  std::cout << "CPU TESTS: " << passed << " passed, " << failed << " failed; source="
+            << (OLD_SOURCE ? "original" : "current") << '\n';
+  if (passed + failed == 0) return 2;
+  return failed == 0 ? 0 : 1;
+}

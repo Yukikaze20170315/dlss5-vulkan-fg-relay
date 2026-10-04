@@ -1,6 +1,6 @@
 @echo off
 rem Offline tests for the 2026-10-01 update. Usage: run.cmd SUITE NEW_OUTPUT_DIRECTORY [ARGUMENT]
-rem Suites: registry hooks guides colour recovery compatibility carrier guard focus gpu racehelper
+rem Suites: registry hooks guides colour recovery compatibility carrier carrier-range minhook-range guard focus gpu racehelper
 rem Every run builds into a NEW directory and refuses an existing one. No game is started.
 setlocal
 if "%~2"=="" goto usage
@@ -61,6 +61,18 @@ copy /y sr-a.dll sr-b.dll >> build.log || goto failed
 cl /nologo /W4 /WX /Od /MT /LD "%HERE%sr-fixture.cpp" rr-fixture.res /Fe:rr-fixture.dll >> build.log 2>&1 || goto failed
 call :bridge test-carrier.cpp || goto failed
 goto run
+
+:suite_minhook-range
+%CL_BRIDGE% "%HERE%test-minhook-range.cpp" "%SRC%\minhook.c" /Fe:test.exe /link %LIBS% > build.log 2>&1 || goto failed
+goto run
+
+:suite_carrier-range
+rc /nologo /fo sr-fixture.res "%HERE%sr-fixture.rc" > build.log 2>&1 || goto failed
+ml64 /nologo /c "%HERE%sr-low-fixture.asm" >> build.log 2>&1 || goto failed
+cl /nologo /W4 /WX /Od /MT /LD /DSR_LOW_FIXTURE "%HERE%sr-fixture.cpp" sr-fixture.res sr-low-fixture.obj /Fe:sr-low.dll /link /EXPORT:NVSDK_NGX_D3D12_EvaluateFeature /BASE:0x128AD0000 /DYNAMICBASE:NO /FIXED >> build.log 2>&1 || goto failed
+call :bridge test-carrier.cpp || goto failed
+test.exe --crowded > run.txt 2>&1
+goto result
 
 :suite_racehelper
 rem Builds only. carrier-race-helper.addon64 is a test-only ReShade add-on; see its source header.

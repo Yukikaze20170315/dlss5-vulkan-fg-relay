@@ -1,0 +1,902 @@
+From a699d5e92f862c842bf06dfeb7f0de8c20b7460f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E7=9B=97=E7=89=88=E3=81=AE=E9=9B=AA=E9=A2=A8=E9=85=B1?=
+ <50561019+Yukikaze20170315@users.noreply.github.com>
+Date: Mon, 5 Oct 2026 02:49:02 +0800
+Subject: [PATCH 2/7] Stage protocol v1: follow Generic's per-stage NR layer
+ counts
+
+A Generic build that exports DLSS5StageProtocolVersion()==1 and
+DLSS5GetStagePlan() chooses NR layers per stage: Render, Upscaled and
+Present, 0-4 each, packed into nine bits. With such a Generic the bridge
+serves only the Present layers, and only when their count is non-zero;
+Render and Upscaled run inside Generic on the game's own Vulkan evaluate.
+A Generic without these exports keeps the existing NRHookPoint behaviour.
+
+- present-adapter-config.h: find the plan query (not cached while Generic
+  is absent, since ReShade may load it after the bridge), reject reserved
+  bits and counts above 4; FgInputActive follows the Present count. Once
+  found, Generic is pinned (GET_MODULE_HANDLE_EX_FLAG_PIN) so the cached
+  query can never outlive the module. ReShade then keeps Generic as an
+  externally registered add-on across instance cycles, as it already does
+  for the bridge; the bridge still takes no transient reference.
+- present-adapter.inc: export DLSS5BridgeStageProtocolVersion() and
+  DLSS5BridgeActiveStagePlan(); PresentAdapterNrScope freezes the plan for
+  each carrier evaluate, and bit 31 tells Generic that the call is the
+  carrier, so it runs the Present layers only. An invalid plan pauses the
+  carrier. The begin-effects path also needs a non-zero Present count.
+- vkmirror.inc: with the protocol the bridge does not mirror the game's
+  Vulkan SR evaluates; they and nested NGX calls are forwarded unchanged,
+  and only a leftover mirror or a pending FG-input release is retired.
+- focus-fg.inc: the focus gate follows the Present count.
+- dlss5-bridge.cpp: never hook nvngx_dlssnr.dll; Generic's NR calls must
+  keep their own caller identity.
+- tests/stage-protocol: 125 legal and 391 invalid plans against the
+  production scope and configuration, for Pipeline 2/3 and Follow 0/1.
+  test-focus stubs the plan query.
+- tests/vulkan-fg-input: the round trip also accepts Generic
+  8.5.0-rc10-stages1 and then writes an explicit plan (Present 2).
+- tests/vulkan-fg-relay/lifetime: with a stage-protocol Generic, stable
+  expects the pinned path (one registration, kept across the instance
+  cycle, no transient reference); late-ref needs a Generic without the
+  protocol and reports not applicable otherwise.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ src/dlss5-bridge.cpp                          |   7 +
+ src/fg-input.inc                              |  11 +-
+ src/fg-relay.inc                              |  17 +-
+ src/focus-fg.inc                              |   9 +-
+ src/present-adapter-config.h                  |  51 +++++-
+ src/present-adapter.inc                       |  61 +++++--
+ src/vkmirror.inc                              |  23 ++-
+ tests/stage-protocol/README.md                |  26 +++
+ tests/stage-protocol/check.cpp                | 167 ++++++++++++++++++
+ tests/stage-protocol/consumer.cpp             |  16 ++
+ tests/stage-protocol/run.cmd                  |  39 ++++
+ tests/vulkan-fg-input/run-roundtrip.py        |  38 +++-
+ tests/vulkan-fg-input/validate-roundtrip.py   |   4 +-
+ tests/vulkan-fg-quality/test-focus.cpp        |   2 +
+ tests/vulkan-fg-relay/README.md               |   2 +-
+ tests/vulkan-fg-relay/lifetime/host.cpp       |  39 +++-
+ .../vulkan-fg-relay/lifetime/run-lifetime.py  |  12 +-
+ 17 files changed, 471 insertions(+), 53 deletions(-)
+ create mode 100644 tests/stage-protocol/README.md
+ create mode 100644 tests/stage-protocol/check.cpp
+ create mode 100644 tests/stage-protocol/consumer.cpp
+ create mode 100644 tests/stage-protocol/run.cmd
+
+diff --git a/src/dlss5-bridge.cpp b/src/dlss5-bridge.cpp
+index 13441ef..e2ae6f9 100644
+--- a/src/dlss5-bridge.cpp
++++ b/src/dlss5-bridge.cpp
+@@ -2836,6 +2836,13 @@ static int HookNewNgxModules(ScanModuleRefs &held)
+             RememberRejected(mods[i]);
+             continue;
+         }
++        // NR needs its original caller identity; the private witness is separate.
++        if (_wcsicmp(leaf, L"nvngx_dlssnr.dll") == 0)
++        {
++            Log("  leaving %ls untouched: Neural Rendering is not an SR entry point.", leaf);
++            RememberRejected(mods[i]);
++            continue;
++        }
+ 
+         // A game that links the NGX client statically exports these from its own
+         // executable, and hooking them writes into the game's code section. The
+diff --git a/src/fg-input.inc b/src/fg-input.inc
+index 823423a..303ec24 100644
+--- a/src/fg-input.inc
++++ b/src/fg-input.inc
+@@ -278,11 +278,12 @@ static bool FgInputWorker()
+     unsigned nr_entries = 0, sr_entries = 0, sr_copies = 0;
+     if (g_present_adapter.run_nr) {
+         g_present_nr_entries = g_present_sr_entries = g_present_sr_copies = 0;
+-        g_present_nr_scope = true;
+-        if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
+-        ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs);
+-        if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
+-        g_present_nr_scope = false;
++        {
++            if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
++            PresentAdapterNrScope scope;
++            ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs);
++            if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
++        }
+         nr_entries = g_present_nr_entries; sr_entries = g_present_sr_entries; sr_copies = g_present_sr_copies;
+         PresentCompatibilityFrame(ok, nr_entries, sr_entries, sr_copies);
+         if (ok && (sr_entries != 1 || sr_copies != 1)) {
+diff --git a/src/fg-relay.inc b/src/fg-relay.inc
+index 24619d6..5bde0e4 100644
+--- a/src/fg-relay.inc
++++ b/src/fg-relay.inc
+@@ -1719,14 +1719,15 @@ static bool FgRelayWorker()
+         FgrCount(f.w_copy_fail);
+     } else if (g_present_adapter.run_nr) {
+         g_present_nr_entries = g_present_sr_entries = g_present_sr_copies = 0;
+-        g_present_nr_scope = true;
+-        if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
+-        // No trailing wait: the release is signalled by the queue below and the
+-        // next frame's Synth12Begin waits the allocator's retire fence, which is
+-        // this submission's own fence value.
+-        ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs, SLOT_OUTPUT, &wrote, false);
+-        if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
+-        g_present_nr_scope = false;
++        {
++            if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
++            PresentAdapterNrScope scope;
++            // No trailing wait: the release is signalled by the queue below and the
++            // next frame's Synth12Begin waits the allocator's retire fence, which is
++            // this submission's own fence value.
++            ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs, SLOT_OUTPUT, &wrote, false);
++            if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
++        }
+         nr_entries = g_present_nr_entries; sr_entries = g_present_sr_entries; sr_copies = g_present_sr_copies;
+         PresentCompatibilityFrame(ok, nr_entries, sr_entries, sr_copies);
+         if (ok && (sr_entries != 1 || sr_copies != 1)) {
+diff --git a/src/focus-fg.inc b/src/focus-fg.inc
+index 506be81..f7fe265 100644
+--- a/src/focus-fg.inc
++++ b/src/focus-fg.inc
+@@ -194,9 +194,14 @@ static void FocusFgMaintenance()
+         state.next_poll = now + 1000;
+         wchar_t path[1024] = {};
+         PresentAdapterPath(path, _countof(path), L"ReShade.ini");
++        // A stage-protocol Generic selects the FG-input feed by its Present layer
++        // count; NRHookPoint is only its legacy single-point setting.
++        uint32_t plan = 0;
++        const bool present_selected = PresentAdapterStagePlan(&plan)
++            ? ((plan >> 6) & 7u) != 0
++            : GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint", -1, path) == 2;
+         const bool enabled = GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NeuralUplift", 0, path) == 1 &&
+-            GetPrivateProfileIntW(L"RenoDX.DLSS5", L"EnableHooks", 0, path) == 1 &&
+-            GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint", -1, path) == 2;
++            GetPrivateProfileIntW(L"RenoDX.DLSS5", L"EnableHooks", 0, path) == 1 && present_selected;
+         InterlockedExchange(&g_focus_fg_enabled, enabled ? 1 : 0);
+         if (enabled) CompositionGuardStart();
+         static unsigned report_count;
+diff --git a/src/present-adapter-config.h b/src/present-adapter-config.h
+index 44cb061..52e620c 100644
+--- a/src/present-adapter-config.h
++++ b/src/present-adapter-config.h
+@@ -1,5 +1,46 @@
+ #pragma once
+ 
++// Protocol v1: three 3-bit counts (Render, Upscaled, Present), each 0..4.
++// Do not cache an absent consumer: ReShade may load Generic after the bridge.
++typedef uint32_t (__cdecl *PFN_PresentAdapterStageQuery)();
++static PFN_PresentAdapterStageQuery PresentAdapterStageQuery()
++{
++    static PVOID volatile cached_query = nullptr;
++    auto query = reinterpret_cast<PFN_PresentAdapterStageQuery>(
++        InterlockedCompareExchangePointer(&cached_query, nullptr, nullptr));
++    if (query == nullptr) {
++        const HMODULE consumer = GetModuleHandleW(L"renodx-dlss5.addon64");
++        if (consumer == nullptr) return nullptr;
++        auto version = reinterpret_cast<PFN_PresentAdapterStageQuery>(
++            GetProcAddress(consumer, "DLSS5StageProtocolVersion"));
++        auto candidate = reinterpret_cast<PFN_PresentAdapterStageQuery>(
++            GetProcAddress(consumer, "DLSS5GetStagePlan"));
++        if (version == nullptr || candidate == nullptr) return nullptr;
++        HMODULE keep = nullptr;
++        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
++                                reinterpret_cast<LPCWSTR>(consumer), &keep) || version() != 1) return nullptr;
++        query = candidate;
++        InterlockedCompareExchangePointer(&cached_query, reinterpret_cast<PVOID>(query), nullptr);
++    }
++    return query;
++}
++
++static bool PresentAdapterStageProtocol()
++{
++    return PresentAdapterStageQuery() != nullptr;
++}
++
++static bool PresentAdapterStagePlan(uint32_t* plan)
++{
++    const auto query = PresentAdapterStageQuery();
++    if (query == nullptr) return false;
++    const uint32_t packed = query();
++    if ((packed & ~0x1ffu) != 0 || (packed & 7u) > 4 ||
++        ((packed >> 3) & 7u) > 4 || ((packed >> 6) & 7u) > 4) return false;
++    if (plan != nullptr) *plan = packed;
++    return true;
++}
++
+ // Restart-only opt-in: an in-flight presentation transport must not silently
+ // change back into the game's DLSS mirror during a live configuration reload.
+ static void PresentAdapterPath(wchar_t* path, size_t count, const wchar_t* leaf)
+@@ -79,15 +120,15 @@ static int PresentAdapterPipeline()
+ // fg-relay.inc. 2 copies the FG inputs at the evaluate, as this add-on's own
+ // batch on DLSSG.CmdQueue; 3 copies them at the game's vkQueuePresentKHR, on the
+ // game's present queue and about 5 ms earlier. Both release the evaluate's park
+-// from the D3D12 side. See fg-relay.inc for the chain and its fallbacks.
++// from the D3D12 side. The stage protocol supplies a validated producer handoff, so it may use the relay as well.
+ static bool PresentAdapterRelay()
+ {
+     const int p = PresentAdapterPipeline();
+     return p == 2 || p == 3;
+ }
+ 
+-static bool PresentAdapterRelayAtEvaluate() { return PresentAdapterPipeline() == 2; }
+-static bool PresentAdapterRelayAtPresent()  { return PresentAdapterPipeline() == 3; }
++static bool PresentAdapterRelayAtEvaluate() { return PresentAdapterRelay() && PresentAdapterPipeline() == 2; }
++static bool PresentAdapterRelayAtPresent()  { return PresentAdapterRelay() && PresentAdapterPipeline() == 3; }
+ 
+ // Import=1 lets the relay use the D3D12-fence <-> Vulkan-timeline-semaphore import,
+ // and has it add VK_KHR_external_semaphore_win32 to the game's device at creation
+@@ -170,5 +211,9 @@ static volatile LONG g_adapter_owner = OWNER_NONE;
+ static bool FgInputActive()
+ {
+     if (!PresentAdapterFgInput()) return false;
++    if (PresentAdapterStageProtocol()) {
++        uint32_t plan = 0;
++        return PresentAdapterStagePlan(&plan) && ((plan >> 6) & 7u) != 0;
++    }
+     return !PresentAdapterFollow() || PresentAdapterHookPoint() == 2;
+ }
+diff --git a/src/present-adapter.inc b/src/present-adapter.inc
+index da9a0e6..97e609f 100644
+--- a/src/present-adapter.inc
++++ b/src/present-adapter.inc
+@@ -67,9 +67,40 @@ void PresentAdapterNrHook();
+ void PresentAdapterSrHook();
+ }
+ static thread_local bool g_present_nr_scope;
++static thread_local uint32_t g_present_nr_plan;
+ static thread_local unsigned g_present_nr_entries;
+ static thread_local unsigned g_present_sr_entries;
+ static thread_local unsigned g_present_sr_copies;
++extern "C" __declspec(dllexport) uint32_t __cdecl DLSS5BridgeStageProtocolVersion()
++{
++    return 1;
++}
++extern "C" __declspec(dllexport) uint32_t __cdecl DLSS5BridgeActiveStagePlan()
++{
++    return g_present_nr_scope ? g_present_nr_plan : 0;
++}
++
++// Freeze each carrier's plan and restore an outer scope on re-entry.
++struct PresentAdapterNrScope {
++    bool previous_scope = g_present_nr_scope;
++    uint32_t previous_plan = g_present_nr_plan;
++    PresentAdapterNrScope()
++    {
++        uint32_t plan = 0;
++        g_present_nr_plan = 0;
++        if (PresentAdapterStageProtocol()) {
++            PresentAdapterStagePlan(&plan);
++            // Invalid plans stay in protocol mode with zero passes.
++            g_present_nr_plan = plan | 0x80000000u;
++        }
++        g_present_nr_scope = true;
++    }
++    ~PresentAdapterNrScope()
++    {
++        g_present_nr_scope = previous_scope;
++        g_present_nr_plan = previous_plan;
++    }
++};
+ extern "C" void PresentAdapterNrEnter()
+ {
+     if (g_present_nr_scope) ++g_present_nr_entries;
+@@ -120,8 +151,13 @@ static bool PresentAdapterConfiguration()
+     PresentAdapterPath(ini, _countof(ini), L"ReShade.ini");
+     wchar_t unit[80] = {};
+     GetPrivateProfileStringW(L"RenoDX.DLSS5", L"NRLinearUnitNits", L"0", unit, _countof(unit), ini);
+-    const int hook_point = GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint",
+-                                                PresentAdapterFollow() ? -1 : 0, ini);
++    const bool stage_protocol = PresentAdapterStageProtocol();
++    if (stage_protocol && !PresentAdapterStagePlan(nullptr)) {
++        PresentCompatibilitySet(0, PC_HOOK_POINT_UNAVAILABLE, "Stage protocol plan is invalid; carrier processing is paused.");
++        return false;
++    }
++    const int hook_point = stage_protocol ? 2 : GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint",
++                                                                    PresentAdapterFollow() ? -1 : 0, ini);
+     const auto code = PresentCompatibilityConfigCode(
+         GetModuleHandleW(L"renodx-dlss5.addon64") != nullptr,
+         GetPrivateProfileIntW(L"RenoDX.DLSS5", L"EnableHooks", 2, ini), hook_point,
+@@ -173,9 +209,9 @@ static void PresentCompatibilityPoll()
+         if (PresentAdapterWitness() && PresentCompatibilitySnapshot().code[1] == PC_NR_ENTRY_UNAVAILABLE)
+             PresentCompatibilityIssue(PC_OK, "");
+     }
+-    // Render is a valid user-selected alternate path. Only diagnose carrier
+-    // requirements when Present is selected, or its selector is unavailable.
+-    if (!PresentAdapterFollow() || PresentAdapterHookPoint() == 2 || consumer == nullptr) {
++    // Render is a valid legacy alternate path; protocol plans have independent counts.
++    if (PresentAdapterStageProtocol() || !PresentAdapterFollow() ||
++        PresentAdapterHookPoint() == 2 || consumer == nullptr) {
+         PresentAdapterConfiguration();
+     } else {
+         wchar_t ini[1024] = {};
+@@ -399,6 +435,10 @@ static void PresentAdapterFrame(reshade::api::effect_runtime* rt, reshade::api::
+     if (in_frame) return;
+     if (rt == nullptr || cmd == nullptr || rtv.handle == 0) return;
+     if (PresentAdapterFgInput()) return;
++    if (PresentAdapterStageProtocol()) {
++        uint32_t plan = 0;
++        if (!PresentAdapterStagePlan(&plan) || ((plan >> 6) & 7u) == 0) return;
++    }
+     device* dev = rt->get_device();
+     if (dev == nullptr || dev->get_api() != device_api::vulkan) return;
+     if (!TryEnterCriticalSection(&g_bridge_cs)) return;
+@@ -520,11 +560,12 @@ static void PresentAdapterFrame(reshade::api::effect_runtime* rt, reshade::api::
+     if (g_present_adapter.run_nr) {
+         PresentAdapterWitness();
+         g_present_nr_entries = g_present_sr_entries = g_present_sr_copies = 0;
+-        g_present_nr_scope = true;
+-        if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
+-        ok = Synth12EvaluateShared(&params, 1000);
+-        if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
+-        g_present_nr_scope = false;
++        {
++            if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
++            PresentAdapterNrScope scope;
++            ok = Synth12EvaluateShared(&params, 1000);
++            if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
++        }
+         nr_entries = g_present_nr_entries;
+         sr_entries = g_present_sr_entries;
+         sr_copies = g_present_sr_copies;
+diff --git a/src/vkmirror.inc b/src/vkmirror.inc
+index 7b61192..184a8a2 100644
+--- a/src/vkmirror.inc
++++ b/src/vkmirror.inc
+@@ -1878,9 +1878,12 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
+     TrampolineCallGuard call_guard;
+     auto fwd = reinterpret_cast<PFN_VkEvaluate>(h.original ? h.original : h.target);
+ 
+-    // Nested: the layer above already handled this frame and is calling down
+-    // through NGX's own plumbing.
+-    if (g_nest > 0) { VKM_FORWARD(fwd(cmd, handle, p, cb)) }
++    const bool stage_protocol = PresentAdapterStageProtocol();
++    // Native protocol SR owns its locks, including calls nested through NGX.
++    if (g_nest > 0) {
++        if (stage_protocol) return fwd(cmd, handle, p, cb);
++        VKM_FORWARD(fwd(cmd, handle, p, cb))
++    }
+     NestGuard nest;
+ 
+     // The bottom 64 KB of the address space can never be mapped, so an argument
+@@ -1895,6 +1898,7 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
+             Log("[vkmirror] an evaluate arrived with handle=%p params=%p cmd=%p -- none of "
+                 "those can be real. Forwarding it untouched and ignoring it.",
+                 static_cast<const void *>(handle), static_cast<const void *>(p), cmd);
++        if (stage_protocol) return fwd(cmd, handle, p, cb);
+         VKM_FORWARD(fwd(cmd, handle, p, cb))
+     }
+ 
+@@ -1945,6 +1949,17 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
+         if (InterlockedExchange(&previous_source_reset, value) != value)
+             Log("[fg-history] native game SR Reset=%ld; foreground=%u.", value, ForegroundIsThisProcess() ? 1u : 0u);
+     }
++    if (stage_protocol)
++    {
++        // Present=0 does not retire an in-flight FG owner.
++        if (TryEnterCriticalSection(&g_bridge_cs)) {
++            const LONG owner = InterlockedCompareExchange(&g_adapter_owner, 0, 0);
++            if (owner == OWNER_MIRROR) MirrorReleaseForFgInput();
++            else if (owner == OWNER_FG && g_fg_input.want_release) FgInputRelease();
++            LeaveCriticalSection(&g_bridge_cs);
++        }
++        return fwd(cmd, handle, p, cb);
++    }
+     if (PresentAdapterFollow() || PresentAdapterFgInput())
+     {
+         EnterCriticalSection(&g_bridge_cs);
+@@ -2068,7 +2083,7 @@ static void VkmNoteCreated(const Hook &hook, int feature_id, NVSDK_NGX_Result r,
+ static void VkmNoteGameCreate(int feature_id, NVSDK_NGX_Result r,
+                               const NVSDK_NGX_Parameter *p)
+ {
+-    if (PresentationAdapterEnabled() && !PresentAdapterFollow()) return;
++    if (PresentAdapterStageProtocol() || (PresentationAdapterEnabled() && !PresentAdapterFollow())) return;
+     if (r != NGX_SUCCESS || feature_id != 1) return;
+ 
+     unsigned int cw = 0, ch = 0, cow = 0, coh = 0;
+diff --git a/tests/stage-protocol/README.md b/tests/stage-protocol/README.md
+new file mode 100644
+index 0000000..a9daf7e
+--- /dev/null
++++ b/tests/stage-protocol/README.md
+@@ -0,0 +1,26 @@
++# Stage protocol v1, bridge side
++
++```
++tests\stage-protocol\run.cmd <new-output-directory>
++```
++
++Needs MSVC (`tests/vulkan-fg-input/vcvars.cmd` finds it) and PowerShell. No game,
++GPU or ReShade is used. `run.cmd` copies the production carrier scope and
++configuration out of `src/present-adapter.inc` into the output directory and
++compiles them with `src/present-adapter-config.h` into `check.exe`.
++`consumer.cpp` stands in for Generic: a DLL exporting
++`DLSS5StageProtocolVersion` and `DLSS5GetStagePlan`, with a version and plan the
++test changes at run time.
++
++For Pipeline 2 and 3, each with Follow 0 and 1, the check covers: a Generic
++loaded after the bridge is found; a version other than 1 is ignored; all 125
++legal plans (Render/Upscaled/Present 0-4 each) are accepted, the FG input is
++active exactly when the Present count is non-zero, and the configuration is
++accepted at every legacy hook point; 391 invalid values (counts above 4,
++reserved bits) pause the carrier and leave the FG input inactive; the carrier's
++plan snapshot is per thread, restored after nested scopes and exceptions; the
++relay settings follow Pipeline/Import alone; EnableHooks and the source
++overrides are still checked.
++
++Pass: four lines starting with `PASS: P2 Follow=0`, `P2 Follow=1`, `P3 Follow=0`,
++`P3 Follow=1`, exit code 0.
+diff --git a/tests/stage-protocol/check.cpp b/tests/stage-protocol/check.cpp
+new file mode 100644
+index 0000000..ed84a22
+--- /dev/null
++++ b/tests/stage-protocol/check.cpp
+@@ -0,0 +1,167 @@
++#define WIN32_LEAN_AND_MEAN
++#include <windows.h>
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
++#include <cwchar>
++#include <thread>
++#include <initializer_list>
++static HMODULE g_self = nullptr;
++static UINT g_pipeline = 0, g_follow = 0;
++static int g_hook_point = 2, g_hooks = 1, g_encoding = 0, g_primaries = 0;
++static const wchar_t* g_linear_unit = L"0";
++static UINT TestProfileInt(LPCWSTR, LPCWSTR key, INT fallback, LPCWSTR) {
++    if (wcscmp(key, L"Enabled") == 0 || wcscmp(key, L"Import") == 0) return 1u;
++    if (wcscmp(key, L"Pipeline") == 0) return g_pipeline;
++    if (wcscmp(key, L"Follow") == 0) return g_follow;
++    if (wcscmp(key, L"NRHookPoint") == 0) return static_cast<UINT>(g_hook_point);
++    if (wcscmp(key, L"EnableHooks") == 0) return static_cast<UINT>(g_hooks);
++    if (wcscmp(key, L"NRSourceEncoding") == 0) return static_cast<UINT>(g_encoding);
++    if (wcscmp(key, L"NRSourcePrimaries") == 0) return static_cast<UINT>(g_primaries);
++    return static_cast<UINT>(fallback);
++}
++static DWORD TestProfileString(LPCWSTR, LPCWSTR key, LPCWSTR, LPWSTR out, DWORD count, LPCWSTR) {
++    const wchar_t* value = wcscmp(key, L"Source") == 0 ? L"fg-input" : g_linear_unit;
++    wcscpy_s(out, count, value);
++    return static_cast<DWORD>(wcslen(value));
++}
++#define GetPrivateProfileIntW TestProfileInt
++#define GetPrivateProfileStringW TestProfileString
++#include "present-adapter-config.h"
++#include "present-compatibility.h"
++#include "scope-under-test.inc"
++static unsigned g_config_code;
++static void PresentCompatibilitySet(unsigned, unsigned code, const char*) {
++    g_config_code = code;
++}
++#include "configuration-under-test.inc"
++#undef GetPrivateProfileIntW
++#undef GetPrivateProfileStringW
++#define CHECK(x) do { if (!(x)) { std::printf("FAIL line %d: %s\n", __LINE__, #x); return 1; } } while (0)
++int main(int argc, char** argv) {
++    g_pipeline = argc > 1 ? static_cast<UINT>(std::strtoul(argv[1], nullptr, 10)) : 2u;
++    g_follow = argc > 2 ? static_cast<UINT>(std::strtoul(argv[2], nullptr, 10)) : 0u;
++    CHECK((g_pipeline == 2 || g_pipeline == 3) && g_follow <= 1);
++    CHECK(!PresentAdapterStageProtocol());
++    CHECK(!PresentAdapterStagePlan(nullptr));
++    CHECK(FgInputActive());
++    CHECK(PresentAdapterRelay());
++    CHECK(PresentAdapterRelayAtEvaluate() == (g_pipeline == 2));
++    CHECK(PresentAdapterRelayAtPresent() == (g_pipeline == 3));
++    CHECK(PresentAdapterRelayImport() && PresentAdapterRelayThrottle() == 1);
++    CHECK(!PresentAdapterConfiguration() && g_config_code == PC_GENERIC_MISSING);
++    CHECK(DLSS5BridgeStageProtocolVersion() == 1);
++    CHECK(DLSS5BridgeActiveStagePlan() == 0);
++    {
++        PresentAdapterNrScope scope;
++        CHECK(DLSS5BridgeActiveStagePlan() == 0);
++    }
++    HMODULE consumer = LoadLibraryW(L"renodx-dlss5.addon64");
++    CHECK(consumer != nullptr);
++    using Set = void (__cdecl*)(uint32_t);
++    auto set_plan = reinterpret_cast<Set>(GetProcAddress(consumer, "SetPlan"));
++    auto set_version = reinterpret_cast<Set>(GetProcAddress(consumer, "SetVersion"));
++    CHECK(set_plan != nullptr && set_version != nullptr);
++    CHECK(!PresentAdapterStageProtocol());
++    CHECK(PresentAdapterRelay());
++    CHECK(PresentAdapterConfiguration());
++    g_hook_point = 1;
++    CHECK(!PresentAdapterConfiguration() && g_config_code == PC_HOOK_POINT_UNAVAILABLE);
++    set_version(1);
++    CHECK(PresentAdapterStageProtocol());
++    // The relay settings follow Pipeline/Import alone; the plan decides whether frames reach it.
++    CHECK(PresentAdapterRelay() && PresentAdapterRelayAtEvaluate() == (g_pipeline == 2) &&
++          PresentAdapterRelayAtPresent() == (g_pipeline == 3));
++    CHECK(PresentAdapterRelayImport() && PresentAdapterRelayThrottle() == 1);
++    uint32_t result = 0;
++    unsigned valid_count = 0;
++    for (uint32_t r = 0; r <= 4; ++r) {
++        for (uint32_t u = 0; u <= 4; ++u) {
++            for (uint32_t p = 0; p <= 4; ++p) {
++                const uint32_t packed = r | (u << 3) | (p << 6);
++                set_plan(packed);
++                CHECK(PresentAdapterStagePlan(&result) && result == packed);
++                for (int point : {0, 1, 2, -1}) {
++                    g_hook_point = point;
++                    CHECK(PresentAdapterConfiguration() && g_config_code == PC_OK);
++                    CHECK(FgInputActive() == (p != 0));
++                }
++                {
++                    PresentAdapterNrScope outer;
++                    CHECK(DLSS5BridgeActiveStagePlan() == (packed | 0x80000000u));
++                    set_plan(0);
++                    CHECK(DLSS5BridgeActiveStagePlan() == (packed | 0x80000000u));
++                    bool isolated = false;
++                    std::thread other([&] { isolated = DLSS5BridgeActiveStagePlan() == 0; });
++                    other.join();
++                    CHECK(isolated);
++                    {
++                        PresentAdapterNrScope inner;
++                        CHECK(DLSS5BridgeActiveStagePlan() == 0x80000000u);
++                    }
++                    CHECK(DLSS5BridgeActiveStagePlan() == (packed | 0x80000000u));
++                }
++                CHECK(DLSS5BridgeActiveStagePlan() == 0 && !g_present_nr_scope);
++                ++valid_count;
++            }
++        }
++    }
++    CHECK(valid_count == 125);
++    g_hook_point = 2;
++    auto invalid_plan = [&](uint32_t invalid) {
++        set_plan(invalid);
++        result = 0x12345678u;
++        CHECK(PresentAdapterStageProtocol());
++        CHECK(!PresentAdapterStagePlan(&result) && result == 0x12345678u);
++        CHECK(!FgInputActive());
++        CHECK(!PresentAdapterConfiguration() && g_config_code == PC_HOOK_POINT_UNAVAILABLE);
++        CHECK(PresentAdapterRelay() && PresentAdapterRelayImport() && PresentAdapterRelayThrottle() == 1);
++        {
++            PresentAdapterNrScope outer;
++            CHECK(DLSS5BridgeActiveStagePlan() == 0x80000000u);
++            set_plan(64);
++            try {
++                PresentAdapterNrScope inner;
++                CHECK(DLSS5BridgeActiveStagePlan() == 0x80000040u);
++                throw 1;
++            } catch (int) {}
++            CHECK(DLSS5BridgeActiveStagePlan() == 0x80000000u);
++        }
++        CHECK(DLSS5BridgeActiveStagePlan() == 0 && !g_present_nr_scope);
++        return 0;
++    };
++    unsigned invalid_count = 0;
++    for (uint32_t packed = 0; packed < 512; ++packed) {
++        if ((packed & 7u) <= 4 && ((packed >> 3) & 7u) <= 4 && ((packed >> 6) & 7u) <= 4) continue;
++        CHECK(invalid_plan(packed) == 0);
++        ++invalid_count;
++    }
++    for (uint32_t invalid : {0x200u, 0x240u, 0x80000000u, 0xffffffffu}) {
++        CHECK(invalid_plan(invalid) == 0);
++        ++invalid_count;
++    }
++    CHECK(invalid_count == 391);
++    set_plan(64);
++    CHECK(FgInputActive() && PresentAdapterConfiguration());
++    for (int hooks : {0, 2}) {
++        g_hooks = hooks;
++        CHECK(!PresentAdapterConfiguration() && g_config_code == PC_HOOKS_DISABLED);
++    }
++    g_hooks = 1;
++    g_encoding = 1;
++    CHECK(!PresentAdapterConfiguration() && g_config_code == PC_SOURCE_OVERRIDE);
++    g_encoding = 0;
++    g_primaries = 1;
++    CHECK(!PresentAdapterConfiguration() && g_config_code == PC_SOURCE_OVERRIDE);
++    g_primaries = 0;
++    g_linear_unit = L"0.5";
++    CHECK(!PresentAdapterConfiguration() && g_config_code == PC_SOURCE_OVERRIDE);
++    g_linear_unit = L"0";
++    CHECK(PresentAdapterConfiguration());
++    set_plan(0);
++    CHECK(PresentAdapterStagePlan(nullptr) && !FgInputActive());
++    CHECK(PresentAdapterRelay());
++    std::printf("PASS: P%u Follow=%u; late discovery, version rejection, %u plans, %u invalid plans fail closed, relay gates follow Pipeline/Import, zero-pass bypass, nested/thread-local snapshots, hook/source validation\n",
++                g_pipeline, g_follow, valid_count, invalid_count);
++    return 0;
++}
+diff --git a/tests/stage-protocol/consumer.cpp b/tests/stage-protocol/consumer.cpp
+new file mode 100644
+index 0000000..56308fa
+--- /dev/null
++++ b/tests/stage-protocol/consumer.cpp
+@@ -0,0 +1,16 @@
++#include <windows.h>
++#include <cstdint>
++static volatile LONG plan = 0;
++static volatile LONG version = 2;
++extern "C" __declspec(dllexport) uint32_t __cdecl DLSS5StageProtocolVersion() {
++    return static_cast<uint32_t>(InterlockedCompareExchange(&version, 0, 0));
++}
++extern "C" __declspec(dllexport) uint32_t __cdecl DLSS5GetStagePlan() {
++    return static_cast<uint32_t>(InterlockedCompareExchange(&plan, 0, 0));
++}
++extern "C" __declspec(dllexport) void __cdecl SetPlan(uint32_t value) {
++    InterlockedExchange(&plan, static_cast<LONG>(value));
++}
++extern "C" __declspec(dllexport) void __cdecl SetVersion(uint32_t value) {
++    InterlockedExchange(&version, static_cast<LONG>(value));
++}
+diff --git a/tests/stage-protocol/run.cmd b/tests/stage-protocol/run.cmd
+new file mode 100644
+index 0000000..9a99c43
+--- /dev/null
++++ b/tests/stage-protocol/run.cmd
+@@ -0,0 +1,39 @@
++@echo off
++rem Stage protocol v1, bridge side: plan discovery, validation, carrier scope and
++rem configuration, compiled from the production code without loading the GPU add-on.
++rem Usage: run.cmd <new-output-directory>   (an existing directory is refused)
++rem consumer.cpp stands in for Generic: a DLL that exports the protocol with a
++rem plan and version the test sets at run time.
++setlocal
++if "%~1"=="" ( echo usage: run.cmd ^<new-output-directory^> & exit /b 2 )
++call "%~dp0..\vulkan-fg-input\vcvars.cmd" || exit /b 2
++for %%I in ("%~dp0..\..\src") do set "SRC=%%~fI"
++set "OUT=%~f1"
++if exist "%OUT%" ( echo run.cmd: "%OUT%" already exists & exit /b 2 )
++mkdir "%OUT%" || exit /b 2
++rem Copy the production carrier scope and configuration verbatim (delimited by
++rem the declarations that open and follow them), as check.cpp includes them.
++powershell -NoProfile -ExecutionPolicy Bypass -Command ^
++  "$s = [IO.File]::ReadAllText('%SRC%\present-adapter.inc');" ^
++  "$a = $s.IndexOf('static thread_local bool g_present_nr_scope;'); $b = $s.IndexOf('extern \"C\" void PresentAdapterNrEnter()');" ^
++  "$c = $s.IndexOf('static bool PresentAdapterConfiguration()'); $d = $s.IndexOf('static bool PresentAdapterConsumer()');" ^
++  "if ($a -lt 0 -or $b -le $a -or $c -lt 0 -or $d -le $c) { exit 3 }" ^
++  "[IO.File]::WriteAllText('%OUT%\scope-under-test.inc', $s.Substring($a, $b - $a));" ^
++  "[IO.File]::WriteAllText('%OUT%\configuration-under-test.inc', $s.Substring($c, $d - $c))" > "%OUT%\build.log" 2>&1
++if errorlevel 1 ( echo run.cmd: production delimiters not found in present-adapter.inc & type "%OUT%\build.log" & exit /b 2 )
++pushd "%OUT%"
++cl /nologo /W4 /WX /O2 /MT /EHsc /std:c++17 /LD "%~dp0consumer.cpp" /Fe:renodx-dlss5.addon64 >> build.log 2>&1 || goto failed
++cl /nologo /W4 /WX /wd4505 /O2 /MT /EHsc /std:c++17 /I"%OUT%" /I"%SRC%" "%~dp0check.cpp" /Fe:check.exe >> build.log 2>&1 || goto failed
++set "RESULT=0"
++for %%P in (2 3) do for %%F in (0 1) do (
++    check.exe %%P %%F >> run.txt 2>&1
++    if errorlevel 1 set "RESULT=1"
++)
++type run.txt
++popd
++exit /b %RESULT%
++
++:failed
++type build.log
++popd
++exit /b 2
+diff --git a/tests/vulkan-fg-input/run-roundtrip.py b/tests/vulkan-fg-input/run-roundtrip.py
+index ca6f3c2..5787f66 100644
+--- a/tests/vulkan-fg-input/run-roundtrip.py
++++ b/tests/vulkan-fg-input/run-roundtrip.py
+@@ -1,11 +1,14 @@
+ """Run the Vulkan adapter's Source=present path in an isolated, off-screen host.
+ 
+ Requires an assets directory holding the third-party files this repository does
+-not ship: renodx-dlss5.addon64 (Generic 8.5.0-rc10), nvngx_dlss.dll,
+-nvngx_dlssnr.dll, optionally nvngx_dlssd.dll (for --with-rr-module), plus a
+-ReShade.ini with a [RenoDX.DLSS5] section (EnableHooks=1, NRHookPoint=0,
+-NRSourceEncoding=0) and a TestPreset.ini. ReShade 6.8 must be installed as the
+-VK_LAYER_reshade layer. Exit 0 means the bounded transport/NR/workset checks in
++not ship: renodx-dlss5.addon64 (Generic 8.5.0-rc10 or 8.5.0-rc10-stages1),
++nvngx_dlss.dll, nvngx_dlssnr.dll, optionally nvngx_dlssd.dll (for
++--with-rr-module), plus a ReShade.ini with a [RenoDX.DLSS5] section
++(EnableHooks=1, NRHookPoint=0, NRSourceEncoding=0) and a TestPreset.ini.
++ReShade 6.8 must be installed as the VK_LAYER_reshade layer. With the
++stage-protocol Generic the run adds an explicit stage plan (--stage-plan,
++default Render 0 / Upscaled 0 / Present 2), because the carrier serves only the
++Present layers. Exit 0 means the bounded transport/NR/workset checks in
+ validate-roundtrip.py passed; it says nothing about game quality or FG coverage.
+ """
+ import argparse
+@@ -21,7 +24,11 @@ from pathlib import Path
+ 
+ validate = runpy.run_path(str(Path(__file__).with_name('validate-roundtrip.py')))['validate']
+ 
+-GENERIC_SHA256 = 'dcd93881e976ad033d83c2bb01f4bc3e4ddc59c15fe0dd4ca165bc5fc7d1ac68'
++# The Generic binaries this test is written for. The stage-protocol build needs a plan.
++GENERIC_BUILDS = {
++    'dcd93881e976ad033d83c2bb01f4bc3e4ddc59c15fe0dd4ca165bc5fc7d1ac68': ('8.5.0-rc10', False),
++    'ccaecb3559cc4ba3b42c2ffebedf5c655914945a9c2488237e9c3d5dd1a95f7c': ('8.5.0-rc10-stages1', True),
++}
+ 
+ 
+ def digest(path: Path) -> str:
+@@ -38,6 +45,8 @@ def main() -> int:
+     parser.add_argument('--with-rr-module', action='store_true', help='also load nvngx_dlssd.dll as a game process does')
+     parser.add_argument('--source-encoding', type=int, choices=(0, 1), default=0)
+     parser.add_argument('--hook-point', type=int, choices=(0, 1, 2), default=0)
++    parser.add_argument('--stage-plan', default='0,0,2',
++                        help='Render,Upscaled,Present layer counts for the stage-protocol Generic (Present must be 2)')
+     args = parser.parse_args()
+     if args.full_resolution:
+         processes = subprocess.run(['tasklist.exe', '/FI', 'IMAGENAME eq Endfield.exe', '/FO', 'CSV', '/NH'],
+@@ -68,13 +77,24 @@ def main() -> int:
+         if digest(target) != expected:
+             raise RuntimeError(f'Copy verification failed: {name}')
+         identities[name] = {'source': str(original), 'sha256': expected}
+-    if identities['renodx-dlss5.addon64']['sha256'] != GENERIC_SHA256:
+-        raise RuntimeError('The isolated test requires the unmodified Generic 8.5.0-rc10 binary')
++    generic = GENERIC_BUILDS.get(identities['renodx-dlss5.addon64']['sha256'])
++    if generic is None:
++        raise RuntimeError('The isolated test requires Generic 8.5.0-rc10 or 8.5.0-rc10-stages1, unmodified')
++    generic_name, stage_protocol = generic
++    stage_plan = [int(v) for v in args.stage_plan.split(',')] if stage_protocol else None
++    if stage_plan is not None and (len(stage_plan) != 3 or stage_plan[2] != 2
++                                   or not all(0 <= v <= 4 for v in stage_plan)):
++        parser.error('--stage-plan must be three counts 0-4 with Present=2 (the validator expects two NR passes)')
+     ini = (assets / 'ReShade.ini').read_text(encoding='utf-8-sig')
+     for key, value in (('NRSourceEncoding', args.source_encoding), ('NRHookPoint', args.hook_point)):
+         if ini.count(f'{key}=0') != 1:
+             raise RuntimeError(f'Expected exactly one baseline {key}=0 setting in the assets ReShade.ini')
+         ini = ini.replace(f'{key}=0', f'{key}={value}')
++    if stage_plan is not None:
++        if ini.count('[RenoDX.DLSS5]\n') != 1 or 'NRPresentPasses=' in ini:
++            raise RuntimeError('Expected one [RenoDX.DLSS5] section without a stage plan in the assets ReShade.ini')
++        ini = ini.replace('[RenoDX.DLSS5]\n', '[RenoDX.DLSS5]\nNRRenderPasses=%d\nNRUpscaledPasses=%d\nNRPresentPasses=%d\n'
++                          % tuple(stage_plan))
+     (directory / 'ReShade.ini').write_text(ini, encoding='utf-8')
+     (directory / 'dlss5-bridge.cfg').write_text('# dlss5-bridge keep\nmode=2\nstage=3\nunwrap=1\nvk_mirror=1\nsynth=0\n', encoding='ascii')
+     (directory / 'vk-present-adapter.ini').write_text('[Adapter]\nEnabled=1\n', encoding='ascii')
+@@ -99,7 +119,7 @@ def main() -> int:
+     }
+     parameters = {
+         'hdr': args.hdr, 'source_encoding': args.source_encoding, 'rr_module_loaded': args.with_rr_module,
+-        'nr_hook_point': args.hook_point,
++        'nr_hook_point': args.hook_point, 'generic_build': generic_name, 'stage_plan': stage_plan,
+         'requested_extent': [5120, 2160] if args.full_resolution else [800, 600],
+         'fixture': 'gray-colour-stripes-v1',
+         'roi_extent': [16, 16], 'roi_offset_from_bottom_right': [-48, -48],
+diff --git a/tests/vulkan-fg-input/validate-roundtrip.py b/tests/vulkan-fg-input/validate-roundtrip.py
+index 82a32d9..e4c7832 100644
+--- a/tests/vulkan-fg-input/validate-roundtrip.py
++++ b/tests/vulkan-fg-input/validate-roundtrip.py
+@@ -84,7 +84,9 @@ def validate_logs(result: dict, nr: str, bridge: str) -> dict:
+                                                for s in grouped[t]) for t in (3, 4)),
+         'sample_timings_valid': bool(samples) and all(math.isfinite(s[k]) and s[k] >= 0
+                                                       for s in samples for k in ('cpu_ms', 'input_wait_ms')),
+-        'author_two_pass_success': bool(re.search(r'inline feature 18 evaluation succeeded[^\r\n]*2 stack pass\(es\)', nr)),
++        # 8.5.0-rc10 logs "2 stack pass(es)"; the stage-protocol build logs the carrier's stage and count.
++        'author_two_pass_success': bool(re.search(
++            r'inline feature 18 evaluation succeeded[^\r\n]*(?:2 stack pass\(es\)|stage=present requested=2 )', nr)),
+         'fixed_input_workset_stable': created == 1,
+         'no_adapter_processing_failure': not failures,
+     }
+diff --git a/tests/vulkan-fg-quality/test-focus.cpp b/tests/vulkan-fg-quality/test-focus.cpp
+index 842fc59..a33a381 100644
+--- a/tests/vulkan-fg-quality/test-focus.cpp
++++ b/tests/vulkan-fg-quality/test-focus.cpp
+@@ -23,6 +23,8 @@ static void Log(const char *, ...) {}
+ static HANDLE StartModuleWorker(LPTHREAD_START_ROUTINE) { return nullptr; }
+ static bool PresentAdapterFocusKeepFG() { return false; }
+ static void PresentAdapterPath(wchar_t *path, size_t, const wchar_t *) { path[0] = 0; }
++// No stage-protocol Generic in this test: the gate keeps its NRHookPoint reading.
++static bool PresentAdapterStagePlan(uint32_t *) { return false; }
+ static bool PinHookModule(const void *) { return true; }
+ static bool HookInstall(Hook &, void *, void *) { return false; }
+ #include "focus-fg.inc"
+diff --git a/tests/vulkan-fg-relay/README.md b/tests/vulkan-fg-relay/README.md
+index 9274d71..2399ab1 100644
+--- a/tests/vulkan-fg-relay/README.md
++++ b/tests/vulkan-fg-relay/README.md
+@@ -10,7 +10,7 @@ DLSS-G evaluate.
+ | --- | --- | --- | --- |
+ | CPU contracts of the observers and hooks (whole add-on source compiled in) | MSVC | `test-fg-trace.cmd <new-dir>` | `PASS: checks=7382 failures=0` |
+ | `ngx-module-scan.h` against the real Windows loader | MSVC | `scan\build-scan-test.cmd <new-dir>` then `<new-dir>\scan-test.exe` | `PASS scan-test: 20705 assertions` |
+-| Add-on unload/reload with the real ReShade and Generic | MSVC, `VULKAN_SDK`, ReShade 6.8 at `C:\ProgramData\ReShade\ReShade64.dll`, `renodx-dlss5.addon64` (8.5.0-rc10) | `lifetime\build.cmd`, then `python lifetime\run-lifetime.py <new-dir> --mode stable --bridge <addon> --generic <renodx-dlss5.addon64>` (also `control`, `late-ref`; `race` with an older bridge) | last line `PASS` |
++| Add-on unload/reload with the real ReShade and Generic | MSVC, `VULKAN_SDK`, ReShade 6.8 at `C:\ProgramData\ReShade\ReShade64.dll`, `renodx-dlss5.addon64` (8.5.0-rc10 or 8.5.0-rc10-stages1) | `lifetime\build.cmd`, then `python lifetime\run-lifetime.py <new-dir> --mode stable --bridge <addon> --generic <renodx-dlss5.addon64>` (also `control`, `late-ref`; `race` with an older bridge) | last line `PASS`. With 8.5.0-rc10-stages1 the host also prints `PINNED`: the bridge pins a Generic that has the stage protocol, and ReShade keeps it registered across the instance cycle. `late-ref` needs 8.5.0-rc10 and reports `NOT APPLICABLE` with stages1 |
+ | Device-extension injection and both shared-fence directions | MSVC, `VULKAN_SDK`, NVIDIA GPU, ReShade 6.8 as `VK_LAYER_reshade` | `inject\build.cmd`, then `python inject\run-injection-probe.py <new-dir> --bridge <addon>` | `exit_code=0` |
+ 
+ `inject\template\` holds the small ReShade/bridge configuration files the probe
+diff --git a/tests/vulkan-fg-relay/lifetime/host.cpp b/tests/vulkan-fg-relay/lifetime/host.cpp
+index ae3966c..dc09ed4 100644
+--- a/tests/vulkan-fg-relay/lifetime/host.cpp
++++ b/tests/vulkan-fg-relay/lifetime/host.cpp
+@@ -18,7 +18,7 @@ static GetProc original_get_proc;
+ static RegisterAddon original_register;
+ static UnregisterAddon original_unregister;
+ static PVOID volatile generic_module;
+-static volatile LONG registered, registrations, acquisitions, gate_claimed;
++static volatile LONG registered, registrations, acquisitions, gate_claimed, pinned;
+ static HANDLE acquired, release_scan, probed, unregistered;
+ static bool gating, late_reference;
+ static HMODULE injected_reference;
+@@ -97,7 +97,13 @@ static BOOL WINAPI GetModule(DWORD flags, LPCWSTR name, HMODULE *module)
+             }
+             return result;
+         }
+-        if (flags & GET_MODULE_HANDLE_EX_FLAG_PIN) return result;
++        if (flags & GET_MODULE_HANDLE_EX_FLAG_PIN) {
++            // A stage-protocol Generic is pinned once, so the bridge's cached plan
++            // query can never outlive the module. This is not a transient reference.
++            if (InterlockedExchange(&pinned, 1) == 0)
++                std::printf("BRIDGE pinned Generic thread=%lu\n", GetCurrentThreadId());
++            return result;
++        }
+         InterlockedIncrement(&acquisitions);
+         if (gating && InterlockedCompareExchange(&gate_claimed, 1, 0) == 0) {
+             std::printf("SCAN holds Generic reference thread=%lu caller=%p\n", GetCurrentThreadId(), caller);
+@@ -208,11 +214,25 @@ int main(int argc, char **argv)
+     vkDestroyInstance(first, nullptr);
+     const HMODULE after_destroy = GetModuleHandleW(L"renodx-dlss5.addon64");
+     std::printf("AFTER destroy registered=%ld module=%p\n", registered, after_destroy);
+-    if (!expect_race && (registered != 0 || after_destroy != nullptr)) {
++    // Pinned: ReShade logs that Generic "was not unregistered" and enables it again
++    // as an externally registered add-on for the next instance, as it does for the
++    // bridge itself. Generic then never unregisters while an instance lives, which
++    // is what the old reference race broke.
++    const bool kept = InterlockedCompareExchange(&pinned, 0, 0) != 0 && registered == 1 &&
++        after_destroy != nullptr && after_destroy == Generic();
++    if (!expect_race && (registered != 0 || after_destroy != nullptr) && !kept) {
+         SetEvent(release_scan);
+         std::puts("FAIL Generic outlived the first instance");
+         return 14;
+     }
++    if (kept) std::puts("PINNED Generic stays loaded and registered across the instance cycle");
++    if (kept && late_reference) {
++        // The negative control needs a second registration to inject into.
++        SetEvent(release_scan);
++        std::puts("N/A late-ref: a pinned stage-protocol Generic never registers again;"
++                  " run late-ref with a Generic that has no stage protocol");
++        return 15;
++    }
+     ResetEvent(unregistered);
+     ResetEvent(probed);
+     VkInstance final{};
+@@ -228,14 +248,17 @@ int main(int argc, char **argv)
+         vkDestroyInstance(final, nullptr);
+         return expect_race && reproduced ? 0 : 10;
+     }
+-    if (!control && (WaitForSingleObject(probed, 8000) != WAIT_OBJECT_0 || !FinishProbe())) return 11;
+-    const bool stable = registered == 1 && registrations >= 2 && acquisitions == 0 &&
++    // A pinned Generic is not loaded again, so the scanner has nothing new to visit.
++    if (!control && !kept && (WaitForSingleObject(probed, 8000) != WAIT_OBJECT_0 || !FinishProbe())) return 11;
++    const bool stable = registered == 1 && registrations >= (kept ? 1 : 2) && acquisitions == 0 &&
+         GetModuleHandleW(L"renodx-dlss5.addon64") != nullptr;
+-    std::printf("VERDICT stable=%d registrations=%ld acquisitions=%ld registered=%ld control=%d\n",
+-        stable, registrations, acquisitions, registered, control);
++    std::printf("VERDICT stable=%d pinned=%d registrations=%ld acquisitions=%ld registered=%ld control=%d\n",
++        stable, kept, registrations, acquisitions, registered, control);
+     if (injected_reference) FreeLibrary(injected_reference);
+     vkDestroyInstance(final, nullptr);
+-    const bool cleaned = registered == 0 && GetModuleHandleW(L"renodx-dlss5.addon64") == nullptr;
++    // A pinned Generic stays loaded and registered until the process exits.
++    const bool cleaned = kept ? registered == 1 && GetModuleHandleW(L"renodx-dlss5.addon64") != nullptr
++                              : registered == 0 && GetModuleHandleW(L"renodx-dlss5.addon64") == nullptr;
+     std::printf("FINAL cleanup=%d acquisitions=%ld\n", cleaned, acquisitions);
+     return !expect_race && stable && cleaned && acquisitions == 0 ? 0 : 12;
+ }
+diff --git a/tests/vulkan-fg-relay/lifetime/run-lifetime.py b/tests/vulkan-fg-relay/lifetime/run-lifetime.py
+index 3401034..df92e63 100644
+--- a/tests/vulkan-fg-relay/lifetime/run-lifetime.py
++++ b/tests/vulkan-fg-relay/lifetime/run-lifetime.py
+@@ -12,9 +12,16 @@ Modes (the run passes when the mode's expected exit code comes back):
+            lives); use it with a bridge build that predates ngx-module-scan.h.
+   stable   the same gated sequence; exit 0 means Generic registered twice, the
+            bridge took zero references to it, and everything unloaded cleanly.
++           A Generic with the stage protocol (8.5.0-rc10-stages1) is pinned by
++           the bridge once the bridge reads its stage plan; it then stays loaded
++           and registered across the instance cycle (ReShade enables it again as
++           an externally registered add-on), and exit 0 means exactly that, with
++           zero transient references.
+   control  no bridge at all; same checks as stable.
+   late-ref injects one extra reference after the notification; the host must
+-           detect it and exit 12 (negative control for the stable checks).
++           detect it and exit 12 (negative control for the stable checks). It
++           needs a Generic without the stage protocol: a pinned Generic never
++           registers again, and the host exits 15 (not applicable).
+ 
+ Usage:
+   python run-lifetime.py <new-dir> --mode race --bridge <dlss5-bridge.addon64>
+@@ -85,7 +92,8 @@ def main() -> int:
+         'scope': 'Two Vulkan instances only; no device, swapchain, GPU workload or game.',
+     }, indent=2), encoding='utf-8')
+     print(output.decode('utf-8', errors='replace'))
+-    print(f'exit_code={code} expected={expected} -> {"PASS" if code == expected else "FAIL"}')
++    verdict = 'PASS' if code == expected else 'NOT APPLICABLE' if code == 15 else 'FAIL'
++    print(f'exit_code={code} expected={expected} -> {verdict}')
+     return 0 if code == expected else 1
+ 
+ 
+-- 
+2.52.0.windows.1
+

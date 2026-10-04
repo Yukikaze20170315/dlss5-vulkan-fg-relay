@@ -5,8 +5,10 @@ Status: verified in one title (Arknights: Endfield, Vulkan, RTX 5090, Generic
 5120x2160, native DLSS-G fixed 6x and DLAA; the 2026-10-01 update was verified
 with the game's own 4x, every DLSS Super Resolution mode, several output
 resolutions, fullscreen and windowed; the 2026-10-02 build was run with
-Streamline 2.14.1 and with the game's own Streamline 2.10.3. Not yet tested
-with other Vulkan games, HDR swapchains, or without native Frame Generation.
+Streamline 2.14.1 and with the game's own Streamline 2.10.3; the 2026-10-05
+update was measured with 5120x2160, two NR layers (one Upscaled, one Present)
+and 6x. Not yet tested with other Vulkan games, HDR swapchains, or without
+native Frame Generation.
 
 Two stages are described here:
 
@@ -17,6 +19,83 @@ Two stages are described here:
   batch and every wait between Vulkan and the private D3D12 session happens on
   the GPU; the game is held at the start of its frame so frames do not queue in
   front of the neural pass.
+
+## Update 2026-10-05
+
+Four changes in the bridge. They come with a Generic build that chooses NR
+layers per stage, 8.5.0-rc10-stages1, which is published as source in
+PEQHUB/RenoDX-DLSS5-Generic (branch `rc10-stages1`).
+
+1. **GPU relay by default.** An absent `Pipeline` key used to select the
+   serial feed. A configuration that had lost the key, or an install script
+   that wrote `Pipeline=0`, then produced a high frame counter with uneven
+   display. Measured in Arknights: Endfield (5120x2160, two NR layers, 6x,
+   120 Hz, PresentMon, first 3 s dropped):
+
+   | | serial feed | relay, throttle of the 2026-10-04 test build | **relay, this throttle** |
+   | --- | --- | --- | --- |
+   | presents / s | 121.2 | 126.9 | **120.7** |
+   | displayed / s | 88.3 | 112.4 | **108.4** |
+   | real frames / s | 20.2 | 21.2 | **20.1** |
+   | present interval p95 / max (ms) | 17.9 / 19.1 | 8.8 / 59.7 | **8.9 / 11.1** |
+   | display intervals >= 25 ms | 0.53 % | 0.23 % | **0 %** |
+   | PC latency p50 / p95 (ms) | 119.5 / 147.5 | 218.6 / 246.2 | **161.9 / 184.6** |
+
+   In the serial feed every sixth present interval was 17.6 ms, and two
+   presents came 0.26 ms apart, so the compositor showed only the second.
+   `Pipeline` now defaults to 2 and `Import` to 1; `Pipeline=0` still works
+   for diagnosis and the log warns. When the relay stands down, NR at the FG
+   input pauses (frame generation keeps the game's own frames), the private
+   session is rebuilt and the relay is retried, up to 3 times per process.
+   It no longer switches to the serial feed; `SerialFallback=1` restores that.
+2. **Throttle.** The 2026-10-04 test build waited for a completed native FG
+   group. With the relay, Streamline issues indices 2..N right before the next
+   group starts, so that gate almost never held the game (middle column). The
+   throttle again waits after `slReflexSleep` for the newest NR value whose
+   Signal is already on the private queue, never for one that is armed but
+   not queued. Each wait is bounded to 250 ms (two NR layers came close to the
+   old 100 ms bound: process maximum 99.3 ms). Five timeouts in a row stand
+   the throttle down for 5 s, then it re-arms itself; before, it stayed off
+   for the process. The relay records the native FG group in the rate log
+   for diagnosis only.
+3. **Stage protocol v1.** A Generic that exports
+   `DLSS5StageProtocolVersion()` returning 1 and `DLSS5GetStagePlan()`
+   chooses 0-4 NR layers each for Render, Upscaled and Present (9 bits). With
+   it, the bridge serves only the Present layers, and only when their count
+   is not 0. Render and Upscaled run inside Generic on the game's own Vulkan
+   evaluate, and the bridge no longer mirrors the game's SR evaluate. The
+   bridge freezes the plan for each carrier evaluate and exports
+   `DLSS5BridgeActiveStagePlan()`; bit 31 tells Generic that the call is the
+   carrier, so it runs the Present layers of that plan only. An invalid plan
+   (reserved bits, a count above 4) pauses the carrier. The focus gate and
+   the composition guard follow the Present count. The bridge never hooks
+   `nvngx_dlssnr.dll`, so Generic's NR calls keep their own caller. Once the
+   bridge has found the plan query, it pins Generic (the module stays loaded
+   until the process exits), so the cached query cannot outlive it. A
+   Generic without these exports keeps the `NRHookPoint` behaviour.
+4. **Composition guard visible to screen capture by default.** While the
+   guard window was excluded from capture (`WDA_EXCLUDEFROMCAPTURE`), the
+   NVIDIA overlay refused to take screenshots of the game and reported a
+   protected application. `HoldCompositionHideCapture` now defaults to 0;
+   1 restores the exclusion. The guard still keeps DWM composing the
+   game's monitor.
+
+Also: the SR carrier hook may use a wider allocation range. In one session it
+failed 30 times in a row with MinHook status 9 (no free 4 KiB block within
++-1 GiB of the SR entry). `MH_CreateHookPrologueExtended`, for the SR carrier
+only, tries +-1 GiB first and then +-0x7FFF0000, and only for the exact
+five-byte `mov [rsp+8], rbx` prologue, which is checked again under thread
+freeze at enable. RIP-relative displacements that do not fit are refused
+instead of truncated. `Trace=1` adds a bounded observer of the FG command
+buffer's submits (diagnostics only). `vk-present-adapter.ini.example` lists
+every key with its current default.
+
+The measurements in the table were taken with bridge and Generic test builds
+whose code equals the published builds except for diagnostic-only code removed
+before release: a read-only count of DLSS-G's `OutputDisableInterpolation`
+(the bridge read a resource pointer as a flag, so the count was meaningless),
+and an unused Generic encode variant. Fix 4 was confirmed in the game on
+2026-10-02.
 
 ## Update 2026-10-01
 
@@ -366,14 +445,17 @@ Source=fg-input
 Follow=1
 Pipeline=2
 Import=1
-Trace=0
 ; Throttle=1 is the default
-; FocusKeepFG=1 and HoldComposition=1 are the defaults (2026-10-01)
+Trace=0
+; HoldComposition=1, HoldCompositionHideCapture=0, FocusKeepFG=1 are defaults (2026-10-01/05)
+; SerialFallback=0 is the default (2026-10-05)
 ```
 
 With `Follow=1`, Generic's own hook-point control is the switch: **Present** runs
 this feed, **Upscaled/Render** keep the existing Vulkan mirror; the session is
-handed over on the render thread.
+handed over on the render thread. With a stage-protocol Generic (8.5.0-rc10-stages1
+and later), `Follow=1` is still respected but the switch is Generic's Present count
+rather than the hook-point setting, and Render/Upscaled run inside Generic regardless.
 
 ## Files
 
@@ -385,7 +467,7 @@ handed over on the render thread.
 | `src/ngx-module-scan.h` | Export-table pre-check before a module is referenced. |
 | `src/fg-composite-shader.h` | UI-preserving composite (cs_5_0). |
 | `src/present-adapter.inc` | Identity-carrier hook on the SR runtime, NR entry witness, configuration checks, the reference present-stream feed. |
-| `src/present-adapter-config.h` | `vk-present-adapter.ini` keys: `Enabled`, `Source`, `Follow`, `AutoRun`, `Pipeline`, `Import`, `Throttle`, `Trace`. |
+| `src/present-adapter-config.h` | `vk-present-adapter.ini` keys: `Enabled`, `Source`, `Follow`, `AutoRun`, `Pipeline`, `Import`, `Throttle`, `Trace`, `HoldComposition`, `HoldCompositionAlpha`, `HoldCompositionHideCapture`, `FocusKeepFG`, `SerialFallback`. Stage protocol v1: `PresentAdapterStageQuery()`, `PresentAdapterStageProtocol()`, `PresentAdapterStagePlan()`. |
 | `src/present-nr-witness.asm` | Tail-forwarding thunks that preserve the four arguments and the caller's return address. |
 | `src/vkmirror.inc` | Worker dispatch (relay first, then `fg_arm`), FG handle tracking, mirror/feed arbitration. |
 | `src/synth.inc`, `src/bridge.inc`, `src/bridge.h` | sRGB path in the colour pass, submission without a CPU completion wait for the relay, fence-completion proofs, resource retention when completion is unproven. |
@@ -411,7 +493,8 @@ handed over on the render thread.
 | `tests/vulkan-fg-relay/scan/` | 20705 assertions of `ngx-module-scan.h` against the real Windows loader: non-candidates, near-miss names, every interface pairing, 20 unload/reload cycles, loader-lock contention, forwarded exports. |
 | `tests/vulkan-fg-relay/lifetime/` | Real ReShade 6.8 + real Generic, two Vulkan instances: `race` reproduces the Generic unregistration with an older bridge, `stable` / `control` pass, `late-ref` must fail with exit 12. |
 | `tests/vulkan-fg-relay/inject/` | A device created without the extension gets it through the hook; D3D12 Signal -> Vulkan timeline value, and D3D12 Signal -> `vkWaitSemaphores`, both pass. |
-| `tests/vulkan-fg-quality/run.cmd SUITE <new-dir>` | 2026-10-01 suites: `registry` (handle table, 188780 checks), `guides` (57), `hooks` (production NGX wrappers, 535), `colour` (sub-rectangle copies, 39), `recovery` (real D3D12 marker, 34), `compatibility` (26), `guard` (real Win32 windows, 28), `focus <sl.dlss_g.dll>` (512 guard combinations and the disk contract), `gpu` (real Vulkan compute scaling; needs `VULKAN_SDK`). 2026-10-02: `carrier` (49), and `racehelper`, which only builds the test-only in-game race add-on. |
+| `tests/vulkan-fg-quality/run.cmd SUITE <new-dir>` | 2026-10-01 suites: `registry` (handle table, 188780 checks), `guides` (57), `hooks` (production NGX wrappers, 545), `colour` (sub-rectangle copies, 39), `recovery` (real D3D12 marker, 34), `compatibility` (26), `guard` (real Win32 windows, 30), `focus <sl.dlss_g.dll>` (512 guard combinations and the disk contract), `gpu` (real Vulkan compute scaling; needs `VULKAN_SDK`). 2026-10-02: `carrier` (49), `carrier-range` (crowded MinHook range, 19), `minhook-range` (global range safety, 34), and `racehelper`, which only builds the test-only in-game race add-on. |
+| `tests/stage-protocol/` | 125 legal and 391 invalid plans (all Pipeline 2/3 and Follow 0/1 combinations) compiled from the production bridge scope and configuration; validates `DLSS5StageProtocolVersion`, `DLSS5BridgeActiveStagePlan`, plan-freeze, bit-31 carrier flag and zero-count gating. `test-focus` stubs the plan query. |
 
 The relay's arm/copy/park/release chain has no offline host: it needs a real
 DLSS-G evaluate. It was validated in the game (below).
@@ -448,7 +531,10 @@ scenes are not guaranteed to be identical.
 * UNORM8 sRGB FG inputs only; other formats are refused with a log line and the
   game keeps its own image. The valid regions of the HUD-less image and the back
   buffer must have the same size. The game must supply `DLSSG.HUDLess`.
-* Any Generic build is tried; only 8.5.0-rc10 has been verified.
+* Any Generic build is tried; 8.5.0-rc10 and 8.5.0-rc10-stages1 have been
+  verified. With 8.5.0-rc10-stages1 the stage protocol is active and the bridge
+  uses the plan that Generic exports; without it, `Follow=1` maps Generic's
+  `NRHookPoint` choice to the feed.
 * Only `Pipeline=2` with `Import=1` is validated in the game. `Pipeline=3` keeps
   the older CPU gate and ran with about two thirds of the FG groups unarmed and
   occasional release-submit failures (host fallback). `Import=0` keeps the CPU
@@ -463,8 +549,10 @@ scenes are not guaranteed to be identical.
   only shows while FG is evaluated, so it stays hidden then. Both builds were
   run in the game on 2026-10-02; NR worked with both while focused.
 * One effect runtime / one swapchain.
-* Generic's layer count and per-layer parameters are global, so the mirror
-  (Upscaled) and this feed (Present) cannot run different layer configurations.
+* Generic's layer count and per-layer parameters are global, so without the
+  stage protocol the mirror (Upscaled) and this feed (Present) cannot run
+  different layer configurations. With the stage protocol each stage has its own
+  count and layers, but per-layer knobs are still shared across stages.
 * Other Vulkan games are not covered. The automatic rebuild after a lost GPU
   completion (update item 4) has not been triggered in the game yet. One 1.5 s
   completion stall was seen once in the game during repeated resolution

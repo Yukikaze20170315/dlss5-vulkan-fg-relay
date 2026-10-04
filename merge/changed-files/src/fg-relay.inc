@@ -115,6 +115,7 @@ struct FgrArm
     bool     valid;
     uint64_t hud, back, depth, mv;
     uint64_t copy_val, nr_val;
+    uint64_t group_serial;
     uint32_t w, h, vk_fmt;
     uint32_t hud_x, hud_y, back_x, back_y;
     FgGuideContract guides;
@@ -127,6 +128,21 @@ struct FgrPool
     void            *queue;
     SVkHandle        pool;
     SVkCommandBuffer cb_copy[kFgrSlots], cb_release[kFgrSlots];
+};
+
+// All group members are read and written under FgrLock. The group serial
+// identifies the real-frame evaluate (idx=1); terminal_serial is published
+// only after the native group has reached idx=count.
+struct FgrGroupState
+{
+    uint64_t serial;
+    uint64_t terminal_serial;
+    uint64_t released_serial;
+    uint64_t released_nr;
+    uint64_t gate_attempted_serial;
+    unsigned count;
+    unsigned phase;
+    bool valid;
 };
 
 struct FgrState
@@ -184,8 +200,10 @@ struct FgrState
     volatile LONG arm_seq, worker_seq, eval_seq, next_slot, pending_slot, last_eval_tick;
     volatile LONG armed, unarmed, skipped, busy, mismatched, writes, copies_failed;
     unsigned  unarmed_streak, mismatch_streak;
+    unsigned  relay_retries;       // stand-downs retried by a session rebuild, per process
     uint64_t  copy_val, nr_val;    // the last values actually submitted / signalled for
     uint64_t  last_release_nr;     // the nr value the frame before this one waited
+    FgrGroupState group;
     uint64_t  nr_progress_value;   // watchdog, evaluate thread only: the shared fence's
     LONG      nr_progress_tick;    // completed value and when it last moved or caught up
     bool      have_last_group, last_group_served;   // evaluate thread only
@@ -197,11 +215,14 @@ struct FgrState
 
     // Throttle (FgRelayThrottle), indexed by site: 0 the game's present, 1 the
     // game's Reflex sleep. Each site is one game thread, so each has its own
-    // event. thr_off is set once waits time out repeatedly and stays set for the
-    // process. last_sleep_ms says the sleep site is live, which retires the
-    // present site.
+    // event. thr_off holds the tick at which repeated timeouts stood the throttle
+    // down (0 = active); it re-arms itself after kFgrThrottleRearmMs.
+    // last_sleep_ms says the sleep site is live, which retires the present site.
+    // nr_queued is the newest NR value whose Signal the worker has actually put on
+    // the private queue; a wait never targets a value that is not queued yet.
     HANDLE    thr_ev[2];
-    volatile LONG thr_off, thr_streak;
+    volatile LONG thr_off, thr_streak[2];
+    volatile LONG64 nr_queued;
     volatile LONG thr_calls[2], thr_waits[2], thr_clear[2], thr_timeouts[2];
     volatile LONG64 thr_sum[2], thr_max, last_sleep_ms;
     volatile LONG presents, p_pipeline_skip, p_notready, p_fallback, p_inactive;
@@ -232,6 +253,7 @@ struct FgrState
     PFN_FgrResetCommandBuffer     ResetCommandBuffer;
     PFN_FgrQueueSubmit            QueueSubmit;
 };
+
 static FgrState g_fgr;
 static const unsigned kFgrAtPresent = 0, kFgrAtSleep = 1;   // throttle sites
 
@@ -257,6 +279,74 @@ static void FgrMax64(volatile LONG64 &value, LONG64 candidate)
 
 static void FgrLock()   { EnterCriticalSection(&g_fgr.cs); }
 static void FgrUnlock() { LeaveCriticalSection(&g_fgr.cs); }
+
+static void FgRelayObserveGroup(unsigned index, unsigned count, bool count_known)
+{
+    FgrState &f = g_fgr;
+    if (!f.cs_ready) return;
+
+    FgrLock();
+    FgrGroupState &group = f.group;
+    if (!count_known || count == 0 || index == 0 || index > count) {
+        group.valid = false;
+        group.count = group.phase = 0;
+        group.terminal_serial = 0;
+    } else if (index == 1) {
+        group.valid = true;
+        ++group.serial;
+        group.count = count;
+        group.phase = 1;
+        group.terminal_serial = count == 1 ? group.serial : 0;
+        group.released_serial = 0;
+        group.released_nr = 0;
+        group.gate_attempted_serial = 0;
+    } else if (!group.valid || group.count != count || group.phase + 1 != index) {
+        // Do not carry a partly observed group into a future throttle point.
+        group.valid = false;
+        group.count = group.phase = 0;
+        group.terminal_serial = 0;
+    } else {
+        group.phase = index;
+        if (index == count) group.terminal_serial = group.serial;
+    }
+    FgrUnlock();
+}
+
+static uint64_t FgRelayCurrentGroupSerial()
+{
+    FgrState &f = g_fgr;
+    if (!f.cs_ready) return 0;
+    FgrLock();
+    const uint64_t serial = f.group.valid && f.group.phase == 1 ? f.group.serial : 0;
+    FgrUnlock();
+    return serial;
+}
+
+static void FgRelayPublishGroupRelease(uint64_t serial, uint64_t nr_val)
+{
+    FgrState &f = g_fgr;
+    if (serial == 0 || nr_val == 0 || !f.cs_ready) return;
+    FgrLock();
+    if (f.group.valid && f.group.serial == serial) {
+        f.group.released_serial = serial;
+        f.group.released_nr = nr_val;
+    }
+    FgrUnlock();
+}
+
+// The caller holds FgrLock. Present and Reflex sleep both use this one claim,
+// so a completed native group can produce at most one host-side throttle wait.
+static bool FgRelayClaimCompletedGroupLocked(FgrGroupState &group)
+{
+    if (!group.valid || group.terminal_serial == 0 ||
+        group.terminal_serial != group.serial ||
+        group.released_serial != group.serial || group.released_nr == 0 ||
+        group.gate_attempted_serial == group.serial)
+        return false;
+    group.gate_attempted_serial = group.serial;
+    return true;
+}
+
 
 // Called once from FgtInit (the hook registration path); every entry point
 // refuses until it has run.
@@ -293,16 +383,38 @@ static bool FgRelayQueueFamily(void *queue, uint32_t *family)
     return false;
 }
 
+static const unsigned kFgrRelayRetries = 3;
+
 static bool FgRelayFallback(const char *why)
 {
     if (!g_fgr.fell_back) {
         g_fgr.fell_back = true;
         g_fgr.why = why;
         PresentCompatibilityIssue(PC_PROCESSING_FAILED, why);
-        Log("[fg-relay] %s. The GPU relay is unavailable; the serial FG-input feed may run. "
-            "This is a degraded path and does not guarantee the same frame pacing.", why);
+        if (PresentAdapterSerialFallback()) {
+            Log("[fg-relay] %s. The GPU relay is unavailable; SerialFallback=1, so the serial FG-input feed runs. "
+                "That feed presents the generated frames in bursts: expect a high frame counter with uneven display.", why);
+        } else if (g_fgr.relay_retries < kFgrRelayRetries) {
+            ++g_fgr.relay_retries;
+            // The rebuild drains the private session on the render thread; its
+            // release clears fell_back, and the next valid FG input opens the relay again.
+            g_fg_input.want_release = true;
+            Log("[fg-relay] %s. NR at the FG input pauses instead of using the serial feed; the private session "
+                "is rebuilt and the relay retried (attempt %u of %u).", why, g_fgr.relay_retries, kFgrRelayRetries);
+        } else {
+            Log("[fg-relay] %s. The relay stood down %u times in this process; NR at the FG input stays paused "
+                "(frame generation keeps the game's own frames). SerialFallback=1 would run the serial feed, "
+                "which presents in bursts.", why, kFgrRelayRetries + 1);
+        }
     }
     return false;
+}
+
+// True while a configured relay has stood down and the serial feed must not
+// take its frames: the FG input then runs without NR until the relay reopens.
+static bool FgRelayBlocksSerialFeed()
+{
+    return PresentAdapterRelay() && g_fgr.cs_ready && g_fgr.fell_back && !PresentAdapterSerialFallback();
 }
 
 // ---------------------------------------------------------------------------
@@ -677,12 +789,15 @@ static void FgRelayEnsure()
         memset(f.pools, 0, sizeof(f.pools));
         for (unsigned i = 0; i < kFgrSlots; ++i) { f.ev_out[i] = f.ev_mark[i] = 0; f.slot_used[i] = false; }
         f.arm_seq = f.worker_seq = f.eval_seq = 0;
-        f.copy_val = f.nr_val = f.last_release_nr = f.nr_progress_value = 0;
+        f.copy_val = f.nr_val = f.last_release_nr = f.nr_progress_value = 0; InterlockedExchange64(&f.nr_queued, 0);
         for (unsigned i = 0; i < kFgrSlots; ++i) {
             f.copy_in_flight[i] = f.release_in_flight[i] = false;
             InterlockedExchange64(&f.copy_submit_qpc[i], 0);
         }
         f.have_last_group = false;
+        FgrLock();
+        f.group = {};
+        FgrUnlock();
         f.have_last = f.have_present = false;
         memset(f.idx_map, 0, sizeof(f.idx_map));
         f.copy_fence12 = nullptr;   // the old device's objects went with it
@@ -1198,8 +1313,19 @@ static void FgRelayPeriodic()
             ps(timeouts - prev_timeouts[s]), avg_ms(sum - prev_sum[s], waits - prev_waits[s]));
         prev_calls[s] = calls; prev_waits[s] = waits; prev_clear[s] = clear; prev_timeouts[s] = timeouts; prev_sum[s] = sum;
     }
-    Log("[fg-relay] rate4: throttle depth=%d off=%ld | sleep %s | present %s | max=%.2fms (process)",
+    FgrGroupState group = {};
+    FgrLock();
+    group = f.group;
+    FgrUnlock();
+    Log("[fg-relay] rate4: throttle depth=%d off=%ld | "
+        "group=%llu phase=%u/%u terminal=%llu released=%llu/%llu gate=%llu | "
+        "sleep %s | present %s | max=%.2fms (process)",
         PresentAdapterRelayThrottle(), static_cast<long>(InterlockedCompareExchange(&f.thr_off, 0, 0)),
+        static_cast<unsigned long long>(group.serial), group.phase, group.count,
+        static_cast<unsigned long long>(group.terminal_serial),
+        static_cast<unsigned long long>(group.released_serial),
+        static_cast<unsigned long long>(group.released_nr),
+        static_cast<unsigned long long>(group.gate_attempted_serial),
         site_text[kFgrAtSleep], site_text[kFgrAtPresent], ms(FgrCountRead64(f.thr_max)));
 
     prev = cur;
@@ -1221,6 +1347,10 @@ struct FgrPresentInfo
 // queued or about to be (the worker queues it without waiting on anything the
 // game does next), so the wait cannot depend on the waiting thread; it is bounded
 // anyway, and a throttle that keeps timing out turns itself off for the process.
+// The wait must not depend on the native MFG group having reached its last index:
+// with the relay, Streamline issues indices 2..N about one real frame after index 1,
+// right before the next group starts, so a "completed group" gate almost never
+// held the game (measured: 0 waits per second, PC latency 216 ms instead of ~158).
 // The fence is referenced under the lock because the session release frees it
 // under the lock.
 //
@@ -1231,8 +1361,13 @@ struct FgrPresentInfo
 // (2026-09-29: PCL 246 -> 209 ms, against 132 ms for a frame cap that sleeps
 // before simulation). The present site is therefore only the fallback for a game
 // that does not call slReflexSleep; it stands down while the sleep site is live.
-static const DWORD    kFgrThrottleMs = 100;
+// Bounded per wait. Several Present layers make the steady wait itself approach the
+// old 100 ms bound, and a new layer's NR feature creation stalls the worker for
+// ~170 ms once; both used to trip the give-up and leave the game unthrottled for the
+// rest of the session (PC latency 246 instead of ~158 ms).
+static const DWORD    kFgrThrottleMs = 250;
 static const unsigned kFgrThrottleGiveUp = 5;
+static const DWORD    kFgrThrottleRearmMs = 5000;
 static void FgRelayThrottle(unsigned site)
 {
     FgrState &f = g_fgr;
@@ -1245,13 +1380,26 @@ static void FgRelayThrottle(unsigned site)
         const LONG64 last_sleep = FgrCountRead64(f.last_sleep_ms);
         if (last_sleep != 0 && now_ms - last_sleep < 500) return;
     }
-    if (!f.ready || f.fell_back || !f.import_ok || f.thr_ev[site] == nullptr ||
-        InterlockedCompareExchange(&f.thr_off, 0, 0) != 0)
-        return;
+    if (!f.ready || f.fell_back || !f.import_ok || f.thr_ev[site] == nullptr) return;
+    const LONG off_tick = InterlockedCompareExchange(&f.thr_off, 0, 0);
+    if (off_tick != 0) {
+        if (static_cast<DWORD>(GetTickCount() - static_cast<DWORD>(off_tick)) < kFgrThrottleRearmMs) return;
+        if (InterlockedCompareExchange(&f.thr_off, 0, off_tick) == off_tick) {
+            InterlockedExchange(&f.thr_streak[0], 0);
+            InterlockedExchange(&f.thr_streak[1], 0);
+            Log("[fg-relay] throttle re-armed after %lu ms.", kFgrThrottleRearmMs);
+        }
+    }
     FgrLock();
     ID3D12Fence *fence = f.nr_fence12;
-    const uint64_t newest = f.nr_val;
-    if (fence != nullptr) fence->AddRef();
+    const uint64_t armed_nr = f.nr_val;
+    const uint64_t queued_nr = static_cast<uint64_t>(FgrCountRead64(f.nr_queued));
+    const uint64_t newest = armed_nr < queued_nr ? armed_nr : queued_nr;
+    if (fence != nullptr) {
+        fence->AddRef();
+        // Bookkeeping for the rate log only; the wait below does not depend on it.
+        (void)FgRelayClaimCompletedGroupLocked(f.group);
+    }
     FgrUnlock();
     if (fence == nullptr) return;
     const uint64_t back = static_cast<uint64_t>(depth - 1);
@@ -1259,6 +1407,7 @@ static void FgRelayThrottle(unsigned site)
     if (target == 0 || fence->GetCompletedValue() >= target) {
         fence->Release();
         FgrCount(f.thr_clear[site]);
+        InterlockedExchange(&f.thr_streak[site], 0);
         return;
     }
     const LONG64 start = FgrQpcNow();
@@ -1281,12 +1430,15 @@ static void FgRelayThrottle(unsigned site)
     FgrCount(f.thr_waits[site]);
     FgrAdd64(f.thr_sum[site], waited);
     FgrMax64(f.thr_max, waited);
-    if (done) { InterlockedExchange(&f.thr_streak, 0); return; }
+    if (done) { InterlockedExchange(&f.thr_streak[site], 0); return; }
     FgrCount(f.thr_timeouts[site]);
-    if (static_cast<unsigned>(InterlockedIncrement(&f.thr_streak)) >= kFgrThrottleGiveUp &&
-        InterlockedExchange(&f.thr_off, 1) == 0)
-        Log("[fg-relay] throttle: the NR fence missed %u consecutive %lu ms waits; the present throttle is off "
-            "for this process (frames may queue ahead of the NR again).", kFgrThrottleGiveUp, kFgrThrottleMs);
+    if (static_cast<unsigned>(InterlockedIncrement(&f.thr_streak[site])) >= kFgrThrottleGiveUp) {
+        const LONG tick = static_cast<LONG>(GetTickCount() | 1u);
+        if (InterlockedCompareExchange(&f.thr_off, tick, 0) == 0)
+            Log("[fg-relay] throttle: the NR fence missed %u consecutive %lu ms waits; the throttle stands down "
+                "for %lu ms (frames may queue ahead of the NR meanwhile).", kFgrThrottleGiveUp, kFgrThrottleMs,
+                kFgrThrottleRearmMs);
+    }
 }
 
 // Called from the interposer's vkQueuePresentKHR detour, on the thread that owns
@@ -1414,6 +1566,9 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
     FgRelayEnsure();
     if (!f.ready) { FgrCount(f.eval_notready); return 0; }
     FgrCount(f.evals);
+    // Capture the idx=1 group before the rest of the evaluate can yield to a
+    // subsequent native interpolation callback on an unusual scheduling path.
+    const uint64_t group_serial = FgRelayCurrentGroupSerial();
 
     if (p != nullptr) {
         void *q = nullptr;
@@ -1580,6 +1735,9 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
         return -1;
     }
     f.mismatch_streak = 0;
+    // Bind this evaluate's release to the real native group observed by fg-input.
+    // A missing serial leaves the existing relay behavior unchanged.
+    a.group_serial = group_serial;
 
     // The slot's release batch is re-recorded when the slot comes round again, so
     // its previous release must be over before its fence is touched. A failed
@@ -1637,6 +1795,7 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
                 f.nr_progress_tick = static_cast<LONG>(GetTickCount());
             }
             f.last_release_nr = a.nr_val;
+            FgRelayPublishGroupRelease(a.group_serial, a.nr_val);
         } else {
             FgrCount(f.rel_fail);
             // The park is recorded and nothing on the GPU will release it: let it
@@ -1719,14 +1878,15 @@ static bool FgRelayWorker()
         FgrCount(f.w_copy_fail);
     } else if (g_present_adapter.run_nr) {
         g_present_nr_entries = g_present_sr_entries = g_present_sr_copies = 0;
-        g_present_nr_scope = true;
-        if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
-        // No trailing wait: the release is signalled by the queue below and the
-        // next frame's Synth12Begin waits the allocator's retire fence, which is
-        // this submission's own fence value.
-        ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs, SLOT_OUTPUT, &wrote, false);
-        if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
-        g_present_nr_scope = false;
+        {
+            if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
+            PresentAdapterNrScope scope;
+            // No trailing wait: the release is signalled by the queue below and the
+            // next frame's Synth12Begin waits the allocator's retire fence, which is
+            // this submission's own fence value.
+            ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs, SLOT_OUTPUT, &wrote, false);
+            if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
+        }
         nr_entries = g_present_nr_entries; sr_entries = g_present_sr_entries; sr_copies = g_present_sr_copies;
         PresentCompatibilityFrame(ok, nr_entries, sr_entries, sr_copies);
         if (ok && (sr_entries != 1 || sr_copies != 1)) {
@@ -1747,7 +1907,12 @@ static bool FgRelayWorker()
     // Signalled on every path. A frame whose NR failed still has a command
     // buffer parked on this value, and the identity copy above is what makes
     // letting it through harmless.
-    if (f.nr_fence12 != nullptr) g_s12.queue->Signal(f.nr_fence12, a.nr_val);
+    if (f.nr_fence12 != nullptr) {
+        g_s12.queue->Signal(f.nr_fence12, a.nr_val);
+        // Published after the Signal is queued: the throttle may wait for it now.
+        if (static_cast<LONG64>(a.nr_val) > FgrCountRead64(f.nr_queued))
+            InterlockedExchange64(&f.nr_queued, static_cast<LONG64>(a.nr_val));
+    }
     if (!f.import_ok) {
         // No shared object to signal through: the CPU stands in, waiting the
         // session's own fences -- the composite's, then the NR submission's --
@@ -1960,17 +2125,19 @@ static void FgRelayOnSessionRelease()
     f.npools = 0;
     memset(f.pools, 0, sizeof(f.pools));
     f.cmd_queue = nullptr;
-    f.copy_val = f.nr_val = f.last_release_nr = f.nr_progress_value = 0;
+    f.copy_val = f.nr_val = f.last_release_nr = f.nr_progress_value = 0; InterlockedExchange64(&f.nr_queued, 0);
     for (unsigned i = 0; i < kFgrSlots; ++i) {
         f.copy_in_flight[i] = f.release_in_flight[i] = false;
         InterlockedExchange64(&f.copy_submit_qpc[i], 0);
     }
     f.have_last_group = false;
+    f.group = {};
     f.mismatch_streak = 0;
     f.unarmed_streak = 0;
     f.last_eval_tick = 0;
     InterlockedExchange(&f.thr_off, 0);
-    InterlockedExchange(&f.thr_streak, 0);
+    for (unsigned i = 0; i < 2; ++i)
+        InterlockedExchange(&f.thr_streak[i], 0);
     FgGuideRequestReset();
     if (f.copy_fence12 != nullptr) { f.copy_fence12->Release(); f.copy_fence12 = nullptr; }
     if (f.nr_fence12 != nullptr) { f.nr_fence12->Release(); f.nr_fence12 = nullptr; }

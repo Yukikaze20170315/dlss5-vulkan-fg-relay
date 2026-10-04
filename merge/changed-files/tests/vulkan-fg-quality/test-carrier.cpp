@@ -87,8 +87,83 @@ static void CheckRelayYieldsWhilePending()
     g_fg_input = {};
 }
 
-int main()
+static int CheckCrowdedCarrier()
 {
+    InitializeCriticalSection(&g_log_cs);
+    strcpy_s(g_log_path, "carrier-crowded.log");
+    Check(MH_Initialize() == MH_OK, "MinHook initialised before address pressure");
+    const HMODULE sr = LoadLibraryW(L".\\sr-low.dll");
+    Check(sr != nullptr && reinterpret_cast<uintptr_t>(sr) == 0x128AD0000ULL, "SR fixture loaded at its fixed low address");
+    void *entry = sr != nullptr ? reinterpret_cast<void *>(GetProcAddress(sr, "NVSDK_NGX_D3D12_EvaluateFeature")) : nullptr;
+    if (entry == nullptr) return 1;
+    const uintptr_t origin = reinterpret_cast<uintptr_t>(entry);
+    const uintptr_t low = origin - 0x50000000ULL, high = origin + 0x50000000ULL;
+    std::vector<void *> reserved;
+    bool complete = true;
+    for (uintptr_t pos = low; pos < high;) {
+        MEMORY_BASIC_INFORMATION region = {};
+        if (VirtualQuery(reinterpret_cast<void *>(pos), &region, sizeof(region)) == 0) { complete = false; break; }
+        const uintptr_t end = reinterpret_cast<uintptr_t>(region.BaseAddress) + region.RegionSize;
+        if (region.State == MEM_FREE) {
+            const uintptr_t begin = (pos + 0xFFFFULL) & ~uintptr_t(0xFFFFULL);
+            const uintptr_t stop = end < high ? end : high;
+            if (begin + 0x1000 <= stop) {
+                void *block = VirtualAlloc(reinterpret_cast<void *>(begin), stop - begin, MEM_RESERVE, PAGE_NOACCESS);
+                if (block != nullptr) reserved.push_back(block);
+                else complete = false;
+            }
+        }
+        pos = end;
+    }
+    Check(complete && !reserved.empty(), "all aligned inner-window free regions reserved without committing memory");
+    using Evaluate = int (*)(void *, void *, void *, void *);
+    const auto evaluate = reinterpret_cast<Evaluate>(entry);
+    Check(evaluate(sr, sr, nullptr, sr) == 3, "external SR baseline accepts all four arguments");
+    void *ordinary = nullptr;
+    Check(MH_CreateHook(entry, reinterpret_cast<void *>(&DummyDetour), &ordinary) == MH_ERROR_MEMORY_ALLOC && ordinary == nullptr,
+          "ordinary hooks still refuse the exhausted inner window");
+    const auto result = PresentAdapterCarrier();
+    std::printf("crowded carrier: status=%u entry=%p trampoline=%p\n", static_cast<unsigned>(result), entry, g_present_sr_original);
+    Check(result == PCR_READY, "production carrier installs with the inner window exhausted");
+    if (result == PCR_READY) {
+        const uintptr_t forward = reinterpret_cast<uintptr_t>(g_present_sr_original);
+        const uintptr_t distance = origin > forward ? origin - forward : forward - origin;
+        Check(distance > 0x40000000ULL && distance < 0x80000000ULL, "carrier trampoline uses the outer rel32 window");
+        Check(evaluate(sr, nullptr, sr, sr) == 3, "external SR is unchanged through the production assembly gate");
+        Check(evaluate(nullptr, nullptr, nullptr, nullptr) == 0, "external null arguments remain unchanged");
+        Check(MH_DisableHook(entry) == MH_OK && evaluate(sr, sr, sr, sr) == 4, "carrier disables without changing external SR");
+        Check(MH_EnableHook(entry) == MH_OK && evaluate(sr, sr, sr, sr) == 4, "scoped carrier re-enables with the same prologue");
+        Check(MH_RemoveHook(entry) == MH_OK, "scoped carrier removes cleanly");
+        DWORD protect = 0;
+        Check(VirtualProtect(entry, 5, PAGE_EXECUTE_READWRITE, &protect) != FALSE, "fixture prologue can be changed for rejection cases");
+        const unsigned char original[5] = {0x48, 0x89, 0x5C, 0x24, 0x08};
+        const unsigned char jump[5] = {0xE9, 0, 0, 0, 0};
+        memcpy(entry, jump, sizeof(jump));
+        ordinary = nullptr;
+        Check(MH_CreateHookPrologueExtended(entry, reinterpret_cast<void *>(&DummyDetour), &ordinary) == MH_ERROR_MEMORY_ALLOC && ordinary == nullptr,
+              "extended create refuses an existing jump rather than hiding its original prologue");
+        Check(memcmp(entry, jump, sizeof(jump)) == 0, "rejected create leaves the target unchanged");
+        memcpy(entry, original, sizeof(original));
+        Check(MH_CreateHookPrologueExtended(entry, reinterpret_cast<void *>(&DummyDetour), &ordinary) == MH_OK,
+              "extended create accepts the verified live prologue");
+        memcpy(entry, jump, sizeof(jump));
+        Check(MH_EnableHook(entry) == MH_ERROR_UNSUPPORTED_FUNCTION, "enable rechecks a prologue changed after create");
+        Check(memcmp(entry, jump, sizeof(jump)) == 0, "rejected enable leaves the intervening jump unchanged");
+        Check(MH_RemoveHook(entry) == MH_OK, "rejected disabled hook removes without patching target");
+        memcpy(entry, original, sizeof(original));
+        DWORD ignored = 0;
+        VirtualProtect(entry, 5, protect, &ignored);
+        FlushInstructionCache(GetCurrentProcess(), entry, 5);
+    }
+    for (void *block : reserved) VirtualFree(block, 0, MEM_RELEASE);
+    DeleteCriticalSection(&g_log_cs);
+    std::printf("%s crowded carrier: checks=%u failures=%u\n", failures == 0 ? "PASS" : "FAIL", checks, failures);
+    return failures == 0 ? 0 : 1;
+}
+
+int main(int argc, char **argv)
+{
+    if (argc == 2 && strcmp(argv[1], "--crowded") == 0) return CheckCrowdedCarrier();
     InitializeCriticalSection(&g_log_cs);
     strcpy_s(g_log_path, "carrier.log");
     g_self = GetModuleHandleW(nullptr);

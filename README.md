@@ -1,38 +1,31 @@
-# Vulkan + DLSS Frame Generation: Generic's NR on the finished frame — update 2026-10-02
+# Vulkan + DLSS Frame Generation: Generic's NR on the finished frame — update 2026-10-05
 
 ## Short version
 
-- **What it is.** An update of the DLSS 5 bridge add-on (`dlss5-bridge.addon64`) released here on 2026-09-29 (`vk-fgrelay-20260929`). In Vulkan games with native DLSS Frame Generation, it runs RenoDX DLSS 5 Generic's neural rendering (NR) on the game's finished real frame, right before the native DLSS-G evaluate, once per real frame; frame generation then interpolates the enhanced frames. Generic itself is not modified.
-- **What was wrong.** After the first release, these problems showed up in normal play in Arknights: Endfield. Items 1-3, 6 and 7 were bridge bugs. Item 4 is how the game behaves without any mod; item 5 appeared once item 4 was changed.
-  1. With any DLSS mode other than DLAA, surfaces flickered when the camera turned, and frame pacing became uneven and stayed uneven until the game was restarted.
-  2. In fullscreen at a resolution below the monitor's (for example 3840x2160 on a 5120x2160 monitor), NR did not run.
-  3. NR could stop by itself after a while of normal play and only came back after a restart.
-  4. When the game window lost focus, frame generation (and with it NR) stopped.
-  5. When frame generation was kept running while unfocused, switching windows showed a short flash of the unprocessed picture about 1-2 s later.
-  6. Only one exact Generic build was accepted; with any other build NR did not run, and only the log said why.
-  7. In some game sessions NR did not start at all. Frame generation ran normally, and changing the resolution once brought NR back.
+- **What it is.** An update of the DLSS 5 bridge add-on (`dlss5-bridge.addon64`) released here on 2026-10-02 (`vk-fgrelay-20261002`). In Vulkan games with native DLSS Frame Generation, it runs RenoDX DLSS 5 Generic's neural rendering (NR) on the game's finished real frame, right before the native DLSS-G evaluate, once per real frame; frame generation then interpolates the enhanced frames.
 - **What this update does, in one line each.**
-  1. The smaller depth and motion-vector images of the other DLSS modes are scaled to the output size on the GPU, and the relay no longer falls back for the rest of the session.
-  2. Each input image is read at its own valid region, so fullscreen below monitor resolution works.
-  3. Frame generation handles are tracked properly (the old table had 8 entries and was never cleaned).
-  4. Streamline's internal focus check is overridden for frame generation only, while the window is visible and NR is on. This needs Streamline 2.14.1; with the 2.10.3 files that Arknights: Endfield ships, the game's own behaviour stays (see the tool below).
-  5. A 2x2, almost transparent, click-through window keeps Windows from switching the game's presentation mode; that switch made Streamline show 9-15 frames without calling frame generation, so without NR.
-  6. The version whitelist is removed; real problems are named in the log and in the ReShade panel, together with the Generic build that is known to work.
-  7. At game start the bridge attaches to the DLSS Super Resolution module. When this cannot work yet, because two such modules are loaded for a moment or there is no free address space next to the module for the hook (this has nothing to do with how much RAM the PC has), the bridge tries again once per second, up to 30 times, instead of giving up for the whole session.
-  Also new: if the GPU stops confirming NR work, the bridge rebuilds its session automatically once it can prove the old work is finished.
-- **New, optional, for Arknights: Endfield only: `EndfieldFGSwitch.exe`.** The game ships NVIDIA Streamline 2.10.3, which allows at most 4x frame generation and stops frame generation when the window is not focused. The tool swaps the game's 8 Streamline and frame generation files for NVIDIA's official Streamline 2.14.1 and frame generation 310.9.1 (and back), and on RTX 50 cards sets a fixed 2x-6x multiplier in the driver profile of this game only. It has two purposes: 6x frame generation on RTX 50 cards, and frame generation and NR that keep running behind other windows, without the flash of item 5. Users who need neither do not need it.
-- **Graphics cards.** Supported: RTX 50 series. Maybe: RTX 40 series (frame generation 2x works there, but the NR runtime build used here only contains RTX 50 code; an RTX 40 build of the NR runtime from the community may work, untested). Needs own adaptation for now: RTX 20 and RTX 30 series (no DLSS Frame Generation, which this add-on depends on).
-- **Tested** in Arknights: Endfield on an RTX 5090 (5120x2160 main monitor plus a 3840x2160 second monitor), Generic 8.5.0-rc10 with two NR passes. Fixes 1-5 were confirmed by the user in the game, with the game's 4x frame generation and Streamline 2.14.1 files in the game folder. Fix 6 is covered by offline tests only; no other Generic build was tried in the game. Fix 7 was checked in the game with a test-only add-on that recreates the condition on purpose: NR started in each of 4 launches without a resolution change. The published build was run with both Streamline versions, and the tool at 4x, 5x and 6x. Offline tests are listed below. Not tested in other games or on other cards.
-- **Use it or merge it.** A ready-to-use build, the tool, patches on top of the 2026-09-29 patches, full copies of every changed file, the offline tests, and the logs and captures behind every number are linked in "Files" below.
+  1. An absent or zero `Pipeline` key used to silently select the serial feed, which caused the game's frame counter to run ahead of what the display showed. `Pipeline` now defaults to 2 (GPU relay); a `Pipeline=0` configuration logs a warning.
+  2. The throttle at `slReflexSleep` now waits for the newest NR value already on the private queue, not for a completed native DLSS-G group. Each wait is bounded to 250 ms; five consecutive timeouts stand the throttle down for 5 s, then it re-arms itself automatically.
+  3. Generic builds that export `DLSS5StageProtocolVersion()` returning 1 and `DLSS5GetStagePlan()` choose NR layers per stage — Render, Upscaled and Present, 0-4 each, up to 12 total. With such a Generic the bridge serves only the Present layers; Render and Upscaled run inside Generic on the game's own Vulkan evaluate. The currently shipped Generic build, 8.5.0-rc10-stages1, uses one Upscaled and one Present layer by default.
+  4. The composition guard window is no longer excluded from screen capture by default; the NVIDIA overlay refused to take screenshots while it was. `HoldCompositionHideCapture=1` restores the exclusion.
+
+  Also: the SR carrier hook may use a wider memory allocation range (MinHook fallback, fixes sessions that hit status 9). `Trace=1` adds a bounded observer of the FG command buffer.
+
+- **What is also new: Generic 8.5.0-rc10-stages1.** The Generic source changes are published as a new branch `rc10-stages1` in PEQHUB/RenoDX-DLSS5-Generic. The compiled add-on (`renodx-dlss5.addon64`) is now included in the ready-to-use zip alongside the bridge. With a bridge that does not support the stage protocol, the new Generic behaves exactly like 8.5.0-rc10 at the Upscaled hook point.
+
+- **Graphics cards.** Supported: RTX 50 series. Maybe: RTX 40 series (DLSS-G 2x works there; the NR runtime contains only RTX 50 code; a community-modified runtime may work, untested). Needs own adaptation for now: RTX 20 and RTX 30 series (no DLSS-G).
+
+- **Tested** in Arknights: Endfield on an RTX 5090 (5120x2160), Generic 8.5.0-rc10-stages1 with one Upscaled and one Present NR layer, native 6x DLSS-G. Items 1 and 4 were confirmed in the game. Item 3 (stage protocol) is confirmed by in-game logs (plan 72 = Upscaled 1 Present 1 at the FG input, Upscaled NR via the game's own SR evaluate). Items 2, 3 and 4 are covered by offline tests. Not tested in other games or on other cards.
+
+- **Use it or merge it.** A ready-to-use build (bridge + Generic + ini), patches on top of the 2026-10-02 patches, full copies of every changed file, the offline tests, and the logs and captures behind every number are linked in "Files" below.
 
 A step-by-step install guide in English and Chinese follows. Everything after the guide is technical detail.
+# Install guide / 安装教程
 
-## Install guide / 安装教程
+**DLSS 5 neural rendering for Arknights: Endfield (Vulkan), build `vk-fgrelay-20261005`**
+**《明日方舟：终末地》Vulkan 版 DLSS 5 神经渲染，版本 `vk-fgrelay-20261005`**
 
-**DLSS 5 neural rendering for Arknights: Endfield (Vulkan), build `vk-fgrelay-20261002`**
-**《明日方舟：终末地》Vulkan 版 DLSS 5 神经渲染，版本 `vk-fgrelay-20261002`**
-
-### What this does / 这是什么
+## What this does / 这是什么
 
 "Neural rendering" (NR) is an AI filter that redraws the game's picture with more detailed lighting and materials. "RenoDX DLSS 5 Generic" (Generic for short) is a free add-on that applies it. This package lets Generic work in Arknights: Endfield when the game runs on Vulkan with the game's own "DLSS Frame Generation" turned on. It needs three other free downloads, listed below. It does not change any game file.
 
@@ -42,7 +35,7 @@ There is also an optional tool, `EndfieldFGSwitch.exe`. It allows 6x frame gener
 
 另外还有一个可选工具 `EndfieldFGSwitch.exe`。它能让 RTX 50 显卡使用 6 倍帧生成，并在你切到其他窗口时让帧生成和神经渲染继续运行。它会改动游戏文件。见下文“可选：EndfieldFGSwitch”；不用它也能使用神经渲染。
 
-### Please read first / 请先阅读
+## Please read first / 请先阅读
 
 - **Account risk / 账号风险:** Arknights: Endfield is an online game with anti-cheat software, and this setup loads third-party software (ReShade with add-ons) into the game. We do not know whether this can affect your account. Decide for yourself; you use it at your own risk.
   《终末地》是带反作弊软件的联网游戏，而这套方案会把第三方软件（带插件的 ReShade）加载进游戏。我们不知道这是否会影响账号。请自行判断，风险自负。
@@ -52,7 +45,7 @@ There is also an optional tool, `EndfieldFGSwitch.exe`. It allows 6x frame gener
   神经渲染很吃性能。我们的测试中（RTX 5090、5120×2160、两层神经渲染），游戏的真实帧率（帧生成插帧之前的帧率）降到了大约一半。
 - **System / 系统:** Windows 10 or 11, 64-bit. / Windows 10 或 11，64 位。
 
-### Which graphics cards work / 支持哪些显卡
+## Which graphics cards work / 支持哪些显卡
 
 - **Supported: NVIDIA GeForce RTX 50 series.** Tested on an RTX 5090 with NVIDIA driver 616.92. With the game's own files, frame generation goes up to 4x. With the optional tool below it goes up to 6x (this needs NVIDIA driver 595.97 or newer).
   **确定支持：NVIDIA GeForce RTX 50 系列。** 在 RTX 5090、NVIDIA 驱动 616.92 上测试过。使用游戏自带文件时，帧生成最高 4 倍；使用下文的可选工具最高 6 倍（需要 NVIDIA 驱动 595.97 或更新版本）。
@@ -61,7 +54,7 @@ There is also an optional tool, `EndfieldFGSwitch.exe`. It allows 6x frame gener
 - **Needs your own adaptation for now: NVIDIA GeForce RTX 20 and RTX 30 series.** This add-on does its work at the moment when the game's DLSS Frame Generation makes new frames. RTX 20 and RTX 30 cards do not have DLSS Frame Generation, so the add-on has nothing to work with. The NR runtime does not run on these cards either. There are community tools that add frame generation to these cards, and NR runtimes modified for them, but they replace parts of the game's or the driver's DLSS files, and none of them has been tested with this add-on. If you try such a combination, you are on your own for now.
   **暂需自行适配：NVIDIA GeForce RTX 20、RTX 30 系列。** 本插件是在游戏的 DLSS 帧生成制作新画面的那一刻工作的。RTX 20、RTX 30 显卡没有 DLSS 帧生成，本插件就没有可以工作的地方。神经渲染运行库也不能在这些显卡上运行。社区里有给这些显卡加上帧生成的工具，也有为它们修改过的神经渲染运行库，但它们会替换游戏或驱动的部分 DLSS 文件，而且都没有和本插件一起测试过。如果你尝试这样的组合，目前只能靠自己。
 
-#### Trying it on an RTX 40 card / 在 RTX 40 显卡上尝试
+### Trying it on an RTX 40 card / 在 RTX 40 显卡上尝试
 
 1. Install everything as described in the case below that fits you, but instead of `nvngx_dlssnr.dll` from download 3, use an `nvngx_dlssnr.dll` whose publisher says that it runs on RTX 40 cards. Such modified files are shared in the RenoDX community; its Discord server is linked at the top of https://github.com/clshortfuse/renodx. Only use a file from a source you trust: a `.dll` file runs inside the game.
    按下文适合你的情况安装，但不要用第 3 项的 `nvngx_dlssnr.dll`，而是换成发布者说明可以在 RTX 40 显卡上运行的 `nvngx_dlssnr.dll`。这类修改过的文件在 RenoDX 社区里分享；它的 Discord 服务器链接在 https://github.com/clshortfuse/renodx 页面顶部。只使用你信任的来源提供的文件：`.dll` 文件是在游戏里运行的。
@@ -72,7 +65,7 @@ There is also an optional tool, `EndfieldFGSwitch.exe`. It allows 6x frame gener
 4. Please tell us the result, whether it works or not: your card model, where the NR runtime came from, and the two log files (see "Asking for help" below). Reports like this are how RTX 40 can move to "supported".
    无论成功与否，都请告诉我们结果：显卡型号、神经渲染运行库的来源，以及两个日志文件（见下文“求助时”）。有了这样的反馈，RTX 40 才能改为“确定支持”。
 
-### Preparation / 准备工作
+## Preparation / 准备工作
 
 - **Show file extensions.** In File Explorer, Windows 11: "View" → "Show" → "File name extensions"; Windows 10: "View" tab → tick "File name extensions". Otherwise `ReShade.ini` and `ReShade.log` both look like "ReShade", and renaming a file can go wrong.
   **显示文件扩展名。** 在文件资源管理器中，Windows 11：“查看”→“显示”→“文件扩展名”；Windows 10：“查看”选项卡 → 勾选“文件扩展名”。否则 `ReShade.ini` 和 `ReShade.log` 看起来都叫“ReShade”，改名时也容易出错。
@@ -85,7 +78,7 @@ There is also an optional tool, `EndfieldFGSwitch.exe`. It allows 6x frame gener
 - **Only change files while the game is closed.**
   **只在游戏关闭时改动文件。**
 
-### Downloads / 需要下载的文件
+## Downloads / 需要下载的文件
 
 On the GitHub pages (downloads 2 to 5), scroll down to "Assets" and click the file named below. Do not download "Source code"; that is not the add-on. After downloading, right-click each `.zip` file and choose "Extract All".
 
@@ -94,16 +87,16 @@ On the GitHub pages (downloads 2 to 5), scroll down to "Assets" and click the fi
 | # | What / 内容 | Where / 下载位置 | Files you need / 需要的文件 |
 | --- | --- | --- | --- |
 | 1 | ReShade 6.8.0 with full add-on support / 带完整插件支持的 ReShade 6.8.0 | https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe (the same file as the button "Download ReShade 6.8.0 with full add-on support" on https://reshade.me / 与 https://reshade.me 上 “Download ReShade 6.8.0 with full add-on support” 按钮是同一个文件) | `ReShade_Setup_6.8.0_Addon.exe` (the installer / 安装程序) |
-| 2 | Generic 8.5.0-rc10 | https://github.com/RankFTW/rhi-repo/releases/tag/renodx-dlss5-8.5.0-rc10 → `renodx-dlss5_8.5.0-rc10.zip` | `renodx-dlss5.addon64` |
+| 2 | Generic 8.5.0-rc10-stages1 | https://github.com/RankFTW/rhi-repo/releases/tag/renodx-dlss5-8.5.0-rc10-stages1 → `renodx-dlss5_8.5.0-rc10-stages1.zip` | `renodx-dlss5.addon64` |
 | 3 | NR runtime 310.8.0 / 神经渲染运行库 310.8.0 | https://github.com/RankFTW/rhi-repo/releases/tag/dlssnr-310.8.0 → `nvngx_dlssnr_310.8.0.zip` | `nvngx_dlssnr.dll` |
-| 4 | This add-on / 本插件 | https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/releases/tag/vk-fgrelay-20261002 → `dlss5-bridge-vk-fgrelay-20261002.zip` | `dlss5-bridge.addon64`, `vk-present-adapter.ini` |
+| 4 | This add-on / 本插件 | https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/releases/tag/vk-fgrelay-20261005 → `dlss5-bridge-vk-fgrelay-20261005.zip` | `dlss5-bridge.addon64`, `renodx-dlss5.addon64`, `vk-present-adapter.ini` |
 | 5 | Optional: EndfieldFGSwitch / 可选：EndfieldFGSwitch | Same page as download 4 → `EndfieldFGSwitch.exe` / 与第 4 项同一页面 → `EndfieldFGSwitch.exe` | `EndfieldFGSwitch.exe` (one file, nothing to extract / 单个文件，无需解压) |
 
 Downloads 2 and 3 are hosted by the RHI project; you do not need to install the RHI program. This package was tested with exactly these versions; the links above always give these versions, even after newer ones come out.
 
 第 2、3 项由 RHI 项目托管，不需要安装 RHI 程序。本插件包只和上表这些版本一起测试过；即使以后出了新版本，上面的链接下载到的仍是这些版本。
 
-### Case 1: you have never installed ReShade or any mod for this game / 情况一：从未给这个游戏装过 ReShade 或任何插件
+## Case 1: you have never installed ReShade or any mod for this game / 情况一：从未给这个游戏装过 ReShade 或任何插件
 
 1. **Switch the game to Vulkan.** Close the game. In the Hypergryph launcher, open the game's settings and choose Vulkan as the graphics mode. If you might want to go back later, write down the mode that was selected before.
    **把游戏切换到 Vulkan。** 关闭游戏。在鹰角启动器里打开游戏设置，把图形模式选为 Vulkan。如果以后可能想改回来，先记下原来选的是哪种模式。
@@ -132,7 +125,7 @@ Downloads 2 and 3 are hosted by the RHI project; you do not need to install the 
 9. **Optional:** if you want 6x frame generation or NR that keeps running behind other windows, see "Optional: EndfieldFGSwitch" below.
    **可选：** 如果想要 6 倍帧生成，或者想让切到其他窗口时神经渲染继续运行，见下文“可选：EndfieldFGSwitch”。
 
-### Case 2: you used a DirectX 11 version of these mods before / 情况二：以前装过 DirectX 11 版本的这类插件
+## Case 2: you used a DirectX 11 version of these mods before / 情况二：以前装过 DirectX 11 版本的这类插件
 
 1. **Back up.** Close the game. Make a backup folder outside the game folder, for example on your desktop. Copy these from the game folder into it, if they exist: `d3d11.dll`, `d3d12.dll`, `dxgi.dll`, `nvngx_dlssnr.dll`, every file ending in `.addon64`, `ReShade.ini`, `ReShadePreset.ini`, and the folder `reshade-shaders`. Also write down which graphics mode the launcher uses now.
    **备份。** 关闭游戏。在游戏文件夹以外新建一个备份文件夹，例如放在桌面。把游戏文件夹里的这些东西（存在的话）复制进去：`d3d11.dll`、`d3d12.dll`、`dxgi.dll`、`nvngx_dlssnr.dll`、所有以 `.addon64` 结尾的文件、`ReShade.ini`、`ReShadePreset.ini`，以及 `reshade-shaders` 文件夹。同时记下启动器现在用的是哪种图形模式。
@@ -145,7 +138,7 @@ Downloads 2 and 3 are hosted by the RHI project; you do not need to install the 
 5. **To go back to your old DirectX 11 setup later,** close the game, remove the four files from Case 1 step 3, rename the `.bak` files back to `.dll`, put your backed-up files back, and switch the launcher back to its previous graphics mode. If you used EndfieldFGSwitch, click "Restore original 2.10.3" in it first.
    **以后想退回旧的 DirectX 11 方案时，** 关闭游戏，移走情况一第 3 步的四个文件，把 `.bak` 文件改回 `.dll`，放回备份的文件，再在启动器里把图形模式改回原来的设置。如果用过 EndfieldFGSwitch，先在工具里点“恢复原装 2.10.3”。
 
-### Case 3: you already use a Vulkan setup, but not this build / 情况三：已经在用 Vulkan 版本，但不是这个版本
+## Case 3: you already use a Vulkan setup, but not this build / 情况三：已经在用 Vulkan 版本，但不是这个版本
 
 1. **Back up.** Close the game. Copy your current `dlss5-bridge.addon64`, `renodx-dlss5.addon64`, `vk-present-adapter.ini` (if you have it) and `ReShade.ini` into a backup folder outside the game folder.
    **备份。** 关闭游戏。把现在的 `dlss5-bridge.addon64`、`renodx-dlss5.addon64`、`vk-present-adapter.ini`（如果有）和 `ReShade.ini` 复制到游戏文件夹以外的备份文件夹。
@@ -153,14 +146,14 @@ Downloads 2 and 3 are hosted by the RHI project; you do not need to install the 
    **保留 ReShade**，前提是它是为 Vulkan 安装的“完整插件支持”版本。
 3. **Replace the bridge.** Copy `dlss5-bridge.addon64` and `vk-present-adapter.ini` from download 4 into the game folder and choose "Replace". Make sure no other bridge add-on (another file ending in `.addon64` with "bridge" in its name) is left in the game folder.
    **替换 bridge。** 把第 4 项下载里的 `dlss5-bridge.addon64` 和 `vk-present-adapter.ini` 复制到游戏文件夹，选择“替换”。确认游戏文件夹里没有留下其他 bridge 插件（名字里带 bridge、以 `.addon64` 结尾的其他文件）。
-4. **Generic version.** We recommend Generic 8.5.0-rc10 (download 2), because this build was tested together with that version. Other versions are allowed. If one does not work with this build, the tab **DLSS 5 Bridge** in the ReShade menu shows a section "NR compatibility" that names the problem.
-   **Generic 版本。** 建议使用 Generic 8.5.0-rc10（第 2 项），因为本版本是和它一起测试的。其他版本也允许使用。如果某个版本和本版本配合不正常，ReShade 菜单的 **DLSS 5 Bridge** 选项卡会出现 “NR compatibility” 一栏，写出问题所在。
+4. **Generic version.** We recommend Generic 8.5.0-rc10-stages1 (download 2), because this build was tested together with that version. Other versions are allowed. If one does not work with this build, the tab **DLSS 5 Bridge** in the ReShade menu shows a section "NR compatibility" that names the problem.
+   **Generic 版本。** 建议使用 Generic 8.5.0-rc10-stages1（第 2 项），因为本版本是和它一起测试的。其他版本也允许使用。如果某个版本和本版本配合不正常，ReShade 菜单的 **DLSS 5 Bridge** 选项卡会出现 “NR compatibility” 一栏，写出问题所在。
 5. **Check `EnableHooks=1`** in `ReShade.ini` as in Case 1 step 5. Keep your own picture settings.
    **检查 `EnableHooks=1`**，方法同情况一第 5 步。你自己的画面参数保持不变。
 6. **Start the game and do Case 1, steps 6 to 9.**
    **启动游戏，完成情况一的第 6～9 步。**
 
-### Optional: EndfieldFGSwitch (6x frame generation, NR behind other windows) / 可选：EndfieldFGSwitch（6 倍帧生成、切到其他窗口时神经渲染不停）
+## Optional: EndfieldFGSwitch (6x frame generation, NR behind other windows) / 可选：EndfieldFGSwitch（6 倍帧生成、切到其他窗口时神经渲染不停）
 
 `EndfieldFGSwitch.exe` (download 5) is a small separate tool. You only need it for one or both of these two things:
 
@@ -215,7 +208,7 @@ The tool shows every label in Chinese and English, for example "切换到 2.14.1
 - On cards older than RTX 40, only "Restore original 2.10.3" is available.
   比 RTX 40 更早的显卡只能使用“恢复原装 2.10.3，倍率交还游戏”。
 
-### If something does not work / 遇到问题时
+## If something does not work / 遇到问题时
 
 - **No ReShade message at game start, and Home does nothing:** ReShade is not loaded. Check that the launcher is set to Vulkan, and run the ReShade installer again for `Endfield.exe` with Vulkan.
   **游戏启动时没有 ReShade 提示、按 Home 也没反应：** 说明 ReShade 没有加载。检查启动器是否设为 Vulkan，再对 `Endfield.exe` 重新运行一次 ReShade 安装程序并选择 Vulkan。
@@ -230,7 +223,7 @@ The tool shows every label in Chinese and English, for example "切换到 2.14.1
 - **Asking for help:** close the game and open an issue at https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/issues. Attach `dlss5-bridge.log` and `ReShade.log` from the game folder. If the problem is about EndfieldFGSwitch, also attach `fg-switch.log` from `%LOCALAPPDATA%\EndfieldFGSwitch`.
   **求助时：** 关闭游戏，到 https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/issues 提交 issue，附上游戏文件夹里的 `dlss5-bridge.log` 和 `ReShade.log`。如果问题与 EndfieldFGSwitch 有关，再附上 `%LOCALAPPDATA%\EndfieldFGSwitch` 里的 `fg-switch.log`。
 
-### Good to know / 注意事项
+## Good to know / 注意事项
 
 - **Frame generation must stay on.** With the game's frame generation off, this add-on does nothing and the picture has no NR.
   **帧生成必须保持开启。** 游戏帧生成关闭时，本插件不工作，画面没有神经渲染。
@@ -248,140 +241,118 @@ The tool shows every label in Chinese and English, for example "切换到 2.14.1
   **游戏更新后，** 先确认游戏能正常启动。如果插件不再生效，保留那两个日志文件并反馈问题。
 - This is an unofficial community project. It is not made or supported by NVIDIA or Hypergryph.
   这是非官方的社区项目，与 NVIDIA 和鹰角网络无关，也不受其官方支持。
-
 ## Files
 
-All paths below are inside https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay. The pull request to PEQHUB/RenoDX-DLSS5-Generic carries the same tree under `contrib/dlss5-bridge-vulkan-fg-relay/`, without the `raw/` folders. Files of the 2026-09-29 release stay where they were.
+All paths below are inside https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay. The source changes to Generic are published as branch `rc10-stages1` in PEQHUB/RenoDX-DLSS5-Generic; the bridge changes will also be proposed there as new commits on top of PR [PEQHUB/RenoDX-DLSS5-Generic#1](https://github.com/PEQHUB/RenoDX-DLSS5-Generic/pull/1). Files of the 2026-10-02 release stay where they were.
 
 | What | Where |
 | --- | --- |
-| Ready-to-use build: DLL, `vk-present-adapter.ini`, install guide, licenses, SHA-256 sums | Release [`vk-fgrelay-20261002`](https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/releases/tag/vk-fgrelay-20261002), file `dlss5-bridge-vk-fgrelay-20261002.zip`. The DLL alone is attached too. |
-| The tool for Arknights: Endfield | Same release, `EndfieldFGSwitch.exe`. Source: `tools/fg-switch/` (its `README.md` explains what it changes and how to build it). |
-| Full source of the bridge build | Same release, `dlss5-bridge-vk-fgrelay-source-0a4af91.zip`. The commits themselves: `merge/dlss5-bridge.bundle` (a git bundle; `git clone merge/dlss5-bridge.bundle` gives branch `feature/vulkan-fg-relay`). |
-| Patches for merging | `merge/patches/`: `0001` = NIGos/dlss5-bridge#49, `0002` = #51, `0003` = the 2026-09-29 release, `0004`-`0010` = this update. The same update as one diff: `merge/update-since-20260929.diff`. `merge/CHANGED-SINCE-20260929.txt` lists what it touches. |
-| Full copies of every file changed since `d1cc508` | `merge/changed-files/` (source, tests, docs), now at `0a4af91`. |
-| Design document | `docs/VULKAN-FG-INPUT-NR.md` ("Update 2026-10-01" and "Update 2026-10-02" at the top) |
+| Ready-to-use build: bridge DLL, Generic DLL, `vk-present-adapter.ini`, install guide, licenses, SHA-256 sums | Release [`vk-fgrelay-20261005`](https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/releases/tag/vk-fgrelay-20261005), file `dlss5-bridge-vk-fgrelay-20261005.zip`. Both DLLs are also attached individually. |
+| Full source of the bridge build | Same release, `dlss5-bridge-vk-fgrelay-source-835c5bf.zip`. The commits: `merge/dlss5-bridge.bundle` (git bundle; `git clone merge/dlss5-bridge.bundle` gives branch `feature/vulkan-fg-relay`). |
+| Patches for merging | `merge/patches/`: `0001`-`0007` on top of `0a4af91` (the 2026-10-02 release head). The same update as one diff: `merge/update-since-20261002.diff`. `merge/CHANGED-FILES.txt` lists what it touches. |
+| Full copies of every file changed since `0a4af91` | `merge/changed-files/` (source, tests, docs), now at `835c5bf`. |
+| Design document | `docs/VULKAN-FG-INPUT-NR.md` ("Update 2026-10-05" at the top) |
 | Install guide | `docs/INSTALL.md` (same file as in the zip and as the guide above) |
-| Offline test results of this build | `evidence/2026-10-02/summary/offline/` |
-| Counted window-switch gaps, tool tests | `evidence/2026-10-02/summary/` |
-| Game logs and PresentMon captures behind the numbers below | `evidence/2026-10-02/raw/` |
-| Scripts | `tools/fg-transition-gaps.py` (frames presented without an FG evaluate, from a bridge log), `tools/compare-presentmon.py` |
+| Offline test results of this build | `evidence/2026-10-05/summary/offline/` |
+| Game logs and PresentMon captures | `evidence/2026-10-05/raw/` |
+| Root-cause PresentMon captures (serial vs relay, throttle variants) | `evidence/rootcause-20261004-2305/` |
+| Scripts | `tools/compare-presentmon.py`, `tools/fg-transition-gaps.py` |
 
-## What changed since 2026-09-29
+## What changed since 2026-10-02
 
-Bridge commits `a88fec9`, `80628aa`, `d6bdb97`, `9751b15`, `54ca269`, `82908fb`, `0a4af91` on top of `d1ef16f`. File version 1.4.13.20, version string `1.4.13-pre8-vk-fgrelay-20261002`. The published DLL was built from `82908fb`; `0a4af91` only changes documentation.
+Bridge commits `56b0616`, `a699d5e`, `fe40337`, `9557013`, `a97e707`, `8045ebd`, `835c5bf` on top of `0a4af91`. File version 1.4.13.29, version string `1.4.13-pre8-vk-fgrelay-20261005`.
 
-1. **DLSS modes other than DLAA** (`src/fg-guides.inc`, `src/fg-guide-compute.inc`, `src/fg-guide-nearest.comp`). With Quality, Balanced or Performance, the FG depth and motion vectors are smaller than the back buffer (3414x1440 for a 5120x2160 output). The relay required equal sizes, so after 120 refused frames it fell back to the serial feed for the rest of the process, and the serial feed then ran NR with `mv=zero depth=zero`. Now each guide's own sub-rectangle is scaled to the output grid with a nearest-neighbour compute shader on the FG queue. It copies raw 32-bit texels, so R32F depth and RG16F motion vectors stay bit-exact, and the motion-vector scale is multiplied by output size / motion-vector size (unit confirmed by disassembling Streamline 2.14.1). A compute shader is used because `vkCmdBlitImage` needs a graphics queue, and in this game FG runs on a compute-only queue family while the window is focused. No image is read back to the CPU and no CPU wait is added.
-2. **Fullscreen below monitor resolution** (`src/fg-input.inc`, `src/fg-relay.inc`, `src/vkmirror.inc`). Fullscreen 3840x2160 on a 5120x2160 monitor gives a 5120-wide back buffer whose real image is the sub-rectangle x=640, w=3840, while the HUD-less image is 3840 wide at x=0. The old check compared whole-image sizes and refused every frame. Each input now carries its own origin; only the valid regions must have the same size and format. Copies read and write each region at its own origin and leave the outside untouched.
-3. **NR stopping during normal play** (`src/fg-handle-registry.h`). FG handles were kept in an 8-entry table that was never cleaned on release. The game recreates its FG feature from time to time; from the ninth new handle on, the relay no longer recognised the evaluate. The registry now tracks create/release with generations, has no fixed capacity and survives address reuse. Transient input problems pause and retry instead of refusing for the rest of the process.
-4. **Loss of GPU completion** (`src/fg-relay.inc`, `src/synth.inc`). If the private D3D12 queue stops signalling for 1.5 s, the relay releases every park (unchanged). New: once the CPU worker and recording have stopped, a marker on the D3D12 queue proves that earlier work has finished, and the Vulkan copy/release fences and parks are checked; only then is the session rebuilt. If completion cannot be proven, resources stay alive and NR stays paused.
-5. **Frame generation while the window is not focused** (`src/focus-fg.inc`, `src/focus-fg-contract.h`). Streamline stops DLSS-G when its internal `IKeyboard::hasFocus()` returns false. The bridge finds that one call site in `sl.dlss_g.dll` by an instruction, branch and log-string contract (not by hash or fixed RVA) and returns true for that caller only, while NR is at the FG input and the window is visible, not minimised and not resizing. Every other caller, the OS focus, an explicit FG Off and resource release are untouched. `FocusKeepFG=0` turns it off. If the contract is not found, native behaviour is kept. The contract is found in `sl.dlss_g.dll` 2.14.1, not in the 2.10.3 build that Arknights: Endfield ships (see "Streamline version" below).
-6. **Flash of the unprocessed picture after switching windows** (`src/composition-guard.inc`). With nothing else on the game's monitor, Windows promotes the game from composed flip to independent flip, and back when the window returns. At each switch Streamline changes DLSS-G pacing (`FlipMetering` 0 <-> 2) and its present queue, and for 9-15 real frames it presents the game's frames without calling DLSS-G. NR runs only inside the FG evaluate, so those frames have no NR. The bridge keeps DWM composing the game's monitor with a 2x2, alpha 1/255, click-through, non-activating, topmost tool window of the game process at the monitor's top-left corner, excluded from screen capture. It is shown while NR is at the FG input, FG was evaluated in the last 1.5 s and the window is not minimised. The game is already composed while focused, so focused behaviour does not change. `HoldComposition=0` removes it.
-7. **NR not starting in some sessions** (`src/present-carrier-retry.h`, `src/present-adapter.inc`, `src/fg-input.inc`, `src/fg-relay.inc`). The private carrier is the D3D12 evaluate export of the one loaded module whose version resource says DLSS Super Resolution; with a driver-side DLSS override, that is the driver's model (`...\NGX\models\dlss\...\*.bin`). While the bridge creates its private NGX feature, NGX also maps the game folder's `nvngx_dlss.dll` for a moment, and the bridge's own NGX module scanner keeps it mapped until the scan has finished. In 28 saved sessions where NR started, the scan took 0.40-0.91 s and finished 120-441 ms before the carrier search; in the failing session it took 1.26 s, the search ran 190 ms before it finished, and both modules were visible. The old code refused the ambiguous carrier for the whole session. Now three failures that can clear by themselves are retried once per second, up to 30 attempts: no unique SR module, an SR module that could not be retained, and MinHook status 9 (no free memory within +-1 GB of the target, seen once in the game). While the carrier is pending, the session stays built and owned, no frame is armed, and evaluates are not handed to the relay (the relay ends every unarmed evaluate itself, so the retry step would otherwise never run). An ambiguous carrier is still never hooked. Sessions where the first attempt succeeds behave as before.
+1. **GPU relay by default; no silent serial fallback** (`src/fg-relay.inc`, `src/fg-input.inc`, `src/present-adapter-config.h`). An absent `Pipeline` key previously selected the serial feed (Pipeline=0). With serial, each real frame held the FG command buffer for the duration of NR — about 27 ms at two passes — while generated frames queued. Streamline then released the queue all at once, DWM displayed only the last frame in each batch, and the frame counter ran about 37 % ahead of what the display showed (121 counted / 88 displayed). `Pipeline` now defaults to 2. `Pipeline=0` still works for diagnosis and is logged as a warning. When the relay stands down, NR at the FG input pauses (frame generation still uses the game's own frames), the private session is rebuilt and the relay is retried, up to 3 times per process; `SerialFallback=1` restores the old fallback.
 
-Also changed:
+2. **Throttle** (`src/fg-relay.inc`). The 2026-10-04 test build waited for a completed DLSS-G group. With the GPU relay, Streamline issues the next group's index right before its start, so that gate almost never held the game. The throttle now waits for the newest NR value already signed onto the private queue. The bound rises from 100 ms to 250 ms (two NR layers at 5120x2160 have been measured up to 99 ms). Five timeouts in a row stand the throttle down for 5 s, then it re-arms automatically; before, it stayed off for the process. The diagnostic log records the DLSS-G group index from the relay, so the old measurement is still auditable from the rate log.
 
-- **No Generic whitelist** (`src/present-compatibility.h`). Any Generic build is tried. A missing module, disabled hooks, an unsupported hook point, source overrides, a missing NR/SR entry point or a carrier mismatch are logged and shown in the bridge's ReShade panel with the reason, together with the build known to work (8.5.0-rc10).
-- **Source-interpretation overrides** (encoding, primaries, linear unit) now pause NR and it resumes when they are back on Auto, instead of stopping it until restart.
-- **Diagnostics.** `[fg-transition]` logs bounded CPU metadata (queue, reset, metering, frame ID, handles) for the first 12 FG calls after a queue, focus or reset change, at most 128 windows per thread. Each carrier attempt is logged; the module list only on the first and last attempt.
-- **Configuration** (`vk-present-adapter.ini`, `[Adapter]`): new `FocusKeepFG` and `HoldComposition` (both default 1), `HoldCompositionAlpha`, `HoldCompositionHideCapture`. The shipped ini is unchanged from 2026-09-29.
+3. **Stage protocol v1** (`src/present-adapter-config.h`, `src/present-adapter.inc`, `src/vkmirror.inc`, `src/focus-fg.inc`, `src/composition-guard.inc`, `src/dlss5-bridge.cpp`). A Generic that exports `DLSS5StageProtocolVersion()` returning 1 and `DLSS5GetStagePlan()` carries a plan: 0-4 NR layers for each of Render, Upscaled and Present, packed into 9 bits. The bridge reads the plan once and pins the module. For each carrier evaluate it freezes the plan, exports `DLSS5BridgeActiveStagePlan()`, and sets bit 31 to tell Generic this is the carrier call. Generic then runs only the Present layers. An invalid plan (reserved bits, a count above 4) pauses the carrier with a log line. The bridge never hooks `nvngx_dlssnr.dll` so Generic's NR calls keep their own caller identity. The focus gate and composition guard follow the Present count. The bridge no longer mirrors the game's SR evaluate when the protocol is active; NGX calls within the carrier evaluate are forwarded unchanged, and only a leftover mirror or a pending FG-input release is retired. A Generic without these exports keeps the existing `NRHookPoint` behaviour.
 
-## Streamline version (Arknights: Endfield)
+4. **Composition guard: visible to screen capture by default** (`src/composition-guard.inc`). `WDA_EXCLUDEFROMCAPTURE` was set on the guard window. While it was, the NVIDIA overlay refused to take screenshots of the game and reported a protected application blocking desktop recording. `HoldCompositionHideCapture` now defaults to 0; set it to 1 to restore the exclusion. Everything else about the guard is unchanged.
 
-The game ships Streamline 2.10.3 with frame generation runtime `nvngx_dlssg.dll` 310.5.2. The published bridge was run in the game with three file sets:
+5. **Wider SR carrier hook range** (`src/minhook/src/buffer.c`). One session saw MinHook status 9 (no free 4 KiB block within ±1 GiB of the SR entry). `MH_CreateHookPrologueExtended`, used for the SR carrier only, tries ±1 GiB first and then ±2 GiB, and only for the exact five-byte `mov [rsp+8], rbx` prologue verified under thread freeze at enable. RIP-relative displacements that do not fit are refused rather than truncated.
 
-| | Streamline 2.10.3 + FG 310.5.2 (game files) | Streamline 2.14.1 + FG 310.5.2 | Streamline 2.14.1 + FG 310.9.1 (the tool's set) |
-| --- | --- | --- | --- |
-| NR at the FG input while focused | yes (1383 frames armed and written, 0 unarmed) | yes (8668 armed and written) | yes (1386 armed and written; 18328 in a longer run) |
-| Focus contract (item 5) | not found: `[focus-fg] unavailable: unique Streamline focus-gate contract was not found; native focus behaviour retained` | found | found |
-| Window not focused | FG stops inside Streamline (the game makes no `slDLSSGSetOptions` call), so NR stops; the composition guard hides with it | not tested | FG and NR keep running |
-| Driver profile fixed at 6x, driver FG model override off | not tested | runtime reports `DLSSG.MultiFrameCountMax=3`; 3 FG evaluates per real frame = 4x | runtime reports 5; 5 FG evaluates per real frame = 6x (19.4 real frames/s) |
-
-So 6x needs both newer files; Streamline 2.14.1 alone still stops at 4x with the game's FG runtime. Streamline 2.10.3's `sl.dlss_g.dll` also limits generated frames to 3 by itself (found by disassembly on 2026-09-27). When the NVIDIA driver's frame generation model override is on, NGX uses the driver's FG model instead of the game's `nvngx_dlssg.dll`; on the test PC that model also reported `MultiFrameCountMax=5`, even with the game's files.
-
-## EndfieldFGSwitch
-
-A Win32 tool (one `.exe`, about 20 MB) that switches Arknights: Endfield between the two file sets and sets the driver multiplier. Source in `tools/fg-switch/`.
-
-- **Files.** The 8 files `sl.common.dll`, `sl.dlss.dll`, `sl.dlss_d.dll`, `sl.dlss_g.dll`, `sl.deepdvc.dll`, `sl.pcl.dll`, `sl.reflex.dll` and `nvngx_dlssg.dll` of both sets are embedded as resources (NVIDIA's official Streamline 2.14.1 and DLSS 310.9.1 files; the game's original files). The game's own `sl.interposer.dll` is never touched: it exports `HGSetupCustomVulkan`, which NVIDIA's generic build does not have.
-- **Safety.** It refuses a folder without `Endfield.exe` and `sl.interposer.dll`, refuses while `Endfield.exe` runs, and only acts when every one of the 8 files matches one of the two known SHA-256 sets (a mix of both is completed). Unknown files, for example after a game update, are never overwritten. Before replacing, it copies the current files to `%LOCALAPPDATA%\EndfieldFGSwitch\backup-<time>`. Each file is written to a temporary name, checked, then moved over the original (`MoveFileEx` with write-through), and the whole folder is checked again.
-- **Driver.** On the existing "Arknights: Endfield" driver profile only (found by `NvAPI_DRS_FindApplicationByName`; no profile is created, global settings are not touched) it sets `NGX_DLSSG_MODE_ID` (0x10308298) = 2 (fixed) and `NGX_DLSSG_MULTI_FRAME_COUNT_ID` (0x104D6667) = multiplier - 1, saves and reads back. "Restore" deletes both settings, so they are inherited again and the game's menu decides.
-- **Cards.** RTX 50 (`NvAPI_GPU_GetArchInfo` >= Blackwell): 2x-6x; 2x-4x if the driver is older than 595.97. RTX 40: files only (2x stays in the game's menu). Older: restore only.
-- **Tests.** Embedded-file self-test 16/16; file switching on a scratch copy of the game folder, 15 checks (unknown version refused and left unchanged, running game refused, mixed set completed, interposer untouched, no temporary files left); a driver write of 6x followed by restore, with the whole driver settings database (7986 profiles, 28364 settings) exported each time: at 6x only the two settings on the game's profile were added, and after restore there were 0 semantic differences from before (`evidence/2026-10-02/summary/fg-switch/`). In the game: the user switched to 2.14.1 at 6x, then 4x and 5x; each multiplier took effect with NR on.
+6. **Trace=1 FG command buffer observer** (`src/fg-submit-observation.h`). A bounded pass-through observer of the FG command buffer's submits, for debugging and validation only. Off by default.
 
 ## Measurements
 
-All in Arknights: Endfield on the RTX 5090 test PC, Generic 8.5.0-rc10 with two NR passes. Logs and captures are in `evidence/2026-10-02/raw/`.
+All in Arknights: Endfield on the RTX 5090 test PC. PresentMon 2.5.1 with `--track_pc_latency --track_app_timing --track_frame_type`, 40 s per run except the first (17 s), first 3 s dropped. Captures in `evidence/rootcause-20261004-2305/raw/`.
 
-- **Window switches before item 6** (2026-10-01 01:34-01:37, a test build with the `[fg-transition]` log, game window on the 5120x2160 monitor, switching between the game and a window on the 3840x2160 monitor). `tools/fg-transition-gaps.py` finds 29 FG queue/`FlipMetering` switches and 366 frames presented without an FG evaluate, 9-15 frames per switch (`summary/window-switch-gaps-before.txt`).
-- **The same with the composition guard** (2026-10-01 02:53:04-02:54:19, the same 2x2 window opened by a separate script before it was built into the bridge). While the guard was open: 3442 presents in the PresentMon capture, all `Composed: Flip`, 857 real frames each with 4 presents, and no queue/`FlipMetering` switch in the bridge log. In the 12 s after the guard was closed: 3 switches with 11-13 frames each without an FG evaluate (`summary/window-switch-gaps-guard.txt`). The user reported that the flash was gone while the guard was open; after the guard moved into the bridge, the user confirmed again that switching windows no longer flashes and the frame-time graph stays smooth.
-- **6x** (2026-10-02, published build, Streamline 2.14.1 + FG 310.9.1, driver profile fixed at 6x): 96.9 FG evaluates/s for 19.4 real frames/s, i.e. 5 generated frames per real frame; NR armed and written for every real frame (1386, 0 unarmed). The user saw about 115 frames per second. With FG 310.5.2 under the same settings: 60.7 evaluates/s for 20.2 real frames/s, i.e. 4x.
-- **SR carrier timing** (item 7): `raw/carrier/carrier-timing.csv` has the module-scan duration and the time from the end of the scan to the carrier search for 31 saved sessions (2026-09-28 to 2026-10-01): 30 found the carrier, 1 saw two SR modules and refused. Two of the 30 are left out of the ranges given in item 7 because their search ran 40 s and 140 s after the scan.
-- The latency and frame-pacing table of 2026-09-29 (`evidence/summary/presentmon-comparison.json`) was not measured again; nothing in the relay's pacing or throttle changed.
+The test builds equal the published builds except for a read-only DLSS-G `OutputDisableInterpolation` counter (meaningless: the bridge read a resource pointer as a flag) removed from the relay, and an unused Generic encode variant. The live measurements used Generic 8.5.0-rc10-stages1 with one Upscaled and one Present NR layer.
+
+| | A: deployed serial | B: fix1 GPU relay, old throttle | C: fix3 relay, improved throttle | F: **fix5 relay, this throttle** |
+| --- | --- | --- | --- | --- |
+| presents / s | 121.2 | 126.9 | 114.1 | **120.7** |
+| displayed / s | 88.3 | 112.4 | 105.5 | **108.4** |
+| real frames / s | 20.2 | 21.2 | 20.7 | **20.1** |
+| present interval p95 / max (ms) | 17.9 / 19.1 | 8.8 / **59.7** | 10.3 / **55.2** | 8.9 / **11.1** |
+| display intervals ≥ 25 ms | 8 (0.53 %) | 7 (0.23 %) | 77 (1.98 %) | **0** |
+| PC latency p50 / p95 (ms) | 119.5 / 147.5 | 218.6 / 246.2 | 158.2 / 181.3 | **161.9 / 184.6** |
+
+Column A is the configuration of the 2026-10-04 deployment: old bridge code with `Pipeline=0` forced by a script. Column B added the GPU relay but used the old throttle gate (DLSS-G group completion), which almost never fired; max present gap 59.7 ms shows the queue draining. Column C fixed the gate to target queued NR but a 100 ms bound was too tight for two passes; display gaps ≥ 25 ms jumped to 77. Column F uses a 250 ms bound.
+
+The GPU relay removes the stutter: column F has no display gaps above 25 ms, compared to 0.53 % in the serial feed and 1.98 % in column C.
+
+The serial feed's lower median latency comes from the game waiting on the parked frame; the price was the 0.53 % gap rate. Column F gives 42 ms more latency than column A (serial) but 0 % display gaps; in motion the relay looks perceptibly smoother.
 
 ## Tests
 
-Offline, on the source of `0a4af91` (the add-on code is that of `82908fb`) and, where a DLL is loaded, on the published DLL. All passed; outputs in `evidence/2026-10-02/summary/offline/`.
+Offline, on the source of `835c5bf` (the add-on code is that of `bcc7908`, the version bump being documentation only) and, where a DLL is loaded, on the published DLL. All passed; outputs in `evidence/2026-10-05/summary/offline/`.
 
 | Test | Result |
 | --- | --- |
-| `tests/vulkan-fg-quality/run.cmd registry`: FG/NGX handle registry | 188780 checks, 0 failures |
-| `run.cmd guides`: rectangles, motion-vector scale, record/reset helpers | 57 checks |
-| `run.cmd hooks`: production NGX wrappers | 535 checks, 0 failures |
-| `run.cmd colour`: sub-rectangle copies | 39 checks, 0 failures, 8 recorded production copies |
-| `run.cmd recovery`: automatic rebuild with a real D3D12 queue marker | 34 checks, 0 failures |
-| `run.cmd compatibility`: no whitelist, pause/resume | 26 checks, 0 failures |
-| `run.cmd carrier`: carrier retry against fixture DLLs, including the relay hand-off while pending | 49 checks, 0 failures |
-| `run.cmd guard`: composition guard with real Win32 windows | 28 checks, 0 failures |
-| `run.cmd gpu`: GPU nearest scaling on real Vulkan queues, read back bit by bit | 402 checks, 0 failures |
-| `run.cmd focus` with Streamline 2.14.1 `sl.dlss_g.dll` | 512 guard combinations; unique call site found (return RVA `0x4c0a7`); changed or ambiguous code rejected |
-| `focus` test with Streamline 2.10.3 `sl.dlss_g.dll`, `--report-only` | `matches=0` (expected: the gate stays native) |
+| `tests/vulkan-fg-quality/run.cmd registry` | 188780 checks, 0 failures |
+| `run.cmd guides` | 57 checks, 0 failures |
+| `run.cmd hooks` | 545 checks, 0 failures |
+| `run.cmd colour` | 39 checks, 0 failures |
+| `run.cmd recovery` | 34 checks, 0 failures |
+| `run.cmd compatibility` | 26 checks, 0 failures |
+| `run.cmd carrier` | 49 checks, 0 failures |
+| `run.cmd carrier-range` (crowded MinHook range) | 19 checks, 0 failures |
+| `run.cmd minhook-range` (global range safety) | 34 checks, 0 failures |
+| `run.cmd guard` | 30 checks, 0 failures |
+| `run.cmd gpu` | 402 checks, 0 failures |
+| `run.cmd focus` with Streamline 2.14.1 `sl.dlss_g.dll` | 512 guard combinations; contract found |
+| `focus` with Streamline 2.10.3 `sl.dlss_g.dll`, `--report-only` | `matches=0` (expected) |
 | `tests/vulkan-fg-relay/test-fg-trace.cmd` | 7382 checks, 0 failures |
 | `tests/vulkan-fg-relay/scan/` | 20705 assertions |
-| `tests/vulkan-fg-relay/lifetime/`, real ReShade 6.8 + real Generic 8.5.0-rc10 | `stable` pass, `control` pass, `late-ref` exit 12 as expected |
-| `tests/vulkan-fg-relay/inject/` | extension appended; both shared-fence directions pass |
-| `tests/vulkan-fg-input/run-roundtrip.py`, SDR with the RR module loaded, and HDR10 | 22 of 22 checks each |
-| `tests/vulkan-fg-input/test-witness.cmd`, `test-composite.cmd` | pass; composite 2868 / 192 / 12 / 0 |
-| EndfieldFGSwitch `--self-test`; `tools/fg-switch/test-files.sh` on a scratch folder | 16 embedded files, 0 mismatches; 15 checks, 0 failures |
+| `tests/vulkan-fg-relay/lifetime/` stable + control (rc10) | exit 0 |
+| `tests/vulkan-fg-relay/lifetime/` stable (stages1, pinned path) | exit 0; log shows `PINNED Generic stays loaded and registered` |
+| `tests/vulkan-fg-relay/lifetime/` late-ref (stages1) | exit 15 (not applicable: stages1 Generic is pinned, never re-registers) |
+| `tests/vulkan-fg-relay/inject/` | export present; both shared-fence directions pass |
+| `tests/vulkan-fg-input/run-roundtrip.py` SDR+RR, HDR (rc10 Generic) | 22 / 22 each |
+| `tests/vulkan-fg-input/run-roundtrip.py` SDR+RR, HDR (stages1 Generic, plan Present=2) | 22 / 22 each; log shows `stage=present plan=128` |
+| `tests/stage-protocol/run.cmd` (bridge scope, 125 legal + 391 invalid plans) | 4 / 4 PASS lines |
+| Generic stage-plan-same-frame test (stage_plan.hpp, 125 plans, nested scopes, concurrent writer) | PASS |
+| Generic Vulkan stage CPU tests (49 behavioral + 30 static checks; 6 negative controls fail against original draft) | PASS |
 
-In the game (Arknights: Endfield, RTX 5090, user's own play):
+In the game (Arknights: Endfield, RTX 5090, 5120x2160, Generic 8.5.0-rc10-stages1, 6x):
 
-- Items 1-3, 2026-09-30 and 2026-10-01: with the game's DLSS Quality mode, no flicker when turning the camera and even pacing; NR kept running through every DLSS mode switch, FG off/on, resolution changes, fullscreen 3840x2160 on the 5120x2160 monitor and windowed mode, and over long sessions.
-- Items 5 and 6, 2026-10-01: frame generation and NR kept running behind other windows; no flash when switching windows.
-- Item 7, 2026-10-02: the first test build (`a6f6e93a`) did not recover in the game. Its log shows `attempt 1 of 30` and no second attempt, because the relay ended every unarmed evaluate before the retry step; this is the ordering defect fixed in `82908fb`. With the published build and the test-only add-on `carrier-race-helper.addon64` (holds the game folder's `nvngx_dlss.dll` for 3 s when the bridge's private D3D12 device is created), NR started in each of 4 launches without a resolution change; the helper's log shows that it fired in all 4. Without the helper, the carrier was found on the first attempt and 18328 frames were armed and written.
-- Streamline 2.10.3 and 2.14.1 runs and the 6x runs: see the table above. EndfieldFGSwitch: switched to 2.14.1 at 6x, then 4x and 5x, each with NR on.
+- Item 1 (serial vs relay): confirmed. With the serial config, the frame counter ran ahead and only about 88 of 121 counted presents were displayed. With Pipeline=2 the display gap rate dropped to 0 %.
+- Item 3 (stage protocol): confirmed in game logs. Plan 72 (Upscaled 1 / Present 1) was active; `stage=upscaled` evaluations at count up to 130800 logged from the game's own SR hook, and `stage=present` evaluations at count up to 128400 logged from the bridge carrier.
+- Item 4 (composition guard, NVIDIA overlay screenshot): the NVIDIA overlay was unable to take screenshots when `HoldCompositionHideCapture=1` was active and took them normally after it was set to 0.
 
 ## Limitations
 
 - One game, one GPU (Arknights: Endfield, RTX 5090, driver 616.92). Other Vulkan DLSS-G games are not covered.
-- **RTX 40 is untested.** The NR runtime that Generic loads (`nvngx_dlssnr.dll` 310.8.0 from the RHI repository) contains only `sm_120` (Blackwell) GPU code and refuses other cards (`DLSSNR: Unsupported GPU architecture 0x%x, minimum required 0x%x`). Nothing in the bridge is specific to RTX 50, but the whole chain has not run on an RTX 40 card, which also only has 2x frame generation. RTX 20 and RTX 30 have no DLSS Frame Generation, which this path depends on.
-- FG inputs must be 8-bit sRGB, the valid regions of the HUD-less image and the back buffer must have the same size, and the game must supply `DLSSG.HUDLess`. Otherwise frames are paused with a log line and the game keeps its own image.
-- Any Generic build is tried; only 8.5.0-rc10 has been verified.
-- Items 5 and 6 need Streamline 2.14.1 in this game (the tool installs it); with the game's 2.10.3, FG and NR stop while the window is not focused.
-- The composition guard is a real 2x2 window on the game's monitor (alpha 1/255, excluded from screen capture).
-- The automatic rebuild after a lost GPU completion (item 4) has not been triggered in the game yet.
-- The carrier retry gives up after 30 attempts (30 s), as before. In the game it was checked with a helper that forces the condition; the natural two-module race was seen in 1 of 31 saved sessions, and MinHook status 9 in one other session.
-- In one launch during the 6x tests (published build, Streamline 2.14.1 + FG 310.9.1), NR did not start and a resolution change brought it back. That launch's bridge log was overwritten by the next start, so the cause is not known; the two following launches were normal.
-- EndfieldFGSwitch only knows the two file sets above and only Arknights: Endfield. After a game update that changes these files it changes nothing until it is updated; a multiplier set earlier stays in the driver profile until then.
-- Only `Pipeline=2` with `Import=1` is validated. One effect runtime, one swapchain. Generic's layer count and per-layer settings are global, so Upscaled and Present cannot use different layer settings.
-
-## Other notes
-
-- **About the word "Present".** Here it names Generic's hook-point setting that switches this path on. The processing itself happens before DLSS-G, on the real frame, not on the frames after frame generation.
-- **Why a contrib folder in PEQHUB/RenoDX-DLSS5-Generic.** The code belongs to the bridge (NIGos/dlss5-bridge, where #49, #51 and #52 are still open). The contrib folder puts the material next to Generic for Generic users and maintainers. Nothing outside `contrib/` is changed and no Generic source is touched.
-
-## Install and rollback
-
-See the guide above or `docs/INSTALL.md`. Rollback of the add-on: put the previous `dlss5-bridge.addon64` back, or set `Enabled=0` in `vk-present-adapter.ini`. Rollback of the tool: its "Restore original 2.10.3" button.
+- RTX 40 is untested. The NR runtime contains only Blackwell (`sm_120`) GPU code and refuses other architectures. Nothing in the bridge itself is Blackwell-specific, but the whole chain has not run on an RTX 40 card.
+- Stage protocol: Generic's per-layer knobs (intensity, transfer strength, etc.) are shared across stages, so Render, Upscaled and Present layers cannot have independent per-layer tuning. The total layer count is up to 12.
+- `Pipeline=0` (serial feed) still works but is warned. `Pipeline=3` (older CPU-gated relay) is untested with the new throttle.
+- The focus gate and composition guard depend on Streamline 2.14.1; with the game's own 2.10.3 files both are inactive (the focus contract is not found in 2.10.3).
+- The stage protocol Generic build (8.5.0-rc10-stages1) has not been tested in a D3D12 game. Its D3D12 Render stage runs before the game's upscaler on a full-size copy of the Color surface, and it changes the automatic frame-generation fallback behaviour: while a game pauses DLSS and FG continues, NR pauses instead of moving to Present.
 
 ## Merging
 
-- From the 2026-09-29 release (`d1ef16f`): `git am merge/patches/0004-*.patch ... 0010-*.patch`, or apply `merge/update-since-20260929.diff`. From NIGos/dlss5-bridge `d1cc508`: `0001`-`0010`. Or fetch the exact commits from `merge/dlss5-bridge.bundle`.
-- Smaller pieces: the handle registry (item 3) is independent and small; the guide scaling (item 1) and the sub-rectangles (item 2) touch the same copy code; the automatic rebuild (item 4); the focus gate (item 5) and the composition guard (item 6) belong together; the compatibility messages; the carrier retry (item 7), which needs the relay hand-off change of `82908fb` together with `d6bdb97`.
-- Build: `src\build.cmd` (MSVC, `/W4 /WX`). Published DLL: SHA-256 `4B0389444F3EA0F564DFF5C8A6EAAF5B4D902D796088D65F2F507306641EC0BC`.
+From the 2026-10-02 release head (`0a4af91`): `git am merge/patches/0001-*.patch ... 0007-*.patch`, or apply `merge/update-since-20261002.diff`. From NIGos/dlss5-bridge `0a4af91`: same patches. Or fetch the exact commits from `merge/dlss5-bridge.bundle`.
+
+Build: `src\build.cmd` (MSVC, `/W4 /WX`). Published DLL: SHA-256 `2F5BBC44C9001FD31F65D4A298861C769EEB27211CEA9A5028D0904F5D32FE45`.
+
+The Generic source: branch `rc10-stages1` in PEQHUB/RenoDX-DLSS5-Generic (3 commits on top of `v8.5dev`). Build at `src/addons/dlss5` inside a compatible RenoDX checkout. Published DLL: SHA-256 `CCAECB3559CC4BA3B42C2FFEBEDF5C655914945A9C2488237E9C3D5DD1A95F7C`. The two builds differ only in their PE timestamp and the version resource HHMM (CMake TIMESTAMP fallback); no code byte changes.
 
 ## Reproducing
 
-- Offline: `tests/vulkan-fg-quality/README.md` and `tests/vulkan-fg-relay/README.md` list each test, what it needs and what passing looks like.
-- Window-switch gaps: `python tools/fg-transition-gaps.py dlss5-bridge.log` on a log with `[fg-transition]` lines.
-- Carrier race: `tests\vulkan-fg-quality\run.cmd racehelper <new-dir>` builds the test-only add-on. Put it next to the game's `.exe` with the bridge, start the game, and remove it afterwards.
+- Bridge offline: `tests/vulkan-fg-quality/README.md` and `tests/vulkan-fg-relay/README.md`.
+- Stage protocol: `tests/stage-protocol/README.md`.
+- Generic stage-plan test: `tests/stage-plan/run.cmd <src/addons/dlss5> <new-directory>`.
+- Generic CPU tests: `tests/vulkan-stage-cpu/run-cpu-tests.py --source <src/addons/dlss5> --out <new-directory> --negative-control <tests/vulkan-stage-cpu/negative-control>`.
+- Root-cause PresentMon analysis: `python tools/compare-presentmon.py` on the captures in `evidence/rootcause-20261004-2305/raw/`.

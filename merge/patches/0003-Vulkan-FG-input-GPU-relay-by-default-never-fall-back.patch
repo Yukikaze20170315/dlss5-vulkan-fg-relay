@@ -1,0 +1,199 @@
+From fe403378bea9b7002b551e62d8b10d9b41320e21 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E7=9B=97=E7=89=88=E3=81=AE=E9=9B=AA=E9=A2=A8=E9=85=B1?=
+ <50561019+Yukikaze20170315@users.noreply.github.com>
+Date: Mon, 5 Oct 2026 02:50:13 +0800
+Subject: [PATCH 3/7] Vulkan FG input: GPU relay by default; never fall back to
+ the serial feed silently
+
+The serial feed (Pipeline=0) parks the real frame inside the FG command
+buffer for the whole NR, so the generated frames of each group reach the
+compositor in a burst. A session of Arknights: Endfield on it (5120x2160,
+two NR layers, 6x frame generation, 120 Hz) showed 121 presents/s with only
+88 displayed: a high frame counter that looks and feels like stutter.
+Before this change an absent Pipeline key selected the serial feed, and
+the relay switched to it whenever the relay stood down.
+
+- Pipeline defaults to 2 (GPU relay at the FG evaluate) and Import to 1.
+  Pipeline=0 still works for diagnosis and logs a warning.
+- When the relay stands down, NR at the FG input pauses (frame generation
+  keeps the game's own frames), the private session is rebuilt and the
+  relay is retried, up to 3 times per process. SerialFallback=1 restores
+  the old switch to the serial feed.
+- The AutoRun log line names the actual pipeline.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ src/fg-input.inc             | 13 ++++++++++++-
+ src/fg-relay.inc             | 27 +++++++++++++++++++++++++--
+ src/present-adapter-config.h | 33 +++++++++++++++++++++++++++++----
+ 3 files changed, 66 insertions(+), 7 deletions(-)
+
+diff --git a/src/fg-input.inc b/src/fg-input.inc
+index 303ec24..1b1580d 100644
+--- a/src/fg-input.inc
++++ b/src/fg-input.inc
+@@ -7,6 +7,7 @@
+ static void FgGuideRequestReset();
+ static bool FgRelayPrepareRelease();
+ static bool FgRelayRecoveryReady();
++static bool FgRelayBlocksSerialFeed();
+ 
+ struct FgComposite {
+     ID3D12RootSignature *rs;
+@@ -531,8 +532,15 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
+         g_present_adapter.deadline = ULLONG_MAX;
+         g_present_adapter.token = 1;
+         g_s12.need_reset = true;
++        const int pipeline = PresentAdapterPipeline();
+         Log("[fg-input] AutoRun: continuous NR at the frame-generation input; a request with frames=0 stops it. pipeline=%s",
+-            PresentAdapterPipeline() == 1 ? "probe (NR concurrent, result discarded, picture carries no NR)" : "serial park");
++            pipeline == 1 ? "probe (NR concurrent, result discarded, picture carries no NR)" :
++            pipeline == 2 ? "GPU relay at the FG evaluate" :
++            pipeline == 3 ? "GPU relay at the game's present" : "serial park");
++        if (pipeline == 0)
++            Log("[fg-input] WARNING: Pipeline=0 (serial feed) is for diagnosis. The real frame is parked inside the FG "
++                "command buffer for the whole NR, so the generated frames reach the screen in bursts: a high frame "
++                "counter with uneven display. Set Pipeline=2 in vk-present-adapter.ini for normal use.");
+     }
+     if (g_present_adapter.remaining == 0 || g_present_adapter.refused) return;
+     if (g_fg_input.census_left != 0) {
+@@ -575,6 +583,9 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
+         // and the serial feed below runs as it always has.
+         const int rel = FgRelayEvaluate(cmd_raw, p);
+         if (rel != 0) return;
++        // A relay that stood down keeps its frames from the serial feed unless
++        // SerialFallback=1; until it reopens, FG interpolates the game's own frames.
++        if (FgRelayBlocksSerialFeed()) return;
+     }
+     if (g_vkm_rt == nullptr) return;
+     reshade::api::device *rdev = g_vkm_rt->get_device();
+diff --git a/src/fg-relay.inc b/src/fg-relay.inc
+index 5bde0e4..5cabe26 100644
+--- a/src/fg-relay.inc
++++ b/src/fg-relay.inc
+@@ -184,6 +184,7 @@ struct FgrState
+     volatile LONG arm_seq, worker_seq, eval_seq, next_slot, pending_slot, last_eval_tick;
+     volatile LONG armed, unarmed, skipped, busy, mismatched, writes, copies_failed;
+     unsigned  unarmed_streak, mismatch_streak;
++    unsigned  relay_retries;       // stand-downs retried by a session rebuild, per process
+     uint64_t  copy_val, nr_val;    // the last values actually submitted / signalled for
+     uint64_t  last_release_nr;     // the nr value the frame before this one waited
+     uint64_t  nr_progress_value;   // watchdog, evaluate thread only: the shared fence's
+@@ -293,18 +294,40 @@ static bool FgRelayQueueFamily(void *queue, uint32_t *family)
+     return false;
+ }
+ 
++static const unsigned kFgrRelayRetries = 3;
++
+ static bool FgRelayFallback(const char *why)
+ {
+     if (!g_fgr.fell_back) {
+         g_fgr.fell_back = true;
+         g_fgr.why = why;
+         PresentCompatibilityIssue(PC_PROCESSING_FAILED, why);
+-        Log("[fg-relay] %s. The GPU relay is unavailable; the serial FG-input feed may run. "
+-            "This is a degraded path and does not guarantee the same frame pacing.", why);
++        if (PresentAdapterSerialFallback()) {
++            Log("[fg-relay] %s. The GPU relay is unavailable; SerialFallback=1, so the serial FG-input feed runs. "
++                "That feed presents the generated frames in bursts: expect a high frame counter with uneven display.", why);
++        } else if (g_fgr.relay_retries < kFgrRelayRetries) {
++            ++g_fgr.relay_retries;
++            // The rebuild drains the private session on the render thread; its
++            // release clears fell_back, and the next valid FG input opens the relay again.
++            g_fg_input.want_release = true;
++            Log("[fg-relay] %s. NR at the FG input pauses instead of using the serial feed; the private session "
++                "is rebuilt and the relay retried (attempt %u of %u).", why, g_fgr.relay_retries, kFgrRelayRetries);
++        } else {
++            Log("[fg-relay] %s. The relay stood down %u times in this process; NR at the FG input stays paused "
++                "(frame generation keeps the game's own frames). SerialFallback=1 would run the serial feed, "
++                "which presents in bursts.", why, kFgrRelayRetries + 1);
++        }
+     }
+     return false;
+ }
+ 
++// True while a configured relay has stood down and the serial feed must not
++// take its frames: the FG input then runs without NR until the relay reopens.
++static bool FgRelayBlocksSerialFeed()
++{
++    return PresentAdapterRelay() && g_fgr.cs_ready && g_fgr.fell_back && !PresentAdapterSerialFallback();
++}
++
+ // ---------------------------------------------------------------------------
+ // Device extension injection: VK_KHR_external_semaphore_win32
+ // ---------------------------------------------------------------------------
+diff --git a/src/present-adapter-config.h b/src/present-adapter-config.h
+index 52e620c..cfb59bc 100644
+--- a/src/present-adapter-config.h
++++ b/src/present-adapter-config.h
+@@ -101,17 +101,27 @@ static bool PresentAdapterFollow()
+     return PresentAdapterFgInput() && follow;
+ }
+ 
+-// Pipeline=0 (default) parks the FG evaluate until the real frame's NR is done.
++// Pipeline=2 (default) is the GPU relay in fg-relay.inc; see below.
++// Pipeline=0 is the serial feed, kept for diagnosis only: the real frame is parked
++// inside the FG command buffer for the whole NR, the generated frames of the group
++// cannot present meanwhile and then reach the compositor in a burst. Measured in
++// Endfield (5120x2160, two NR passes, 6x, 120 Hz): 121 presents/s but only 88
++// displayed, every sixth interval 17.6 ms and two presents 0.26 ms apart -- a high
++// frame counter that looks and feels like stutter. An absent key must therefore
++// not select it.
+ // Pipeline=1 is a throughput probe: the same NR runs on the private device while
+ // frame generation proceeds on the game's own image, and the result is discarded.
+ // It measures the GPU headroom a one-frame-delayed pipeline could use; the
+ // picture is the game's own, without NR, for the duration.
++static const int kPresentAdapterDefaultPipeline = 2;
+ static int PresentAdapterPipeline()
+ {
+     static const int pipeline = [] {
+         wchar_t path[1024] = {};
+         PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
+-        return path[0] != 0 ? GetPrivateProfileIntW(L"Adapter", L"Pipeline", 0, path) : 0;
++        return path[0] != 0 ? static_cast<int>(GetPrivateProfileIntW(L"Adapter", L"Pipeline",
++                                                                     kPresentAdapterDefaultPipeline, path))
++                            : kPresentAdapterDefaultPipeline;
+     }();
+     return PresentAdapterFgInput() ? pipeline : 0;
+ }
+@@ -137,13 +147,14 @@ static bool PresentAdapterRelayAtPresent()  { return PresentAdapterRelay() && Pr
+ // refuses it). The import is taken only for a device that create accepted the name
+ // on: a non-null vkGetDeviceProcAddr answer is not proof the extension is enabled,
+ // so the KHR entry points are never called on a device that was not shown to carry
+-// it. Off by default.
++// it. On by default: without it the relay keeps a CPU gate that left a quarter to a
++// half of the frames unarmed in the game, and the throttle needs it. Import=0 opts out.
+ static bool PresentAdapterRelayImport()
+ {
+     static const bool import = [] {
+         wchar_t path[1024] = {};
+         PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
+-        return path[0] != 0 && GetPrivateProfileIntW(L"Adapter", L"Import", 0, path) == 1;
++        return path[0] == 0 || GetPrivateProfileIntW(L"Adapter", L"Import", 1, path) == 1;
+     }();
+     return PresentAdapterRelay() && import;
+ }
+@@ -177,6 +188,20 @@ static bool PresentAdapterTrace()
+     return PresentAdapterFgInput() && trace;
+ }
+ 
++// SerialFallback=1 lets the serial feed take over when the GPU relay stands down.
++// Off by default: that feed presents the generated frames in bursts (see
++// PresentAdapterPipeline), so a relay failure pauses NR at the FG input instead,
++// and the relay is retried after the private session has been rebuilt.
++static bool PresentAdapterSerialFallback()
++{
++    static const bool allow = [] {
++        wchar_t path[1024] = {};
++        PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
++        return path[0] != 0 && GetPrivateProfileIntW(L"Adapter", L"SerialFallback", 0, path) == 1;
++    }();
++    return allow;
++}
++
+ // Keep the DLSS-G plugin's internal focus check active for a drawable NR
+ // window. This never changes the game's explicit FG mode or OS input focus.
+ // Unknown Streamline focus-gate contracts retain native behaviour.
+-- 
+2.52.0.windows.1
+

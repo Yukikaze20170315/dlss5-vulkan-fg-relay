@@ -12,9 +12,16 @@ Modes (the run passes when the mode's expected exit code comes back):
            lives); use it with a bridge build that predates ngx-module-scan.h.
   stable   the same gated sequence; exit 0 means Generic registered twice, the
            bridge took zero references to it, and everything unloaded cleanly.
+           A Generic with the stage protocol (8.5.0-rc10-stages1) is pinned by
+           the bridge once the bridge reads its stage plan; it then stays loaded
+           and registered across the instance cycle (ReShade enables it again as
+           an externally registered add-on), and exit 0 means exactly that, with
+           zero transient references.
   control  no bridge at all; same checks as stable.
   late-ref injects one extra reference after the notification; the host must
-           detect it and exit 12 (negative control for the stable checks).
+           detect it and exit 12 (negative control for the stable checks). It
+           needs a Generic without the stage protocol: a pinned Generic never
+           registers again, and the host exits 15 (not applicable).
 
 Usage:
   python run-lifetime.py <new-dir> --mode race --bridge <dlss5-bridge.addon64>
@@ -85,7 +92,8 @@ def main() -> int:
         'scope': 'Two Vulkan instances only; no device, swapchain, GPU workload or game.',
     }, indent=2), encoding='utf-8')
     print(output.decode('utf-8', errors='replace'))
-    print(f'exit_code={code} expected={expected} -> {"PASS" if code == expected else "FAIL"}')
+    verdict = 'PASS' if code == expected else 'NOT APPLICABLE' if code == 15 else 'FAIL'
+    print(f'exit_code={code} expected={expected} -> {verdict}')
     return 0 if code == expected else 1
 
 

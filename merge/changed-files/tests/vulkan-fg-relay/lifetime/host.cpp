@@ -18,7 +18,7 @@ static GetProc original_get_proc;
 static RegisterAddon original_register;
 static UnregisterAddon original_unregister;
 static PVOID volatile generic_module;
-static volatile LONG registered, registrations, acquisitions, gate_claimed;
+static volatile LONG registered, registrations, acquisitions, gate_claimed, pinned;
 static HANDLE acquired, release_scan, probed, unregistered;
 static bool gating, late_reference;
 static HMODULE injected_reference;
@@ -97,7 +97,13 @@ static BOOL WINAPI GetModule(DWORD flags, LPCWSTR name, HMODULE *module)
             }
             return result;
         }
-        if (flags & GET_MODULE_HANDLE_EX_FLAG_PIN) return result;
+        if (flags & GET_MODULE_HANDLE_EX_FLAG_PIN) {
+            // A stage-protocol Generic is pinned once, so the bridge's cached plan
+            // query can never outlive the module. This is not a transient reference.
+            if (InterlockedExchange(&pinned, 1) == 0)
+                std::printf("BRIDGE pinned Generic thread=%lu\n", GetCurrentThreadId());
+            return result;
+        }
         InterlockedIncrement(&acquisitions);
         if (gating && InterlockedCompareExchange(&gate_claimed, 1, 0) == 0) {
             std::printf("SCAN holds Generic reference thread=%lu caller=%p\n", GetCurrentThreadId(), caller);
@@ -208,10 +214,24 @@ int main(int argc, char **argv)
     vkDestroyInstance(first, nullptr);
     const HMODULE after_destroy = GetModuleHandleW(L"renodx-dlss5.addon64");
     std::printf("AFTER destroy registered=%ld module=%p\n", registered, after_destroy);
-    if (!expect_race && (registered != 0 || after_destroy != nullptr)) {
+    // Pinned: ReShade logs that Generic "was not unregistered" and enables it again
+    // as an externally registered add-on for the next instance, as it does for the
+    // bridge itself. Generic then never unregisters while an instance lives, which
+    // is what the old reference race broke.
+    const bool kept = InterlockedCompareExchange(&pinned, 0, 0) != 0 && registered == 1 &&
+        after_destroy != nullptr && after_destroy == Generic();
+    if (!expect_race && (registered != 0 || after_destroy != nullptr) && !kept) {
         SetEvent(release_scan);
         std::puts("FAIL Generic outlived the first instance");
         return 14;
+    }
+    if (kept) std::puts("PINNED Generic stays loaded and registered across the instance cycle");
+    if (kept && late_reference) {
+        // The negative control needs a second registration to inject into.
+        SetEvent(release_scan);
+        std::puts("N/A late-ref: a pinned stage-protocol Generic never registers again;"
+                  " run late-ref with a Generic that has no stage protocol");
+        return 15;
     }
     ResetEvent(unregistered);
     ResetEvent(probed);
@@ -228,14 +248,17 @@ int main(int argc, char **argv)
         vkDestroyInstance(final, nullptr);
         return expect_race && reproduced ? 0 : 10;
     }
-    if (!control && (WaitForSingleObject(probed, 8000) != WAIT_OBJECT_0 || !FinishProbe())) return 11;
-    const bool stable = registered == 1 && registrations >= 2 && acquisitions == 0 &&
+    // A pinned Generic is not loaded again, so the scanner has nothing new to visit.
+    if (!control && !kept && (WaitForSingleObject(probed, 8000) != WAIT_OBJECT_0 || !FinishProbe())) return 11;
+    const bool stable = registered == 1 && registrations >= (kept ? 1 : 2) && acquisitions == 0 &&
         GetModuleHandleW(L"renodx-dlss5.addon64") != nullptr;
-    std::printf("VERDICT stable=%d registrations=%ld acquisitions=%ld registered=%ld control=%d\n",
-        stable, registrations, acquisitions, registered, control);
+    std::printf("VERDICT stable=%d pinned=%d registrations=%ld acquisitions=%ld registered=%ld control=%d\n",
+        stable, kept, registrations, acquisitions, registered, control);
     if (injected_reference) FreeLibrary(injected_reference);
     vkDestroyInstance(final, nullptr);
-    const bool cleaned = registered == 0 && GetModuleHandleW(L"renodx-dlss5.addon64") == nullptr;
+    // A pinned Generic stays loaded and registered until the process exits.
+    const bool cleaned = kept ? registered == 1 && GetModuleHandleW(L"renodx-dlss5.addon64") != nullptr
+                              : registered == 0 && GetModuleHandleW(L"renodx-dlss5.addon64") == nullptr;
     std::printf("FINAL cleanup=%d acquisitions=%ld\n", cleaned, acquisitions);
     return !expect_race && stable && cleaned && acquisitions == 0 ? 0 : 12;
 }

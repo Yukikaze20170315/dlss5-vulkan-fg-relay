@@ -1,5 +1,46 @@
 #pragma once
 
+// Protocol v1: three 3-bit counts (Render, Upscaled, Present), each 0..4.
+// Do not cache an absent consumer: ReShade may load Generic after the bridge.
+typedef uint32_t (__cdecl *PFN_PresentAdapterStageQuery)();
+static PFN_PresentAdapterStageQuery PresentAdapterStageQuery()
+{
+    static PVOID volatile cached_query = nullptr;
+    auto query = reinterpret_cast<PFN_PresentAdapterStageQuery>(
+        InterlockedCompareExchangePointer(&cached_query, nullptr, nullptr));
+    if (query == nullptr) {
+        const HMODULE consumer = GetModuleHandleW(L"renodx-dlss5.addon64");
+        if (consumer == nullptr) return nullptr;
+        auto version = reinterpret_cast<PFN_PresentAdapterStageQuery>(
+            GetProcAddress(consumer, "DLSS5StageProtocolVersion"));
+        auto candidate = reinterpret_cast<PFN_PresentAdapterStageQuery>(
+            GetProcAddress(consumer, "DLSS5GetStagePlan"));
+        if (version == nullptr || candidate == nullptr) return nullptr;
+        HMODULE keep = nullptr;
+        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                                reinterpret_cast<LPCWSTR>(consumer), &keep) || version() != 1) return nullptr;
+        query = candidate;
+        InterlockedCompareExchangePointer(&cached_query, reinterpret_cast<PVOID>(query), nullptr);
+    }
+    return query;
+}
+
+static bool PresentAdapterStageProtocol()
+{
+    return PresentAdapterStageQuery() != nullptr;
+}
+
+static bool PresentAdapterStagePlan(uint32_t* plan)
+{
+    const auto query = PresentAdapterStageQuery();
+    if (query == nullptr) return false;
+    const uint32_t packed = query();
+    if ((packed & ~0x1ffu) != 0 || (packed & 7u) > 4 ||
+        ((packed >> 3) & 7u) > 4 || ((packed >> 6) & 7u) > 4) return false;
+    if (plan != nullptr) *plan = packed;
+    return true;
+}
+
 // Restart-only opt-in: an in-flight presentation transport must not silently
 // change back into the game's DLSS mirror during a live configuration reload.
 static void PresentAdapterPath(wchar_t* path, size_t count, const wchar_t* leaf)
@@ -60,17 +101,27 @@ static bool PresentAdapterFollow()
     return PresentAdapterFgInput() && follow;
 }
 
-// Pipeline=0 (default) parks the FG evaluate until the real frame's NR is done.
+// Pipeline=2 (default) is the GPU relay in fg-relay.inc; see below.
+// Pipeline=0 is the serial feed, kept for diagnosis only: the real frame is parked
+// inside the FG command buffer for the whole NR, the generated frames of the group
+// cannot present meanwhile and then reach the compositor in a burst. Measured in
+// Endfield (5120x2160, two NR passes, 6x, 120 Hz): 121 presents/s but only 88
+// displayed, every sixth interval 17.6 ms and two presents 0.26 ms apart -- a high
+// frame counter that looks and feels like stutter. An absent key must therefore
+// not select it.
 // Pipeline=1 is a throughput probe: the same NR runs on the private device while
 // frame generation proceeds on the game's own image, and the result is discarded.
 // It measures the GPU headroom a one-frame-delayed pipeline could use; the
 // picture is the game's own, without NR, for the duration.
+static const int kPresentAdapterDefaultPipeline = 2;
 static int PresentAdapterPipeline()
 {
     static const int pipeline = [] {
         wchar_t path[1024] = {};
         PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
-        return path[0] != 0 ? GetPrivateProfileIntW(L"Adapter", L"Pipeline", 0, path) : 0;
+        return path[0] != 0 ? static_cast<int>(GetPrivateProfileIntW(L"Adapter", L"Pipeline",
+                                                                     kPresentAdapterDefaultPipeline, path))
+                            : kPresentAdapterDefaultPipeline;
     }();
     return PresentAdapterFgInput() ? pipeline : 0;
 }
@@ -79,15 +130,15 @@ static int PresentAdapterPipeline()
 // fg-relay.inc. 2 copies the FG inputs at the evaluate, as this add-on's own
 // batch on DLSSG.CmdQueue; 3 copies them at the game's vkQueuePresentKHR, on the
 // game's present queue and about 5 ms earlier. Both release the evaluate's park
-// from the D3D12 side. See fg-relay.inc for the chain and its fallbacks.
+// from the D3D12 side. The stage protocol supplies a validated producer handoff, so it may use the relay as well.
 static bool PresentAdapterRelay()
 {
     const int p = PresentAdapterPipeline();
     return p == 2 || p == 3;
 }
 
-static bool PresentAdapterRelayAtEvaluate() { return PresentAdapterPipeline() == 2; }
-static bool PresentAdapterRelayAtPresent()  { return PresentAdapterPipeline() == 3; }
+static bool PresentAdapterRelayAtEvaluate() { return PresentAdapterRelay() && PresentAdapterPipeline() == 2; }
+static bool PresentAdapterRelayAtPresent()  { return PresentAdapterRelay() && PresentAdapterPipeline() == 3; }
 
 // Import=1 lets the relay use the D3D12-fence <-> Vulkan-timeline-semaphore import,
 // and has it add VK_KHR_external_semaphore_win32 to the game's device at creation
@@ -96,13 +147,14 @@ static bool PresentAdapterRelayAtPresent()  { return PresentAdapterPipeline() ==
 // refuses it). The import is taken only for a device that create accepted the name
 // on: a non-null vkGetDeviceProcAddr answer is not proof the extension is enabled,
 // so the KHR entry points are never called on a device that was not shown to carry
-// it. Off by default.
+// it. On by default: without it the relay keeps a CPU gate that left a quarter to a
+// half of the frames unarmed in the game, and the throttle needs it. Import=0 opts out.
 static bool PresentAdapterRelayImport()
 {
     static const bool import = [] {
         wchar_t path[1024] = {};
         PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
-        return path[0] != 0 && GetPrivateProfileIntW(L"Adapter", L"Import", 0, path) == 1;
+        return path[0] == 0 || GetPrivateProfileIntW(L"Adapter", L"Import", 1, path) == 1;
     }();
     return PresentAdapterRelay() && import;
 }
@@ -134,6 +186,20 @@ static bool PresentAdapterTrace()
         return path[0] != 0 && GetPrivateProfileIntW(L"Adapter", L"Trace", 0, path) == 1;
     }();
     return PresentAdapterFgInput() && trace;
+}
+
+// SerialFallback=1 lets the serial feed take over when the GPU relay stands down.
+// Off by default: that feed presents the generated frames in bursts (see
+// PresentAdapterPipeline), so a relay failure pauses NR at the FG input instead,
+// and the relay is retried after the private session has been rebuilt.
+static bool PresentAdapterSerialFallback()
+{
+    static const bool allow = [] {
+        wchar_t path[1024] = {};
+        PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
+        return path[0] != 0 && GetPrivateProfileIntW(L"Adapter", L"SerialFallback", 0, path) == 1;
+    }();
+    return allow;
 }
 
 // Keep the DLSS-G plugin's internal focus check active for a drawable NR
@@ -170,5 +236,9 @@ static volatile LONG g_adapter_owner = OWNER_NONE;
 static bool FgInputActive()
 {
     if (!PresentAdapterFgInput()) return false;
+    if (PresentAdapterStageProtocol()) {
+        uint32_t plan = 0;
+        return PresentAdapterStagePlan(&plan) && ((plan >> 6) & 7u) != 0;
+    }
     return !PresentAdapterFollow() || PresentAdapterHookPoint() == 2;
 }

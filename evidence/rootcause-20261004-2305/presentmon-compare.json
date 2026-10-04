@@ -1,0 +1,155 @@
+{
+  "trim_s": 3.0,
+  "captures": {
+    "A": {
+      "file": "evidence/rootcause-20261004-2305/A-current/presentmon.csv",
+      "process_id": "46940",
+      "span_s": 16.93,
+      "presents_per_s": 121.24,
+      "displayed_per_s": 88.34,
+      "real_frames_per_s": 20.2,
+      "MsBetweenPresents": {
+        "p50": 8.17,
+        "p95": 17.88,
+        "max": 19.11
+      },
+      "MsBetweenDisplayChange": {
+        "p50": 8.35,
+        "p95": 18.21,
+        "p99": 18.37,
+        "max": 26.59,
+        "ge25ms": 8,
+        "ge25ms_share": 0.53
+      },
+      "MsUntilDisplayed": {
+        "p50": 13.97,
+        "p95": 22.06
+      },
+      "MsPCLatency": {
+        "p50": 119.53,
+        "p95": 147.47,
+        "p99": 166.08
+      }
+    },
+    "B": {
+      "file": "evidence/rootcause-20261004-2305/B-pipeline2/presentmon.csv",
+      "process_id": "47576",
+      "span_s": 26.93,
+      "presents_per_s": 126.91,
+      "displayed_per_s": 112.36,
+      "real_frames_per_s": 21.16,
+      "MsBetweenPresents": {
+        "p50": 8.02,
+        "p95": 8.81,
+        "max": 59.71
+      },
+      "MsBetweenDisplayChange": {
+        "p50": 8.33,
+        "p95": 16.66,
+        "p99": 16.69,
+        "max": 58.37,
+        "ge25ms": 7,
+        "ge25ms_share": 0.23
+      },
+      "MsUntilDisplayed": {
+        "p50": 14.39,
+        "p95": 19.41
+      },
+      "MsPCLatency": {
+        "p50": 218.58,
+        "p95": 246.17,
+        "p99": 260.71
+      }
+    },
+    "C": {
+      "file": "evidence/rootcause-20261004-2305/C-fix3/presentmon.csv",
+      "process_id": "28328",
+      "span_s": 36.95,
+      "presents_per_s": 114.13,
+      "displayed_per_s": 105.5,
+      "real_frames_per_s": 20.73,
+      "MsBetweenPresents": {
+        "p50": 8.12,
+        "p95": 10.3,
+        "max": 55.15
+      },
+      "MsBetweenDisplayChange": {
+        "p50": 8.33,
+        "p95": 16.66,
+        "p99": 41.65,
+        "max": 59.35,
+        "ge25ms": 77,
+        "ge25ms_share": 1.98
+      },
+      "MsUntilDisplayed": {
+        "p50": 14.24,
+        "p95": 19.31
+      },
+      "MsPCLatency": {
+        "p50": 158.19,
+        "p95": 181.33,
+        "p99": 186.0
+      }
+    },
+    "E": {
+      "file": "evidence/rootcause-20261004-2305/E-fix5-face1-noguard/presentmon.csv",
+      "process_id": "46724",
+      "span_s": 36.93,
+      "presents_per_s": 105.32,
+      "displayed_per_s": 90.91,
+      "real_frames_per_s": 17.55,
+      "MsBetweenPresents": {
+        "p50": 7.1,
+        "p95": 28.57,
+        "max": 48.15
+      },
+      "MsBetweenDisplayChange": {
+        "p50": 9.52,
+        "p95": 25.18,
+        "p99": 27.91,
+        "max": 31.75,
+        "ge25ms": 176,
+        "ge25ms_share": 5.24
+      },
+      "MsUntilDisplayed": {
+        "p50": 44.48,
+        "p95": 55.21
+      },
+      "MsPCLatency": {
+        "p50": 151.43,
+        "p95": 207.4,
+        "p99": 218.93
+      }
+    },
+    "F": {
+      "file": "evidence/rootcause-20261004-2305/F-fix5-face1-guard/presentmon.csv",
+      "process_id": "46724",
+      "span_s": 26.94,
+      "presents_per_s": 120.7,
+      "displayed_per_s": 108.37,
+      "real_frames_per_s": 20.12,
+      "MsBetweenPresents": {
+        "p50": 8.28,
+        "p95": 8.89,
+        "max": 11.14
+      },
+      "MsBetweenDisplayChange": {
+        "p50": 8.34,
+        "p95": 16.67,
+        "p99": 16.69,
+        "max": 16.75,
+        "ge25ms": 0,
+        "ge25ms_share": 0.0
+      },
+      "MsUntilDisplayed": {
+        "p50": 13.14,
+        "p95": 19.51
+      },
+      "MsPCLatency": {
+        "p50": 161.92,
+        "p95": 184.57,
+        "p99": 188.35
+      }
+    }
+  }
+}

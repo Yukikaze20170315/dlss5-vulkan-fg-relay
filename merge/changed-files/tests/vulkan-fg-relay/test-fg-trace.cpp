@@ -337,7 +337,14 @@ static void TestDetoursAndParsers(void *guard)
     const FgtQueue &q = g_fgt.queues[0];
     Check(q.submits == 4 && q.cbs == 8 && q.waits == 4 && q.signals == 4 && q.fences == 2, "full and empty submit statistics");
     Check(q.submits2 == 2, "zero-count vkQueueSubmit2 remains a submit2 API call");
-    Check(q.timeline == 1, "only explicit VkTimelineSemaphoreSubmitInfo contributes known timeline evidence");
+    // The per-batch preview (and with it the timeline count) is parsed only while the
+    // submit observer's first-evaluate sample window is open; the batch, CB, wait and
+    // signal totals above come from the full traversal and are always counted.
+    const bool preview = g_fgt_observer.Summary().firsts <= fg_submit_observation::kSamples;
+    std::printf("note: submit preview window %s (first evaluates observed: %llu), timeline=%u\n",
+                preview ? "open" : "closed", static_cast<unsigned long long>(g_fgt_observer.Summary().firsts), q.timeline);
+    Check(q.timeline == (preview ? 1u : 0u),
+        "only explicit VkTimelineSemaphoreSubmitInfo contributes known timeline evidence, inside the preview window");
     for (unsigned i = 0; i < 3; ++i) {
         void *output = nullptr;
         expected = {}; expected.kind = i == 0 ? GetQueue : i == 1 ? GetQueue2 : GetQueueLayer;

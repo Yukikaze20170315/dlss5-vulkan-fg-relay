@@ -1,4 +1,6 @@
 // Observations are CPU-side and unpaired: stable handles do not establish frame identity or GPU readiness.
+#include "fg-submit-observation.h"
+namespace fso = fg_submit_observation;
 
 static const unsigned kFgtDistinct = 12;
 struct FgtSet { uint64_t v[kFgtDistinct]; unsigned n, overflow, hits; };
@@ -111,7 +113,8 @@ struct FgtTagType {
 
 struct FgtQueue {
     uint64_t queue;
-    unsigned submits, submits2, cbs, waits, signals, fences, timeline;
+    unsigned submits, submits2, fences, timeline;
+    uint64_t cbs, waits, signals;
     FgtSet threads;
 };
 
@@ -150,6 +153,8 @@ struct FgtControl {
 };
 static FgTrace g_fgt;
 static FgtControl g_fgt_control;
+static fso::Observer g_fgt_observer;
+static bool g_fgt_command_events_registered, g_fgt_submit_observed, g_fgt_submit2_observed;
 static void *volatile g_fgt_submit_target;
 static void *volatile g_fgt_submit2_target;
 static void *volatile g_fgt_queue_target;
@@ -208,6 +213,126 @@ static void FgtFlushLog()
 static const char *FgtLifecycleName(unsigned l)
 {
     return l == 0 ? "OnlyValidNow" : l == 1 ? "ValidUntilPresent" : l == 2 ? "ValidUntilEvaluate" : "?";
+}
+
+// ReShade SDK authority: reshade/reshade_events.hpp addon_event_traits. In Vulkan,
+// reset_command_list is emitted before vkBeginCommandBuffer. A generation is an
+// observed recording boundary, never proof that native/bypassed commands are covered.
+static bool FgtCommandIdentity(reshade::api::command_list *cmd, uint64_t *cb, uint64_t *device)
+{
+    if (!FgtEnabled() || !g_fgt_control.cs_ready || cmd == nullptr) return false;
+    auto *dev = cmd->get_device();
+    if (dev == nullptr || dev->get_api() != reshade::api::device_api::vulkan) return false;
+    *cb = cmd->get_native(); *device = dev->get_native();
+    return *cb != 0;
+}
+static void OnFgtInitCommandList(reshade::api::command_list *cmd)
+{
+    uint64_t cb, device;
+    if (!FgtCommandIdentity(cmd, &cb, &device)) return;
+    FgtLock(); g_fgt_observer.Init(cb, device); FgtUnlock();
+}
+static void OnFgtResetCommandList(reshade::api::command_list *cmd)
+{
+    uint64_t cb, device;
+    if (!FgtCommandIdentity(cmd, &cb, &device)) return;
+    FgtLock(); g_fgt_observer.Reset(cb, device); FgtUnlock();
+}
+static void OnFgtDestroyCommandList(reshade::api::command_list *cmd)
+{
+    uint64_t cb, device;
+    if (!FgtCommandIdentity(cmd, &cb, &device)) return;
+    FgtLock(); g_fgt_observer.Destroy(cb); FgtUnlock();
+}
+static void OnFgtDestroyCommandDevice(reshade::api::device *dev)
+{
+    if (!FgtEnabled() || !g_fgt_control.cs_ready || dev == nullptr || dev->get_api() != reshade::api::device_api::vulkan) return;
+    const uint64_t device = dev->get_native();
+    FgtLock(); g_fgt_observer.DestroyDevice(device); FgtUnlock();
+}
+static void FgtCommandActivity(reshade::api::command_list *cmd, fso::Command kind)
+{
+    uint64_t cb, device;
+    if (!FgtCommandIdentity(cmd, &cb, &device)) return;
+    FgtLock(); g_fgt_observer.Activity(cb, device, kind); FgtUnlock();
+}
+
+// Derive the complete callback ABI from the vendored trait instead of repeating
+// parameter lists. Counts are callback occurrences, not workgroup/resource counts.
+// Bool events always return false: observing must never consume a game command.
+// Secondary events count the execute site only; their contents are not flattened.
+template <fso::Command Kind, typename Signature> struct FgtCommandEvent;
+template <fso::Command Kind, typename Return, typename... Args>
+struct FgtCommandEvent<Kind, Return (*)(reshade::api::command_list *, Args...)> {
+    static Return Callback(reshade::api::command_list *cmd, Args...)
+    {
+        FgtCommandActivity(cmd, Kind);
+        return Return();
+    }
+};
+template <reshade::addon_event Event>
+static void FgtRegisterTyped(PFN_ReShadeRegisterEvent reg, typename reshade::addon_event_traits<Event>::decl callback)
+{
+    reg(Event, reinterpret_cast<void *>(callback));
+}
+template <reshade::addon_event Event, fso::Command Kind>
+static void FgtRegisterCommand(PFN_ReShadeRegisterEvent reg)
+{
+    FgtRegisterTyped<Event>(reg, &FgtCommandEvent<Kind, typename reshade::addon_event_traits<Event>::decl>::Callback);
+}
+static void FgtRegisterCommandEvents(PFN_ReShadeRegisterEvent reg)
+{
+    FgtRegisterTyped<reshade::addon_event::init_command_list>(reg, &OnFgtInitCommandList);
+    FgtRegisterTyped<reshade::addon_event::reset_command_list>(reg, &OnFgtResetCommandList);
+    FgtRegisterTyped<reshade::addon_event::destroy_command_list>(reg, &OnFgtDestroyCommandList);
+    FgtRegisterTyped<reshade::addon_event::destroy_device>(reg, &OnFgtDestroyCommandDevice);
+    FgtRegisterCommand<reshade::addon_event::dispatch, fso::Command::dispatch>(reg);
+    FgtRegisterCommand<reshade::addon_event::dispatch_mesh, fso::Command::dispatch>(reg);
+    FgtRegisterCommand<reshade::addon_event::dispatch_rays, fso::Command::dispatch>(reg);
+    FgtRegisterCommand<reshade::addon_event::draw, fso::Command::draw>(reg);
+    FgtRegisterCommand<reshade::addon_event::draw_indexed, fso::Command::draw>(reg);
+    FgtRegisterCommand<reshade::addon_event::draw_or_dispatch_indirect, fso::Command::indirect>(reg);
+    FgtRegisterCommand<reshade::addon_event::barrier, fso::Command::barrier>(reg);
+    FgtRegisterCommand<reshade::addon_event::execute_secondary_command_list, fso::Command::secondary>(reg);
+    FgtRegisterCommand<reshade::addon_event::copy_resource, fso::Command::copy>(reg);
+    FgtRegisterCommand<reshade::addon_event::copy_buffer_region, fso::Command::copy>(reg);
+    FgtRegisterCommand<reshade::addon_event::copy_buffer_to_texture, fso::Command::copy>(reg);
+    FgtRegisterCommand<reshade::addon_event::copy_texture_region, fso::Command::copy>(reg);
+    FgtRegisterCommand<reshade::addon_event::copy_texture_to_buffer, fso::Command::copy>(reg);
+    FgtRegisterCommand<reshade::addon_event::resolve_texture_region, fso::Command::copy>(reg);
+    FgtRegisterCommand<reshade::addon_event::update_buffer_region_command, fso::Command::copy>(reg);
+    FgtRegisterCommand<reshade::addon_event::update_texture_region_command, fso::Command::copy>(reg);
+    FgtRegisterCommand<reshade::addon_event::clear_depth_stencil_view, fso::Command::clear>(reg);
+    FgtRegisterCommand<reshade::addon_event::clear_render_target_view, fso::Command::clear>(reg);
+    FgtRegisterCommand<reshade::addon_event::clear_unordered_access_view_uint, fso::Command::clear>(reg);
+    FgtRegisterCommand<reshade::addon_event::clear_unordered_access_view_float, fso::Command::clear>(reg);
+    FgtRegisterCommand<reshade::addon_event::begin_render_pass, fso::Command::render_pass>(reg);
+    FgtRegisterCommand<reshade::addon_event::end_render_pass, fso::Command::render_pass>(reg);
+    FgtRegisterCommand<reshade::addon_event::bind_pipeline, fso::Command::bind>(reg);
+    FgtRegisterCommand<reshade::addon_event::bind_descriptor_tables, fso::Command::bind>(reg);
+    FgtRegisterCommand<reshade::addon_event::bind_render_targets_and_depth_stencil, fso::Command::bind>(reg);
+    FgtRegisterCommand<reshade::addon_event::push_constants, fso::Command::bind>(reg);
+    FgtRegisterCommand<reshade::addon_event::push_descriptors, fso::Command::bind>(reg);
+    FgtRegisterCommand<reshade::addon_event::begin_query, fso::Command::query>(reg);
+    FgtRegisterCommand<reshade::addon_event::end_query, fso::Command::query>(reg);
+    FgtRegisterCommand<reshade::addon_event::copy_query_heap_results, fso::Command::query>(reg);
+    FgtLock(); g_fgt_command_events_registered = true; FgtUnlock();
+    FgtLog("[fg-submit-observer] coverage=events-registered-not-proven-on-FG-CB; first_limit=%u cb_capacity=%u locations_per_sample=%u; "
+        "generations=observed-init/begin; counts=callback-occurrences secondary=execute-site-only; matches=first-observed-direct-submit-attempt/retries-summary-only; "
+        "native/addon commands may bypass ReShade; late-load/missed-lifecycle/capacity are incomplete; count0 never proves empty; observed prefix does not prove input production or GPU readiness",
+        fso::kSamples, fso::kCommandLists, fso::kLocations);
+}
+static void FgtLogFirstSample(const fso::Sample &s)
+{
+    if (s.id == 0) return;
+    const uint64_t *c = s.prefix.kind;
+    FgtLog("[fg-submit-observer] first=%llu eval_qpc=%llu idx=%u%s cb=%llx generation=%llu eval_queue=%llx coverage=%s "
+        "hud=%llx back=%llx depth=%llx mv=%llx images_known=0x%x prefix=%s total=%llu "
+        "dispatch=%llu copy=%llu barrier=%llu draw=%llu execute_secondary=%llu indirect=%llu clear=%llu render_pass=%llu bind=%llu query=%llu",
+        s.id, s.qpc, s.index, s.indexed ? "" : "(OutputReal-fallback)", s.cb, s.generation, s.eval_queue, fso::CoverageName(s.coverage),
+        s.images.hud, s.images.back, s.images.depth, s.images.mv, s.images.known,
+        s.prefix.total != 0 ? "PRESENT(observed-events-before-FG;not-input-producer-proof)" : "NOT-CAPTURED(does-not-prove-absent-or-empty)",
+        s.prefix.total, c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9]);
 }
 
 #include "focus-fg.inc"
@@ -365,49 +490,150 @@ static FgtQueue *FgtQueueSlot(uint64_t q)
     return nullptr;
 }
 
+// The observer copies only scalar metadata from borrowed arrays. SEH is confined
+// to a trivial leaf, so unreadable application memory cannot strand our lock or
+// suppress the original submit. Neither semaphore payloads nor pNext are needed
+// for recording-identity matching; the original receives every pointer unchanged.
+template <typename T>
+static bool FgtReadArray(const T *source, uint32_t index, T *out)
+{
+    const uintptr_t base = reinterpret_cast<uintptr_t>(source);
+    const uintptr_t max = ~uintptr_t(0);
+    if (base == 0 || base > max - (sizeof(T) - 1) ||
+        static_cast<uintptr_t>(index) > (max - base - (sizeof(T) - 1)) / sizeof(T)) return false;
+    __try { memcpy(out, reinterpret_cast<const void *>(base + static_cast<uintptr_t>(index) * sizeof(T)), sizeof(T)); return true; }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+struct FgtSubmitBatch {
+    uint32_t waits, signals, cbs;
+    void *const *commands;
+    const FgtCommandBufferSubmitInfo *commands2;
+};
+static bool FgtReadSubmitBatch(const FgtSubmitInfo *subs, const FgtSubmitInfo2 *subs2, uint32_t index,
+    bool submit2, FgtSubmitBatch *out)
+{
+    if (submit2) {
+        FgtSubmitInfo2 s = {};
+        if (!FgtReadArray(subs2, index, &s)) return false;
+        out->waits = s.waitSemaphoreInfoCount; out->signals = s.signalSemaphoreInfoCount;
+        out->cbs = s.commandBufferInfoCount; out->commands2 = s.pCommandBufferInfos;
+    } else {
+        FgtSubmitInfo s = {};
+        if (!FgtReadArray(subs, index, &s)) return false;
+        out->waits = s.waitSemaphoreCount; out->signals = s.signalSemaphoreCount;
+        out->cbs = s.commandBufferCount; out->commands = s.pCommandBuffers;
+    }
+    return true;
+}
+static void FgtObserveSubmit(fso::Submit *out, const FgtSubmitInfo *subs, const FgtSubmitInfo2 *subs2)
+{
+    for (uint32_t batch = 0; batch < out->batches; ++batch) {
+        FgtSubmitBatch s = {};
+        if (!FgtReadSubmitBatch(subs, subs2, batch, out->submit2, &s)) { fso::Add(out->read_faults); break; }
+        fso::Add(out->batches_read); fso::Add(out->waits, s.waits);
+        fso::Add(out->signals, s.signals); fso::Add(out->declared_cbs, s.cbs);
+        for (uint32_t cb = 0; cb < s.cbs; ++cb) {
+            void *command = nullptr;
+            if (out->submit2) {
+                FgtCommandBufferSubmitInfo item = {};
+                if (!FgtReadArray(s.commands2, cb, &item)) { fso::Add(out->read_faults); break; }
+                command = item.commandBuffer;
+            } else if (!FgtReadArray(s.commands, cb, &command)) { fso::Add(out->read_faults); break; }
+            fso::Observer::MatchCommand(*out, reinterpret_cast<uint64_t>(command), { batch, cb, s.cbs, s.waits, s.signals });
+        }
+    }
+}
+static void FgtFinishObservedSubmit(fso::Submit *s, uint32_t result)
+{
+    FgtLock(); g_fgt_observer.Finish(*s, result); FgtUnlock();
+    for (unsigned i = 0; i < s->candidates; ++i) {
+        const fso::Match &m = s->matches[i];
+        if (!m.claimed) continue;
+        FgtLog("[fg-submit-observer] first=%llu submit=%llu api=%s queue=%llx fence=%llx cb=%llx "
+            "eval_generation=%llu submit_generation=%llu match=%s coverage=%s generation_changed_during_call=%u "
+            "batches=%u read=%llu cbs=%llu/%llu waits=%llu signals=%llu read_faults=%llu occurrences=%llu locations_omitted=%llu "
+            "result_bits=0x%08x (submit-return-not-GPU-completion)",
+            m.sample.id, s->id, s->submit2 ? "vkQueueSubmit2/KHR" : "vkQueueSubmit", s->queue, s->fence, m.sample.cb,
+            m.sample.generation, m.submit_generation, m.sample.generation != 0 ? "same-observed-generation" : "HANDLE-ONLY-untracked",
+            fso::CoverageName(m.sample.coverage), m.generation_changed ? 1u : 0u,
+            s->batches, s->batches_read, s->cbs_read, s->declared_cbs, s->waits, s->signals, s->read_faults,
+            m.occurrences, m.omitted_locations, s->result);
+        for (unsigned j = 0; j < m.stored; ++j) {
+            const fso::Location &p = m.locations[j];
+            FgtLog("[fg-submit-observer] first=%llu submit=%llu occurrence=%u batch=%u cb_index=%u batch_cbs=%u waits=%u signals=%u",
+                m.sample.id, s->id, j, p.batch, p.cb_index, p.batch_cbs, p.waits, p.signals);
+        }
+    }
+}
+
 struct FgtSubmitView {
-    uint32_t waits, cbs, signals; bool timeline, has_fg_cmd;
+    uint32_t waits, cbs, signals; bool timeline, has_fg_cmd, incomplete;
     uint64_t wait_sem[3], signal_sem[3]; uint64_t wait_val[3], signal_val[3]; void *cb[3];
 };
 
-static void FgtViewSubmit(const FgtSubmitInfo *s, void *fg_cmd, FgtSubmitView *v)
+static void FgtViewSubmit(const FgtSubmitInfo *source, void *fg_cmd, FgtSubmitView *v)
 {
-    v->waits = s->waitSemaphoreCount; v->cbs = s->commandBufferCount; v->signals = s->signalSemaphoreCount;
-    for (uint32_t i = 0; s->pWaitSemaphores != nullptr && i < v->waits && i < 3; ++i) v->wait_sem[i] = s->pWaitSemaphores[i];
-    for (uint32_t i = 0; s->pSignalSemaphores != nullptr && i < v->signals && i < 3; ++i) v->signal_sem[i] = s->pSignalSemaphores[i];
-    for (uint32_t i = 0; s->pCommandBuffers != nullptr && i < v->cbs; ++i) {
-        if (i < 3) v->cb[i] = s->pCommandBuffers[i];
-        if (s->pCommandBuffers[i] == fg_cmd && fg_cmd != nullptr) v->has_fg_cmd = true;
+    FgtSubmitInfo s = {};
+    if (!FgtReadArray(source, 0, &s)) { v->incomplete = true; return; }
+    v->waits = s.waitSemaphoreCount; v->cbs = s.commandBufferCount; v->signals = s.signalSemaphoreCount;
+    for (uint32_t i = 0; i < v->waits && i < 3; ++i)
+        if (!FgtReadArray(s.pWaitSemaphores, i, &v->wait_sem[i])) { v->incomplete = true; break; }
+    for (uint32_t i = 0; i < v->signals && i < 3; ++i)
+        if (!FgtReadArray(s.pSignalSemaphores, i, &v->signal_sem[i])) { v->incomplete = true; break; }
+    for (uint32_t i = 0; i < v->cbs; ++i) {
+        void *cb = nullptr;
+        if (!FgtReadArray(s.pCommandBuffers, i, &cb)) { v->incomplete = true; break; }
+        if (i < 3) v->cb[i] = cb;
+        if (cb == fg_cmd && fg_cmd != nullptr) v->has_fg_cmd = true;
     }
-    for (const uint32_t *ext = static_cast<const uint32_t *>(s->pNext); ext != nullptr;
-         ext = static_cast<const uint32_t *>(*reinterpret_cast<const void *const *>(ext + 2))) {
-        if (*ext != kFgtStTimelineSubmitInfo) continue;
-        const FgtTimelineSubmitInfo *tl = reinterpret_cast<const FgtTimelineSubmitInfo *>(ext);
-        v->timeline = true;
-        for (uint32_t i = 0; tl->pWaitValues != nullptr && i < tl->waitValueCount && i < 3; ++i) v->wait_val[i] = tl->pWaitValues[i];
-        for (uint32_t i = 0; tl->pSignalValues != nullptr && i < tl->signalValueCount && i < 3; ++i) v->signal_val[i] = tl->pSignalValues[i];
-        break;
+    struct Extension { uint32_t sType; const void *pNext; };
+    const void *next = s.pNext;
+    for (unsigned depth = 0; next != nullptr && depth < 16; ++depth) {
+        Extension ext = {};
+        if (!FgtReadArray(static_cast<const Extension *>(next), 0, &ext)) { v->incomplete = true; return; }
+        if (ext.sType == kFgtStTimelineSubmitInfo) {
+            FgtTimelineSubmitInfo tl = {};
+            if (!FgtReadArray(static_cast<const FgtTimelineSubmitInfo *>(next), 0, &tl)) { v->incomplete = true; return; }
+            v->timeline = true;
+            for (uint32_t i = 0; i < tl.waitValueCount && i < 3; ++i)
+                if (!FgtReadArray(tl.pWaitValues, i, &v->wait_val[i])) { v->incomplete = true; break; }
+            for (uint32_t i = 0; i < tl.signalValueCount && i < 3; ++i)
+                if (!FgtReadArray(tl.pSignalValues, i, &v->signal_val[i])) { v->incomplete = true; break; }
+            return;
+        }
+        next = ext.pNext;
     }
+    if (next != nullptr) v->incomplete = true; // Bounded even for a cyclic legacy-detail pNext chain.
 }
 
-static void FgtViewSubmit2(const FgtSubmitInfo2 *s, void *fg_cmd, FgtSubmitView *v)
+static void FgtViewSubmit2(const FgtSubmitInfo2 *source, void *fg_cmd, FgtSubmitView *v)
 {
-    v->waits = s->waitSemaphoreInfoCount; v->cbs = s->commandBufferInfoCount; v->signals = s->signalSemaphoreInfoCount;
+    FgtSubmitInfo2 s = {};
+    if (!FgtReadArray(source, 0, &s)) { v->incomplete = true; return; }
+    v->waits = s.waitSemaphoreInfoCount; v->cbs = s.commandBufferInfoCount; v->signals = s.signalSemaphoreInfoCount;
     v->timeline = false;
-    for (uint32_t i = 0; s->pWaitSemaphoreInfos != nullptr && i < v->waits && i < 3; ++i) {
-        v->wait_sem[i] = s->pWaitSemaphoreInfos[i].semaphore; v->wait_val[i] = s->pWaitSemaphoreInfos[i].value;
+    for (uint32_t i = 0; i < v->waits && i < 3; ++i) {
+        FgtSemaphoreSubmitInfo sem = {};
+        if (!FgtReadArray(s.pWaitSemaphoreInfos, i, &sem)) { v->incomplete = true; break; }
+        v->wait_sem[i] = sem.semaphore; v->wait_val[i] = sem.value;
     }
-    for (uint32_t i = 0; s->pSignalSemaphoreInfos != nullptr && i < v->signals && i < 3; ++i) {
-        v->signal_sem[i] = s->pSignalSemaphoreInfos[i].semaphore; v->signal_val[i] = s->pSignalSemaphoreInfos[i].value;
+    for (uint32_t i = 0; i < v->signals && i < 3; ++i) {
+        FgtSemaphoreSubmitInfo sem = {};
+        if (!FgtReadArray(s.pSignalSemaphoreInfos, i, &sem)) { v->incomplete = true; break; }
+        v->signal_sem[i] = sem.semaphore; v->signal_val[i] = sem.value;
     }
-    for (uint32_t i = 0; s->pCommandBufferInfos != nullptr && i < v->cbs; ++i) {
-        if (i < 3) v->cb[i] = s->pCommandBufferInfos[i].commandBuffer;
-        if (s->pCommandBufferInfos[i].commandBuffer == fg_cmd && fg_cmd != nullptr) v->has_fg_cmd = true;
+    for (uint32_t i = 0; i < v->cbs; ++i) {
+        FgtCommandBufferSubmitInfo cb = {};
+        if (!FgtReadArray(s.pCommandBufferInfos, i, &cb)) { v->incomplete = true; break; }
+        if (i < 3) v->cb[i] = cb.commandBuffer;
+        if (cb.commandBuffer == fg_cmd && fg_cmd != nullptr) v->has_fg_cmd = true;
     }
 }
 
-static void FgtNoteSubmit(void *queue, uint32_t count, const FgtSubmitInfo *subs, const FgtSubmitInfo2 *subs2, uint64_t fence, bool is_submit2)
+static void FgtNoteSubmit(void *queue, uint32_t count, const FgtSubmitInfo *subs, const FgtSubmitInfo2 *subs2,
+    uint64_t fence, bool is_submit2, const fso::Submit &observation)
 {
+    if (!FgtEnabled() || !g_fgt_control.cs_ready) return;
     FgTrace &t = g_fgt;
     const uint64_t q = reinterpret_cast<uint64_t>(queue);
     const LONGLONG now = FgtNow();
@@ -416,10 +642,19 @@ static void FgtNoteSubmit(void *queue, uint32_t count, const FgtSubmitInfo *subs
     const uint32_t n = count < _countof(views) ? count : static_cast<uint32_t>(_countof(views));
     FgtLock();
     void *const fg_cmd = t.last_fg_cmd;
+    const bool sample_window = g_fgt_observer.Summary().firsts <= fso::kSamples;
     FgtUnlock();
     for (uint32_t i = 0; i < n; ++i) {
-        if (subs != nullptr) FgtViewSubmit(subs + i, fg_cmd, &views[i]);
-        else if (subs2 != nullptr) FgtViewSubmit2(subs2 + i, fg_cmd, &views[i]);
+        if (!sample_window) break;
+        if (is_submit2) {
+            FgtSubmitInfo2 s = {};
+            if (FgtReadArray(subs2, i, &s)) FgtViewSubmit2(&s, fg_cmd, &views[i]);
+            else views[i].incomplete = true;
+        } else {
+            FgtSubmitInfo s = {};
+            if (FgtReadArray(subs, i, &s)) FgtViewSubmit(&s, fg_cmd, &views[i]);
+            else views[i].incomplete = true;
+        }
     }
     bool detail = false;
     const char *why = "";
@@ -430,10 +665,9 @@ static void FgtNoteSubmit(void *queue, uint32_t count, const FgtSubmitInfo *subs
         if (is_submit2) ++slot->submits2;
         if (fence != 0) ++slot->fences;
         FgtNote(slot->threads, tid);
-        for (uint32_t i = 0; i < n; ++i) {
-            slot->cbs += views[i].cbs; slot->waits += views[i].waits; slot->signals += views[i].signals;
+        fso::Add(slot->cbs, observation.cbs_read); fso::Add(slot->waits, observation.waits); fso::Add(slot->signals, observation.signals);
+        for (uint32_t i = 0; i < n; ++i)
             if (views[i].timeline) ++slot->timeline;
-        }
     }
     if (q == t.cmd_queue && t.cmd_queue != 0 && t.cmdqueue_detail_left != 0) { --t.cmdqueue_detail_left; detail = true; why = "FG queue"; }
     else if (q == t.present_queue && t.present_queue != 0 && t.present_queue_detail_left != 0) { --t.present_queue_detail_left; detail = true; why = "game present queue"; }
@@ -441,30 +675,61 @@ static void FgtNoteSubmit(void *queue, uint32_t count, const FgtSubmitInfo *subs
     const LONGLONG eval1 = t.last_eval1_qpc;
     const LONGLONG present = t.last_present_qpc;
     FgtUnlock();
-    if (!detail) return;
-    FgtLog("[fg-trace] %s (%s) queue=%p thread=%lu batches=%u fence=%llx since_present=%.2fms since_eval1=%.2fms",
+    if (!detail || !sample_window) return;
+    FgtLog("[fg-trace] %s (%s; legacy-preview-only/max4-batches/max3-printed-CBs/not-recording-identity) queue=%p thread=%lu batches=%u fence=%llx since_present=%.2fms since_eval1=%.2fms",
         is_submit2 ? "vkQueueSubmit2" : "vkQueueSubmit", why, queue, tid, count, fence,
         present != 0 ? FgtMs(present, now) : -1.0, eval1 != 0 ? FgtMs(eval1, now) : -1.0);
     for (uint32_t i = 0; i < n; ++i) {
         const FgtSubmitView &v = views[i];
-        FgtLog("[fg-trace]   batch[%u] waits=%u [%llx:%llu %llx:%llu %llx:%llu] cbs=%u [%p %p %p]%s signals=%u [%llx:%llu %llx:%llu %llx:%llu]%s",
+        FgtLog("[fg-trace]   batch[%u] waits=%u [%llx:%llu %llx:%llu %llx:%llu] cbs=%u [%p %p %p]%s signals=%u [%llx:%llu %llx:%llu %llx:%llu]%s%s",
             i, v.waits, v.wait_sem[0], v.wait_val[0], v.wait_sem[1], v.wait_val[1], v.wait_sem[2], v.wait_val[2],
-            v.cbs, v.cb[0], v.cb[1], v.cb[2], v.has_fg_cmd ? " <FG evaluate cmd>" : "",
+            v.cbs, v.cb[0], v.cb[1], v.cb[2], v.has_fg_cmd ? " <last-FG-handle-only>" : "",
             v.signals, v.signal_sem[0], v.signal_val[0], v.signal_sem[1], v.signal_val[1], v.signal_sem[2], v.signal_val[2],
-            v.timeline ? " timeline" : "");
+            v.timeline ? " timeline" : "", v.incomplete ? " incomplete-read" : "");
     }
 }
 
+static thread_local bool g_fgt_in_submit_observer;
+static bool FgtBeginSubmitObservation()
+{
+    if (!FgtEnabled() || !g_fgt_control.cs_ready) return false;
+    if (g_fgt_in_submit_observer) {
+        FgtLock(); g_fgt_observer.NestedSubmitSkipped(); FgtUnlock();
+        return false; // Layer forwarding may re-enter another observed dispatch target.
+    }
+    g_fgt_in_submit_observer = true;
+    return true;
+}
 static uint32_t FgtQueueSubmitDetour(void *queue, uint32_t count, const FgtSubmitInfo *subs, uint64_t fence)
 {
-    FgtNoteSubmit(queue, count, subs, nullptr, fence, false);
-    return reinterpret_cast<PFN_FgtQueueSubmit>(g_fgt_control.submit_hook.original)(queue, count, subs, fence);
+    if (!FgtBeginSubmitObservation())
+        return reinterpret_cast<PFN_FgtQueueSubmit>(g_fgt_control.submit_hook.original)(queue, count, subs, fence);
+    fso::Submit observation;
+    FgtLock(); g_fgt_observer.BeginSubmit(observation, reinterpret_cast<uint64_t>(queue), count, fence, false); FgtUnlock();
+    FgtObserveSubmit(&observation, subs, nullptr);
+    FgtLock(); g_fgt_observer.Claim(observation); FgtUnlock();
+    FgtNoteSubmit(queue, count, subs, nullptr, fence, false, observation);
+    // Borrowed pointers and scalar arguments are forwarded exactly once, unchanged.
+    // No observation/log lock spans this call (including any ReShade callbacks).
+    const uint32_t result = reinterpret_cast<PFN_FgtQueueSubmit>(g_fgt_control.submit_hook.original)(queue, count, subs, fence);
+    FgtFinishObservedSubmit(&observation, result);
+    g_fgt_in_submit_observer = false;
+    return result;
 }
 
 static uint32_t FgtQueueSubmit2Detour(void *queue, uint32_t count, const FgtSubmitInfo2 *subs, uint64_t fence)
 {
-    FgtNoteSubmit(queue, count, nullptr, subs, fence, true);
-    return reinterpret_cast<PFN_FgtQueueSubmit2>(g_fgt_control.submit2_hook.original)(queue, count, subs, fence);
+    if (!FgtBeginSubmitObservation())
+        return reinterpret_cast<PFN_FgtQueueSubmit2>(g_fgt_control.submit2_hook.original)(queue, count, subs, fence);
+    fso::Submit observation;
+    FgtLock(); g_fgt_observer.BeginSubmit(observation, reinterpret_cast<uint64_t>(queue), count, fence, true); FgtUnlock();
+    FgtObserveSubmit(&observation, nullptr, subs);
+    FgtLock(); g_fgt_observer.Claim(observation); FgtUnlock();
+    FgtNoteSubmit(queue, count, nullptr, subs, fence, true, observation);
+    const uint32_t result = reinterpret_cast<PFN_FgtQueueSubmit2>(g_fgt_control.submit2_hook.original)(queue, count, subs, fence);
+    FgtFinishObservedSubmit(&observation, result);
+    g_fgt_in_submit_observer = false;
+    return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -594,7 +859,8 @@ static void FgtRegisterEvents(PFN_ReShadeRegisterEvent reg)
     if (!FgtHooksWanted() || reg == nullptr) return;
     FgtInit();
     if (!FgtEnabled()) return;   // relay-only: nothing to register, the hooks come from the worker
-    reg(reshade::addon_event::init_command_queue, reinterpret_cast<void *>(&OnFgtInitCommandQueue));
+    FgtRegisterTyped<reshade::addon_event::init_command_queue>(reg, &OnFgtInitCommandQueue);
+    FgtRegisterCommandEvents(reg);
     FgtLog("[fg-trace] Trace=1: asynchronous log; hook installation deferred to the NGX hook worker. Early calls may be missed.");
 }
 
@@ -652,7 +918,10 @@ static void FgtMaintenance()
             void *submit2 = InterlockedCompareExchangePointer(&g_fgt_submit2_target, nullptr, nullptr);
             const bool a = HookInstall(t.submit_hook, submit, reinterpret_cast<void *>(&FgtQueueSubmitDetour));
             const bool b = submit2 != nullptr && submit2 != submit && HookInstall(t.submit2_hook, submit2, reinterpret_cast<void *>(&FgtQueueSubmit2Detour));
+            FgtLock(); g_fgt_submit_observed = a; g_fgt_submit2_observed = b; FgtUnlock();
             FgtLog("[fg-trace] queue observers: submit=%p %s submit2=%p %s", submit, a ? "hooked" : "FAILED", submit2, b ? "hooked" : "unavailable");
+            FgtLog("[fg-submit-observer] submit-coverage=%s submit2-coverage=%s; selected-dispatch-targets-only, early/other-target/secondary-only submissions may be missed; original waits/signals unchanged",
+                a ? "hooked" : "unavailable", b ? "hooked" : "unavailable");
         }
         // The relay's own device-creation hook (Import=1 only; it logs its
         // verdict). Here rather than at the top because it is the same kind of
@@ -669,12 +938,35 @@ static void FgtSummary()
 {
     FgTrace t;
     FgtQueueId queue_ids[16];
-    unsigned queue_id_count;
+    unsigned queue_id_count, pending = 0, in_submit = 0;
+    fso::Stats observer;
+    bool events_registered, submit_hooked, submit2_hooked;
     FgtLock();
     t = g_fgt;
     queue_id_count = g_fgt_queue_id_count;
     memcpy(queue_ids, g_fgt_queue_ids, sizeof(queue_ids));
+    observer = g_fgt_observer.Summary();
+    events_registered = g_fgt_command_events_registered;
+    submit_hooked = g_fgt_submit_observed; submit2_hooked = g_fgt_submit2_observed;
+    for (unsigned i = 0; i < g_fgt_observer.SampleCount(); ++i) {
+        const fso::Sample s = g_fgt_observer.GetSample(i);
+        if (s.state == fso::State::pending) ++pending;
+        if (s.state == fso::State::in_submit) ++in_submit;
+    }
     FgtUnlock();
+    FgtLog("[fg-submit-observer] summary coverage events_registered=%u submit_hooked=%u submit2_hooked=%u "
+        "init=%llu begin/reset=%llu destroy=%llu device_destroy=%llu events=%llu partial_starts=%llu capacity_misses=%llu generation_exhausted=%llu "
+        "firsts=%llu observed_prefix=%llu untracked=%llu partial=%llu; no-prefix-is-not-empty/native-coverage-incomplete",
+        events_registered ? 1u : 0u, submit_hooked ? 1u : 0u, submit2_hooked ? 1u : 0u,
+        observer.inits, observer.resets, observer.destroys, observer.device_destroys, observer.events,
+        observer.partial_starts, observer.capacity_misses, observer.generation_exhausted,
+        observer.firsts, observer.prefixes, observer.untracked_firsts, observer.partial_firsts);
+    FgtLog("[fg-submit-observer] summary submits=%llu submit2=%llu batches_read=%llu cbs_read=%llu read_faults=%llu nested_suppressed=%llu "
+        "sample_returns=%llu handle_only=%llu pending=%u in_submit=%u invalidated=%llu duplicates=%llu locations_omitted=%llu nonzero_results=%llu log_dropped_all_trace=%ld; "
+        "detail_limit=8-firsts/8-locations-each; unobserved-submit-is-not-no-submit; success-is-not-GPU-readiness",
+        observer.submits, observer.submits2, observer.batches, observer.cbs, observer.read_faults, observer.nested_suppressed,
+        observer.returned, observer.handle_only, pending, in_submit, observer.invalidated,
+        observer.duplicate_occurrences, observer.omitted_locations, observer.failed_results, InterlockedCompareExchange(&g_fgt_log_dropped, 0, 0));
     char a[512], b[256];
     FgtLog("[fg-trace] ---- summary at %u FG groups / %u evaluates / %u game presents; log_dropped=%ld ----",
         t.eval_groups, t.eval_calls, t.present_calls, InterlockedCompareExchange(&g_fgt_log_dropped, 0, 0));
@@ -719,7 +1011,7 @@ static void FgtSummary()
         char fam[48] = "family=? index=?";
         for (unsigned k = 0; k < queue_id_count; ++k)
             if (queue_ids[k].queue == q.queue) { _snprintf_s(fam, sizeof(fam), _TRUNCATE, "family=%u index=%u", queue_ids[k].family, queue_ids[k].index); break; }
-        FgtLog("[fg-trace] queue %llx%s%s %s reshade_type=%s0x%x submits=%u (submit2 %u, timeline %u, fenced %u) cbs=%u waits=%u signals=%u threads %s",
+        FgtLog("[fg-trace] queue %llx%s%s %s reshade_type=%s0x%x submits=%u (submit2 %u, timeline-preview-only %u, fenced %u) cbs=%llu waits=%llu signals=%llu threads %s",
             q.queue, label, label2, fam, rs >= 0 ? "" : "unknown ", rs >= 0 && rs < static_cast<int>(kFgtDistinct) ? t.reshade_queue_types[rs] : 0u,
             q.submits, q.submits2, q.timeline, q.fences, q.cbs, q.waits, q.signals, a);
     }
@@ -802,6 +1094,7 @@ static void FgTraceEvaluate(void *cmd, const NVSDK_NGX_Parameter *p)
     const bool have_real = VkmGetRes(p, "DLSSG.OutputReal", &oreal, &why);
     const bool have_interp = VkmGetRes(p, "DLSSG.OutputInterpolated", &ointerp, &why);
     const bool first = indexed ? idx == 1 : have_real;
+    fso::Sample first_sample;
     unsigned groups = 0, calls = 0;
     double since_present = -1.0;
     FgtLock();
@@ -814,6 +1107,11 @@ static void FgTraceEvaluate(void *cmd, const NVSDK_NGX_Parameter *p)
     if (first) {
         ++t.eval_groups;
         t.last_fg_cmd = cmd;
+        const fso::Images images = { have_hud ? hud.image : 0ull, have_back ? back.image : 0ull,
+            have_depth ? depth.image : 0ull, have_mv ? mv.image : 0ull,
+            (have_hud ? 1u : 0u) | (have_back ? 2u : 0u) | (have_depth ? 4u : 0u) | (have_mv ? 8u : 0u) };
+        first_sample = g_fgt_observer.First(reinterpret_cast<uint64_t>(cmd), reinterpret_cast<uint64_t>(queue),
+            images, static_cast<uint64_t>(now), idx, indexed);
         if (present != 0 && now >= present) { since_present = FgtMs(present, now); FgtStatAdd(t.present_to_eval, since_present); }
         if (t.last_eval1_qpc != 0) FgtStatAdd(t.eval_interval, FgtMs(t.last_eval1_qpc, now));
         t.last_eval1_qpc = now;
@@ -829,7 +1127,8 @@ static void FgTraceEvaluate(void *cmd, const NVSDK_NGX_Parameter *p)
     if (have_interp) FgtNote(t.out_interp, ointerp.image);
     groups = t.eval_groups;
     FgtUnlock();
-    if (groups <= 3 || (first && groups % 1800 == 0)) {
+    FgtLogFirstSample(first_sample);
+    if (groups <= 3) {
         FgtLog("[fg-trace] evaluate #%u idx=%u%s thread=%lu cmd=%p queue=%p since_present=%.2fms hud=%llx back=%llx depth=%llx mv=%llx real=%llx interp=%llx",
             calls, idx, indexed ? "" : "(unindexed)", GetCurrentThreadId(), cmd, queue,
             first ? since_present : (present != 0 ? FgtMs(present, now) : -1.0),

@@ -1,0 +1,922 @@
+{
+  "mode": "CPU only: extracted production functions and statement ranges; fake SDK/device/resources",
+  "production_source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+  "production_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8",
+  "shared_source_sha256_at_extraction": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b",
+  "negative_control_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5",
+  "cpu_summary": "CPU TESTS: 49 passed, 0 failed; source=current\r",
+  "static_assertions_passed": 30,
+  "static_assertions": [
+    "negative-control source SHA-256 is the recorded draft",
+    "NGX turn -> runtime_mutex -> latch",
+    "nonnull arguments and registry lookup precede reset read",
+    "reset latch guarded by registered SR or RR eligibility",
+    "latch before if (!enabled.load())",
+    "latch before if (NrYieldsToForeign())",
+    "latch before if (bridge_serves)",
+    "latch before if (!eligible)",
+    "exactly one game Reset read in Vulkan production source",
+    "Reset=1 latches all slots of both feature stages",
+    "game Reset does not advance global epoch",
+    "Render Auto off and Upscaled Auto on at actual call",
+    "suffix retirement reuses single-pass primitive",
+    "retirement carries parameters and independent history use ID",
+    "single-pass retirement does not synchronously release recorded resources",
+    "failure retires only failed slot and restores retry state",
+    "failure invalidates only skipped suffix model histories",
+    "failure preserves stage dimensions governor and worksets",
+    "tracked evaluate result and exception converge on failure recovery",
+    "success clears failure retry count",
+    "drain requires nonreplay proof then releases handle before parameters",
+    "missing-guide bypass cannot consume normalization latch",
+    "normalization consumes latch only after shader commands and scale transition",
+    "native SR failure skips Upscaled after entry reset latching",
+    "all ProcessNr production callers are inside reset-latching hook",
+    "zero-stage reconciliation cannot erase pending governor reset",
+    "contract recreation backoff and frame-ahead maturation code unchanged",
+    "existing recorded-use drain policy unchanged",
+    "original source contains all three negative-control defects",
+    "tested Vulkan source remained unchanged through CPU run"
+  ],
+  "old_source_expected_failures": [
+    "look-auto-render-off",
+    "failure-pass-0-result",
+    "failure-pass-2-exception",
+    "reset-survives-missing-guides",
+    "reset-survives-native-sr-failure-stage-isolation",
+    "reset-before-bypass-0"
+  ],
+  "coverage_boundary": [
+    "Full HookedEvaluate compiled; ProcessNr reconciliation/guide gates and evaluate/create/retry branches compiled as extracted fragments.",
+    "Actual retirement, recorded-use bookkeeping, reset latch, LookSettingsSnapshot, SetModelParameters, PlanFrameScale and look-history helpers compiled.",
+    "GPU work, image content, submission fences, real SDK ABI, full Generic translation unit and concurrency stress not executed.",
+    "Command-buffer safety proof is simulated through actual TrackRecordedUse/ForgetRecordedUses, not measured on GPU.",
+    "Normalization dispatch ordering checked statically; CPU plan/latch and per-stage model consumption exercised dynamically."
+  ],
+  "extractions": [
+    {
+      "label": "^constexpr uint32_t kMaxNrPasses = .*;$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 221,
+      "end_line": 221,
+      "fragment_sha256": "7f782e9dc06f75d5b9c31144feea7143f8a09765d0b982ca55cdf522c0350ad4",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "template <typename Buffer>\nstruct BasicLookHistory",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 238,
+      "end_line": 249,
+      "fragment_sha256": "42bf92a5130aa64747240a26d59dfe0a915ca5c43b2890aa2f091eed33e82178",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "struct NrFeatureSlot",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 255,
+      "end_line": 295,
+      "fragment_sha256": "2c5f15e69377a7f837cca5f5f7cb216a01e68056acca8092d4529d50c2bb1e87",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "enum class FeedSource",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 299,
+      "end_line": 304,
+      "fragment_sha256": "ecb68aa98c38f028806dd5fb740fe2d1d8aafce9fe180c82efe45faeedeb9636",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "struct NormStream",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 318,
+      "end_line": 330,
+      "fragment_sha256": "c37962ba570d90d778863da138c065033027a2a77861b5434a4cd2726448861b",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "look flags",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/look_stage.hpp",
+      "start_line": 31,
+      "end_line": 40,
+      "fragment_sha256": "d5b264bd4cbdf17b7eda05946d9bc0875102233ffcc39c8b1e62c23b4e6331f9",
+      "source_sha256": "4bbe2b175d5a2183991479a2bddec895e30e4077c4a0127d4c3e7fbc239f3492"
+    },
+    {
+      "label": "^constexpr float kHistoryMaxGapSeconds = .*;$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/look_stage.hpp",
+      "start_line": 77,
+      "end_line": 77,
+      "fragment_sha256": "9989ca558cf3263e968ba341c6d1b6c0b463fd9409d1260b1645371f97f2af4e",
+      "source_sha256": "4bbe2b175d5a2183991479a2bddec895e30e4077c4a0127d4c3e7fbc239f3492"
+    },
+    {
+      "label": "struct Constants",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/look_stage.hpp",
+      "start_line": 80,
+      "end_line": 110,
+      "fragment_sha256": "c19707b5bc994d44dbcc2125bee48c7de3f59bcfd182902f0fc986f740c73570",
+      "source_sha256": "4bbe2b175d5a2183991479a2bddec895e30e4077c4a0127d4c3e7fbc239f3492"
+    },
+    {
+      "label": "struct Settings",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/look_stage.hpp",
+      "start_line": 116,
+      "end_line": 144,
+      "fragment_sha256": "919d5da2f425401c757cdeaa836cd9692f11593e32c452d9e08c6aa4353e4bb0",
+      "source_sha256": "4bbe2b175d5a2183991479a2bddec895e30e4077c4a0127d4c3e7fbc239f3492"
+    },
+    {
+      "label": "struct Frame",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/look_stage.hpp",
+      "start_line": 198,
+      "end_line": 211,
+      "fragment_sha256": "4408e4eff7acc39fa20c5e488610a12599e5f9b3b15aa63b92dde0071a30d290",
+      "source_sha256": "4bbe2b175d5a2183991479a2bddec895e30e4077c4a0127d4c3e7fbc239f3492"
+    },
+    {
+      "label": "upsampling constants",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/look_stage.hpp",
+      "start_line": 155,
+      "end_line": 160,
+      "fragment_sha256": "321f0ce5172020dd338a3daf889bbf5adf5b9487374d07284dbf51e5ada7dac2",
+      "source_sha256": "4bbe2b175d5a2183991479a2bddec895e30e4077c4a0127d4c3e7fbc239f3492"
+    },
+    {
+      "label": "^inline constexpr float kDetailStabilityAlpha = .*;$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 1725,
+      "end_line": 1725,
+      "fragment_sha256": "0276df00b85f4b4dc456d53bbbde9a3a7bf1f91011573241473d5353b5d911c3",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "^inline constexpr int64_t kNormResetQuietNs = .*;$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 1666,
+      "end_line": 1666,
+      "fragment_sha256": "336587d2f32dbb2d2c286a6515aed422a1f2f4137f3c051da6b59d21fa0b7648",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "^constexpr uint32_t kSnapPrime = .*;$|^constexpr uint32_t kSnapPrime = .*;[^\\n]*$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/norm_trace.hpp",
+      "start_line": 64,
+      "end_line": 64,
+      "fragment_sha256": "86320543d63504ee2f23b723c65e15a39de56837c717a7be401db8d3a7449260",
+      "source_sha256": "f00941caf585ca6aa2886348bc5cb62ec8e97e141991f1e4697021e6276e6a06"
+    },
+    {
+      "label": "^constexpr uint32_t kSnapEpoch = .*;$|^constexpr uint32_t kSnapEpoch = .*;[^\\n]*$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/norm_trace.hpp",
+      "start_line": 65,
+      "end_line": 65,
+      "fragment_sha256": "729f8329e10c86fc72e0588e6b4d06d3dda1dc02bbb96fb5e780c1e75f0773de",
+      "source_sha256": "f00941caf585ca6aa2886348bc5cb62ec8e97e141991f1e4697021e6276e6a06"
+    },
+    {
+      "label": "^constexpr uint32_t kSnapReset = .*;$|^constexpr uint32_t kSnapReset = .*;[^\\n]*$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/norm_trace.hpp",
+      "start_line": 66,
+      "end_line": 66,
+      "fragment_sha256": "c122e997ec98d69518e6c4dd4647a09272e512890f24a09933e875efa5f89ebd",
+      "source_sha256": "f00941caf585ca6aa2886348bc5cb62ec8e97e141991f1e4697021e6276e6a06"
+    },
+    {
+      "label": "^constexpr uint32_t kSnapFeed = .*;$|^constexpr uint32_t kSnapFeed = .*;[^\\n]*$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/norm_trace.hpp",
+      "start_line": 67,
+      "end_line": 67,
+      "fragment_sha256": "f92e896c2a43743bfc9def4e2fb0f490dd799983509cc78fd00a6778fc84338a",
+      "source_sha256": "f00941caf585ca6aa2886348bc5cb62ec8e97e141991f1e4697021e6276e6a06"
+    },
+    {
+      "label": "inline bool StackSlotNeedsReset(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/reset_epoch.hpp",
+      "start_line": 41,
+      "end_line": 52,
+      "fragment_sha256": "cfc82b39ef2d0f837f71765f9fac54ad6966e9e48ce34e3d597a41586ff22350",
+      "source_sha256": "9fe120e015d577f330288e07f24732956541f761f262812f175f2aca18ea217f"
+    },
+    {
+      "label": "struct SkinSteering",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 2180,
+      "end_line": 2183,
+      "fragment_sha256": "cc5959c8fb69368392afee1240e194a26c9623313fb346575372e5b8dd2e53cb",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "inline SkinSteering SentSkinSteering(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 2184,
+      "end_line": 2187,
+      "fragment_sha256": "b64a71e7e5f1454ce8d22f88959691b50fdcc10dc4bd7019043f0aa0834a0527",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "inline look::Settings LookSettingsSnapshot(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 2199,
+      "end_line": 2242,
+      "fragment_sha256": "d552c27ff9d5b06a3db491d03dcd1c843e197e6767a4ad42a763325bba11e6f5",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "^constexpr int64_t kFeatureRetryFirstNs = .*;$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 4346,
+      "end_line": 4346,
+      "fragment_sha256": "0d4058a861a0de19f6b95e1a1648422acf221142d50855c56e2e348378a783be",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "^constexpr int64_t kFeatureRetryMaxNs = .*;$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 4347,
+      "end_line": 4347,
+      "fragment_sha256": "0954b080520c9c373a32394b12656a608d245f599945f0a5d3642a18a75470d1",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "inline bool FeatureFailureExpired(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 4349,
+      "end_line": 4354,
+      "fragment_sha256": "9208d0e34fafb7378ab84519ba2ff05ddd2b72f5e24a9d34db2262d1dc7fd7e4",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "inline void SetModelParameters(NrFeatureSlot& slot, uint32_t slot_index,\n                               uint64_t chain_reset_epoch, uint32_t create_flags,\n                               int32_t frame_reset, bool frame_ui_correction) {",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 6723,
+      "end_line": 6825,
+      "fragment_sha256": "4350eeff96d7e6e13e6c84fba8fb610c15d2f0c91fc608bae3c58344c6711437",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "struct FrameScalePlan",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 7470,
+      "end_line": 7478,
+      "fragment_sha256": "73b8124dd82d4eeaa362f8cf00621a0d38ac7f62c9c2eb13581036356c183e22",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "inline FrameScalePlan PlanFrameScale(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 7479,
+      "end_line": 7566,
+      "fragment_sha256": "8e0b5fe99caee1bbf1309fcec011826ef3b69ffc78c81c7a89e948f4fcdeb9eb",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "template <typename History>\ninline void PlanLookHistory(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 7943,
+      "end_line": 7957,
+      "fragment_sha256": "e2d573f04eb8b044b6cd994a8fe6691fdc596e5d36befa53b7449a3a2a6340b0",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "template <typename History>\ninline void FinishLookPass(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/dlssnr.hpp",
+      "start_line": 7972,
+      "end_line": 7996,
+      "fragment_sha256": "5b902c0852c5ce4e4c4fe664ca9338e4d20777fbd0fbd4ff6dc6921f6eac0eda",
+      "source_sha256": "3185e4eb0dcc401163b230ab46c5529b528a855437fdf3a1a1ca5df382d8b54b"
+    },
+    {
+      "label": "enum Surface : uint32_t",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 298,
+      "end_line": 317,
+      "fragment_sha256": "e41694f940bf1ec5bf0225ba6f434cb5fd2ebdf992c9c5c40138da2bb65245ae",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "struct Workset",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 318,
+      "end_line": 337,
+      "fragment_sha256": "b66161edadbb3a7f5c35d26540a520ba83bfa940c379f8b45d3b3a4eca854b56",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "struct LookHistoryImage",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 343,
+      "end_line": 346,
+      "fragment_sha256": "8e4db843845e5c081a816ab1c234a2c371755efa3882b94bd838040d586c974c",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "struct RetiredLookHistory",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 347,
+      "end_line": 350,
+      "fragment_sha256": "993b9a0134220a1be1294661ddb8585e7c00fb14236c98c43bb4e7d7eabdded7",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "struct RetiredNrHandle",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 351,
+      "end_line": 355,
+      "fragment_sha256": "310667a868cc5435d9257ba6229bbc81fb965dcd6bb92b6a3010d261dc14fbb1",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "^using LookHistoryVk = .*;$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 356,
+      "end_line": 356,
+      "fragment_sha256": "2eb47dfe3a09e6c746b634ebac2579723a596004fa5a6e2cf4874d600489d3ce",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "struct StageFeature",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 360,
+      "end_line": 392,
+      "fragment_sha256": "b89b38a27ca38570b73991a2fb5e0a93d100c2825ba662a2d1cdf04ec5517a90",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "struct Feature {",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 393,
+      "end_line": 401,
+      "fragment_sha256": "0a321b930d26bb4b150b254a933ffc2d301dbe051843117930082b3a2ffd2231",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "complete recorded-use bookkeeping",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 193,
+      "end_line": 226,
+      "fragment_sha256": "e00c0509520849aaedab832e8c763aef01a80df14e98e8c19e28b1427557a55e",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "inline void DestroyWorkset(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 1661,
+      "end_line": 1668,
+      "fragment_sha256": "31fd8bd47f4e31c11c5386bc4318789924090f1e9d48b4797aa981a3931b69a4",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "inline void DestroyLookHistoryImage(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 1670,
+      "end_line": 1674,
+      "fragment_sha256": "d56e9f06eddbf418120dd734ac0476aedbc16a5798f1e83b22ace270cbed5205",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "inline void DrainRetiredFeature(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 1678,
+      "end_line": 1713,
+      "fragment_sha256": "2800b144ead1de8ad991130748c0b3d1e7d960ef4df3d2d3e2704b7eb6ac23e1",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "inline void RetireStagePass(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 1788,
+      "end_line": 1805,
+      "fragment_sha256": "5f899a80318ab767d653bec0ed362682fc2956434f44704188cd5d08ae171a6e",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "inline void RetireStagePasses(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 1809,
+      "end_line": 1829,
+      "fragment_sha256": "d153f4be3776487fc748622c86cfa248ce5b5a4061dc28ddd95904bcddbaa84d",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "inline void FailStagePass(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 1833,
+      "end_line": 1844,
+      "fragment_sha256": "550264873b4f6af91e2f2e0f945635d612afd8db737305078f672f30940133e4",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "complete slot contract/retry/create/warmup statements",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 2292,
+      "end_line": 2370,
+      "fragment_sha256": "ea6084de559c5e15fe272d11a9c8cf0d59be316ffb8db9041a7b57f592589f61",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "^  const int32_t frame_reset = .*;$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 2757,
+      "end_line": 2757,
+      "fragment_sha256": "fa508e3550bd28aa45ed4691faa58d631264d829b0f1c0d1bab4711caf1c55d0",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "complete model/evaluate/exception/failure/success statements",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 2847,
+      "end_line": 2877,
+      "fragment_sha256": "acc797efbdf11b09a15213175a5004b4395896a328520dacedca068545863dd3",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "^  const look::Settings look_settings = LookSettingsSnapshot\\(.*\\);$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 2501,
+      "end_line": 2501,
+      "fragment_sha256": "8a7339754c6f61a7eae96c93adf301fec700cda44943969f913e2b673ed02629",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "^      frame.frame_reset = .*;$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 2667,
+      "end_line": 2667,
+      "fragment_sha256": "65d44bfdabf36f7c7daa5aa2d564043368ba297e91896981108a145e188ccf8f",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "^      const FrameScalePlan plan = PlanFrameScale.*;$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 2674,
+      "end_line": 2674,
+      "fragment_sha256": "ca07f88767a40c3fea937207fe02580ef203c0a298961980851fea1079454597",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "^      feature.norm_pending_reset = false;$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 2721,
+      "end_line": 2721,
+      "fragment_sha256": "c18970001dc6ea1f7aacb0af89bffe9656c725376035793cfb763acc4a61d389",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "ProcessNr reconciliation and zero-stage gates",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 1931,
+      "end_line": 1959,
+      "fragment_sha256": "cfa90cc542db76871a19fc12899fea1c52e60da7a877af363a757c9ff949d62a",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "^  if \\(depth == nullptr \\|\\| motion == nullptr\\).*;$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 1988,
+      "end_line": 1988,
+      "fragment_sha256": "d838d9868b9720c0f279312194fb15784506a7a1b8df6437bba153b5c1c7a5be",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "^  if \\(output == nullptr \\|\\| \\(!pre_sr && !output->ReadWrite\\)\\).*;$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 1989,
+      "end_line": 1989,
+      "fragment_sha256": "e97209a261e5afc90cb59397b04ae95e3d77ebe241419f401d72d06228e4c2a0",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "inline void LatchFeatureReset(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 3361,
+      "end_line": 3367,
+      "fragment_sha256": "c927654241aaedea602cdb3b0407576b73a1daf5893fe3fdf22a8aa552c98301",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "template <int Slot>\ninline NVSDK_NGX_Result NVSDK_CONV HookedEvaluate(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/vulkan_path.hpp",
+      "start_line": 3369,
+      "end_line": 3473,
+      "fragment_sha256": "9ea72942b95f2bda3e0adfa5c00d968f1e18f54ed7816d24433500498848065b",
+      "source_sha256": "33aad2b1ec980c6889b96aad1cdb4f61f8d6cbfdcea1ff9d9cfee2e3b8abd6b8"
+    },
+    {
+      "label": "^constexpr uint32_t kMaxNrPasses = .*;$",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 221,
+      "end_line": 221,
+      "fragment_sha256": "7f782e9dc06f75d5b9c31144feea7143f8a09765d0b982ca55cdf522c0350ad4",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "template <typename Buffer>\nstruct BasicLookHistory",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 238,
+      "end_line": 249,
+      "fragment_sha256": "42bf92a5130aa64747240a26d59dfe0a915ca5c43b2890aa2f091eed33e82178",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "struct NrFeatureSlot",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 255,
+      "end_line": 295,
+      "fragment_sha256": "2c5f15e69377a7f837cca5f5f7cb216a01e68056acca8092d4529d50c2bb1e87",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "enum class FeedSource",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 299,
+      "end_line": 304,
+      "fragment_sha256": "ecb68aa98c38f028806dd5fb740fe2d1d8aafce9fe180c82efe45faeedeb9636",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "struct NormStream",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 318,
+      "end_line": 330,
+      "fragment_sha256": "c37962ba570d90d778863da138c065033027a2a77861b5434a4cd2726448861b",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "look flags",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/look_stage.hpp",
+      "start_line": 31,
+      "end_line": 40,
+      "fragment_sha256": "d5b264bd4cbdf17b7eda05946d9bc0875102233ffcc39c8b1e62c23b4e6331f9",
+      "source_sha256": "4bbe2b175d5a2183991479a2bddec895e30e4077c4a0127d4c3e7fbc239f3492"
+    },
+    {
+      "label": "^constexpr float kHistoryMaxGapSeconds = .*;$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/look_stage.hpp",
+      "start_line": 77,
+      "end_line": 77,
+      "fragment_sha256": "9989ca558cf3263e968ba341c6d1b6c0b463fd9409d1260b1645371f97f2af4e",
+      "source_sha256": "4bbe2b175d5a2183991479a2bddec895e30e4077c4a0127d4c3e7fbc239f3492"
+    },
+    {
+      "label": "struct Constants",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/look_stage.hpp",
+      "start_line": 80,
+      "end_line": 110,
+      "fragment_sha256": "c19707b5bc994d44dbcc2125bee48c7de3f59bcfd182902f0fc986f740c73570",
+      "source_sha256": "4bbe2b175d5a2183991479a2bddec895e30e4077c4a0127d4c3e7fbc239f3492"
+    },
+    {
+      "label": "struct Settings",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/look_stage.hpp",
+      "start_line": 116,
+      "end_line": 144,
+      "fragment_sha256": "919d5da2f425401c757cdeaa836cd9692f11593e32c452d9e08c6aa4353e4bb0",
+      "source_sha256": "4bbe2b175d5a2183991479a2bddec895e30e4077c4a0127d4c3e7fbc239f3492"
+    },
+    {
+      "label": "struct Frame",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/look_stage.hpp",
+      "start_line": 198,
+      "end_line": 211,
+      "fragment_sha256": "4408e4eff7acc39fa20c5e488610a12599e5f9b3b15aa63b92dde0071a30d290",
+      "source_sha256": "4bbe2b175d5a2183991479a2bddec895e30e4077c4a0127d4c3e7fbc239f3492"
+    },
+    {
+      "label": "upsampling constants",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/look_stage.hpp",
+      "start_line": 155,
+      "end_line": 160,
+      "fragment_sha256": "321f0ce5172020dd338a3daf889bbf5adf5b9487374d07284dbf51e5ada7dac2",
+      "source_sha256": "4bbe2b175d5a2183991479a2bddec895e30e4077c4a0127d4c3e7fbc239f3492"
+    },
+    {
+      "label": "^inline constexpr float kDetailStabilityAlpha = .*;$",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 1717,
+      "end_line": 1717,
+      "fragment_sha256": "0276df00b85f4b4dc456d53bbbde9a3a7bf1f91011573241473d5353b5d911c3",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "^inline constexpr int64_t kNormResetQuietNs = .*;$",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 1658,
+      "end_line": 1658,
+      "fragment_sha256": "336587d2f32dbb2d2c286a6515aed422a1f2f4137f3c051da6b59d21fa0b7648",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "^constexpr uint32_t kSnapPrime = .*;$|^constexpr uint32_t kSnapPrime = .*;[^\\n]*$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/norm_trace.hpp",
+      "start_line": 64,
+      "end_line": 64,
+      "fragment_sha256": "86320543d63504ee2f23b723c65e15a39de56837c717a7be401db8d3a7449260",
+      "source_sha256": "f00941caf585ca6aa2886348bc5cb62ec8e97e141991f1e4697021e6276e6a06"
+    },
+    {
+      "label": "^constexpr uint32_t kSnapEpoch = .*;$|^constexpr uint32_t kSnapEpoch = .*;[^\\n]*$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/norm_trace.hpp",
+      "start_line": 65,
+      "end_line": 65,
+      "fragment_sha256": "729f8329e10c86fc72e0588e6b4d06d3dda1dc02bbb96fb5e780c1e75f0773de",
+      "source_sha256": "f00941caf585ca6aa2886348bc5cb62ec8e97e141991f1e4697021e6276e6a06"
+    },
+    {
+      "label": "^constexpr uint32_t kSnapReset = .*;$|^constexpr uint32_t kSnapReset = .*;[^\\n]*$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/norm_trace.hpp",
+      "start_line": 66,
+      "end_line": 66,
+      "fragment_sha256": "c122e997ec98d69518e6c4dd4647a09272e512890f24a09933e875efa5f89ebd",
+      "source_sha256": "f00941caf585ca6aa2886348bc5cb62ec8e97e141991f1e4697021e6276e6a06"
+    },
+    {
+      "label": "^constexpr uint32_t kSnapFeed = .*;$|^constexpr uint32_t kSnapFeed = .*;[^\\n]*$",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/norm_trace.hpp",
+      "start_line": 67,
+      "end_line": 67,
+      "fragment_sha256": "f92e896c2a43743bfc9def4e2fb0f490dd799983509cc78fd00a6778fc84338a",
+      "source_sha256": "f00941caf585ca6aa2886348bc5cb62ec8e97e141991f1e4697021e6276e6a06"
+    },
+    {
+      "label": "inline bool StackSlotNeedsReset(",
+      "source": "C:/Users/Administrator/Documents/ChatGPT/DLSS 5 泄露版 相关开发/worktrees/peqhub-stages1/reset_epoch.hpp",
+      "start_line": 41,
+      "end_line": 52,
+      "fragment_sha256": "cfc82b39ef2d0f837f71765f9fac54ad6966e9e48ce34e3d597a41586ff22350",
+      "source_sha256": "9fe120e015d577f330288e07f24732956541f761f262812f175f2aca18ea217f"
+    },
+    {
+      "label": "struct SkinSteering",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 2165,
+      "end_line": 2168,
+      "fragment_sha256": "cc5959c8fb69368392afee1240e194a26c9623313fb346575372e5b8dd2e53cb",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "inline SkinSteering SentSkinSteering(",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 2169,
+      "end_line": 2172,
+      "fragment_sha256": "b64a71e7e5f1454ce8d22f88959691b50fdcc10dc4bd7019043f0aa0834a0527",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "inline look::Settings LookSettingsSnapshot(",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 2184,
+      "end_line": 2227,
+      "fragment_sha256": "d552c27ff9d5b06a3db491d03dcd1c843e197e6767a4ad42a763325bba11e6f5",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "^constexpr int64_t kFeatureRetryFirstNs = .*;$",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 4331,
+      "end_line": 4331,
+      "fragment_sha256": "0d4058a861a0de19f6b95e1a1648422acf221142d50855c56e2e348378a783be",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "^constexpr int64_t kFeatureRetryMaxNs = .*;$",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 4332,
+      "end_line": 4332,
+      "fragment_sha256": "0954b080520c9c373a32394b12656a608d245f599945f0a5d3642a18a75470d1",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "inline bool FeatureFailureExpired(",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 4334,
+      "end_line": 4339,
+      "fragment_sha256": "9208d0e34fafb7378ab84519ba2ff05ddd2b72f5e24a9d34db2262d1dc7fd7e4",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "inline void SetModelParameters(NrFeatureSlot& slot, uint32_t slot_index,\n                               uint64_t chain_reset_epoch, uint32_t create_flags,\n                               int32_t frame_reset, bool frame_ui_correction) {",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 6708,
+      "end_line": 6810,
+      "fragment_sha256": "4350eeff96d7e6e13e6c84fba8fb610c15d2f0c91fc608bae3c58344c6711437",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "struct FrameScalePlan",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 7456,
+      "end_line": 7464,
+      "fragment_sha256": "73b8124dd82d4eeaa362f8cf00621a0d38ac7f62c9c2eb13581036356c183e22",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "inline FrameScalePlan PlanFrameScale(",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 7465,
+      "end_line": 7552,
+      "fragment_sha256": "8e0b5fe99caee1bbf1309fcec011826ef3b69ffc78c81c7a89e948f4fcdeb9eb",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "template <typename History>\ninline void PlanLookHistory(",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 7929,
+      "end_line": 7943,
+      "fragment_sha256": "e2d573f04eb8b044b6cd994a8fe6691fdc596e5d36befa53b7449a3a2a6340b0",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "template <typename History>\ninline void FinishLookPass(",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/dlssnr.hpp",
+      "start_line": 7958,
+      "end_line": 7982,
+      "fragment_sha256": "5b902c0852c5ce4e4c4fe664ca9338e4d20777fbd0fbd4ff6dc6921f6eac0eda",
+      "source_sha256": "0851e763421874f9468db6b4af2c4eaaf00c2b856e91070ad89e2a2948b6df08"
+    },
+    {
+      "label": "enum Surface : uint32_t",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 298,
+      "end_line": 317,
+      "fragment_sha256": "e41694f940bf1ec5bf0225ba6f434cb5fd2ebdf992c9c5c40138da2bb65245ae",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "struct Workset",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 318,
+      "end_line": 337,
+      "fragment_sha256": "b66161edadbb3a7f5c35d26540a520ba83bfa940c379f8b45d3b3a4eca854b56",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "struct LookHistoryImage",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 343,
+      "end_line": 346,
+      "fragment_sha256": "8e4db843845e5c081a816ab1c234a2c371755efa3882b94bd838040d586c974c",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "struct RetiredLookHistory",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 347,
+      "end_line": 350,
+      "fragment_sha256": "993b9a0134220a1be1294661ddb8585e7c00fb14236c98c43bb4e7d7eabdded7",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "struct RetiredNrHandle",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 351,
+      "end_line": 355,
+      "fragment_sha256": "310667a868cc5435d9257ba6229bbc81fb965dcd6bb92b6a3010d261dc14fbb1",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "^using LookHistoryVk = .*;$",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 356,
+      "end_line": 356,
+      "fragment_sha256": "2eb47dfe3a09e6c746b634ebac2579723a596004fa5a6e2cf4874d600489d3ce",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "struct StageFeature",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 360,
+      "end_line": 389,
+      "fragment_sha256": "f2b102e95db75e117c7638b9eda2763b84f5423eba2665333f3db4d505e50b62",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "struct Feature {",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 390,
+      "end_line": 398,
+      "fragment_sha256": "0a321b930d26bb4b150b254a933ffc2d301dbe051843117930082b3a2ffd2231",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "complete recorded-use bookkeeping",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 193,
+      "end_line": 226,
+      "fragment_sha256": "e00c0509520849aaedab832e8c763aef01a80df14e98e8c19e28b1427557a55e",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "inline void DestroyWorkset(",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 1658,
+      "end_line": 1665,
+      "fragment_sha256": "31fd8bd47f4e31c11c5386bc4318789924090f1e9d48b4797aa981a3931b69a4",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "inline void DestroyLookHistoryImage(",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 1667,
+      "end_line": 1671,
+      "fragment_sha256": "d56e9f06eddbf418120dd734ac0476aedbc16a5798f1e83b22ace270cbed5205",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "inline void DrainRetiredFeature(",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 1675,
+      "end_line": 1710,
+      "fragment_sha256": "2800b144ead1de8ad991130748c0b3d1e7d960ef4df3d2d3e2704b7eb6ac23e1",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "inline void RetireStagePasses(",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 1786,
+      "end_line": 1821,
+      "fragment_sha256": "c19536baa7ab0d8d84709352ee15fcde9cfe03043743377d999d9675286371de",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "complete slot contract/retry/create/warmup statements",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 2269,
+      "end_line": 2347,
+      "fragment_sha256": "ea6084de559c5e15fe272d11a9c8cf0d59be316ffb8db9041a7b57f592589f61",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "^  const int32_t frame_reset = .*;$",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 2730,
+      "end_line": 2730,
+      "fragment_sha256": "77378274865b86836e12a31922a302f6b878e43d54aabf293f6c33f1170f8dda",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "complete model/evaluate/exception/failure/success statements",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 2820,
+      "end_line": 2849,
+      "fragment_sha256": "ee97b55f20b09a2d9a6e72722f8f4e10fdc44aecd33eba3661d407636df19778",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "^  const look::Settings look_settings = LookSettingsSnapshot\\(.*\\);$",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 2477,
+      "end_line": 2477,
+      "fragment_sha256": "0c3d7f7e3ef31d4fcb4c26fe004230e72acbf7e291d35254aa1a6b53f11a7fc0",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "^      frame.frame_reset = .*;$",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 2643,
+      "end_line": 2643,
+      "fragment_sha256": "3148e28f96a827e850efe09dd29226da6cefced845e08b809540fb0840b7f0f1",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "^      const FrameScalePlan plan = PlanFrameScale.*;$",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 2650,
+      "end_line": 2650,
+      "fragment_sha256": "ca07f88767a40c3fea937207fe02580ef203c0a298961980851fea1079454597",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "ProcessNr reconciliation and zero-stage gates",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 1908,
+      "end_line": 1936,
+      "fragment_sha256": "cfa90cc542db76871a19fc12899fea1c52e60da7a877af363a757c9ff949d62a",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "^  if \\(depth == nullptr \\|\\| motion == nullptr\\).*;$",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 1965,
+      "end_line": 1965,
+      "fragment_sha256": "d838d9868b9720c0f279312194fb15784506a7a1b8df6437bba153b5c1c7a5be",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "^  if \\(output == nullptr \\|\\| \\(!pre_sr && !output->ReadWrite\\)\\).*;$",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 1966,
+      "end_line": 1966,
+      "fragment_sha256": "e97209a261e5afc90cb59397b04ae95e3d77ebe241419f401d72d06228e4c2a0",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    },
+    {
+      "label": "template <int Slot>\ninline NVSDK_NGX_Result NVSDK_CONV HookedEvaluate(",
+      "source": "C:/Users/Administrator/AppData/Local/Temp/prwork/gtests-port/negative-control/vulkan_path.hpp",
+      "start_line": 3331,
+      "end_line": 3434,
+      "fragment_sha256": "7ff4087025ef8513ff7b056cc2a49bbf9335a8fcd0340841f18c18c1e515c300",
+      "source_sha256": "fad97095ffc0882d3f67fb8f17ad01cbdce06b645b0bfb2be1161ce7ee5a64c5"
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 static_assert(MH_ERROR_MEMORY_ALLOC == 9, "present-carrier-retry.h classifies MinHook status 9");
 
 static const char *const kPresentCompatibleGeneric =
-    u8"Generic builds confirmed to work with this bridge: 8.5.0-rc10 / 已经确定可以正常使用该版本插件的Generic插件：8.5.0-rc10";
+    u8"Generic build confirmed to work with this bridge: 8.5.0-rc10-stages1 (shipped with it) / 已经确定可以正常使用该版本插件的Generic插件：8.5.0-rc10-stages1（与本插件一同提供）";
 struct PresentCompatibilityStatus {
     unsigned code[2];
     char reason[2][384];
@@ -67,9 +67,40 @@ void PresentAdapterNrHook();
 void PresentAdapterSrHook();
 }
 static thread_local bool g_present_nr_scope;
+static thread_local uint32_t g_present_nr_plan;
 static thread_local unsigned g_present_nr_entries;
 static thread_local unsigned g_present_sr_entries;
 static thread_local unsigned g_present_sr_copies;
+extern "C" __declspec(dllexport) uint32_t __cdecl DLSS5BridgeStageProtocolVersion()
+{
+    return 1;
+}
+extern "C" __declspec(dllexport) uint32_t __cdecl DLSS5BridgeActiveStagePlan()
+{
+    return g_present_nr_scope ? g_present_nr_plan : 0;
+}
+
+// Freeze each carrier's plan and restore an outer scope on re-entry.
+struct PresentAdapterNrScope {
+    bool previous_scope = g_present_nr_scope;
+    uint32_t previous_plan = g_present_nr_plan;
+    PresentAdapterNrScope()
+    {
+        uint32_t plan = 0;
+        g_present_nr_plan = 0;
+        if (PresentAdapterStageProtocol()) {
+            PresentAdapterStagePlan(&plan);
+            // Invalid plans stay in protocol mode with zero passes.
+            g_present_nr_plan = plan | 0x80000000u;
+        }
+        g_present_nr_scope = true;
+    }
+    ~PresentAdapterNrScope()
+    {
+        g_present_nr_scope = previous_scope;
+        g_present_nr_plan = previous_plan;
+    }
+};
 extern "C" void PresentAdapterNrEnter()
 {
     if (g_present_nr_scope) ++g_present_nr_entries;
@@ -120,8 +151,13 @@ static bool PresentAdapterConfiguration()
     PresentAdapterPath(ini, _countof(ini), L"ReShade.ini");
     wchar_t unit[80] = {};
     GetPrivateProfileStringW(L"RenoDX.DLSS5", L"NRLinearUnitNits", L"0", unit, _countof(unit), ini);
-    const int hook_point = GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint",
-                                                PresentAdapterFollow() ? -1 : 0, ini);
+    const bool stage_protocol = PresentAdapterStageProtocol();
+    if (stage_protocol && !PresentAdapterStagePlan(nullptr)) {
+        PresentCompatibilitySet(0, PC_HOOK_POINT_UNAVAILABLE, "Stage protocol plan is invalid; carrier processing is paused.");
+        return false;
+    }
+    const int hook_point = stage_protocol ? 2 : GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint",
+                                                                    PresentAdapterFollow() ? -1 : 0, ini);
     const auto code = PresentCompatibilityConfigCode(
         GetModuleHandleW(L"renodx-dlss5.addon64") != nullptr,
         GetPrivateProfileIntW(L"RenoDX.DLSS5", L"EnableHooks", 2, ini), hook_point,
@@ -159,7 +195,10 @@ static void PresentCompatibilityPoll()
         char hash[65] = {};
         const bool hashed = GetModuleFileNameW(consumer, path, _countof(path)) != 0 &&
                             Sha256File(path, hash, sizeof(hash));
-        const bool known = hashed && _stricmp(hash, "DCD93881E976AD033D83C2BB01F4BC3E4DDC59C15FE0DD4CA165BC5FC7D1AC68") == 0;
+        // 8.5.0-rc10 (Present hook point only) and 8.5.0-rc10-stages1 (stage protocol).
+        const bool known = hashed &&
+            (_stricmp(hash, "DCD93881E976AD033D83C2BB01F4BC3E4DDC59C15FE0DD4CA165BC5FC7D1AC68") == 0 ||
+             _stricmp(hash, "CCAECB3559CC4BA3B42C2FFEBEDF5C655914945A9C2488237E9C3D5DD1A95F7C") == 0);
         AcquireSRWLockExclusive(&g_present_compatibility_lock);
         g_present_compatibility.unknown_build = !known;
         ReleaseSRWLockExclusive(&g_present_compatibility_lock);
@@ -173,9 +212,9 @@ static void PresentCompatibilityPoll()
         if (PresentAdapterWitness() && PresentCompatibilitySnapshot().code[1] == PC_NR_ENTRY_UNAVAILABLE)
             PresentCompatibilityIssue(PC_OK, "");
     }
-    // Render is a valid user-selected alternate path. Only diagnose carrier
-    // requirements when Present is selected, or its selector is unavailable.
-    if (!PresentAdapterFollow() || PresentAdapterHookPoint() == 2 || consumer == nullptr) {
+    // Render is a valid legacy alternate path; protocol plans have independent counts.
+    if (PresentAdapterStageProtocol() || !PresentAdapterFollow() ||
+        PresentAdapterHookPoint() == 2 || consumer == nullptr) {
         PresentAdapterConfiguration();
     } else {
         wchar_t ini[1024] = {};
@@ -294,7 +333,7 @@ static PresentCarrierResult PresentAdapterCarrier(bool verbose = true)
         Log("[present-adapter] SR module could not be retained: entry=%p error=%lu.", entry, GetLastError());
         return PCR_TRANSIENT;
     }
-    const MH_STATUS made = MH_CreateHook(entry, reinterpret_cast<void*>(&PresentAdapterSrHook), &g_present_sr_original);
+    const MH_STATUS made = MH_CreateHookPrologueExtended(entry, reinterpret_cast<void*>(&PresentAdapterSrHook), &g_present_sr_original);
     if (made != MH_OK) {
         Log("[present-adapter] SR hook creation failed: status=%d entry=%p.", static_cast<int>(made), entry);
         PresentCompatibilityIssue(PC_HOOK_INSTALL_FAILED, "The private SR carrier hook could not be installed.");
@@ -307,6 +346,12 @@ static PresentCarrierResult PresentAdapterCarrier(bool verbose = true)
         g_present_sr_original = nullptr;
         return PCR_FATAL;
     }
+    const auto origin = reinterpret_cast<uintptr_t>(entry);
+    const auto trampoline = reinterpret_cast<uintptr_t>(g_present_sr_original);
+    const auto distance = origin > trampoline ? origin - trampoline : trampoline - origin;
+    if (distance > 0x40000000ULL)
+        Log("[present-adapter] SR carrier used extended rel32 allocation: entry=%p trampoline=%p distance=%llu bytes.",
+            entry, g_present_sr_original, static_cast<unsigned long long>(distance));
     g_present_adapter.sr_hook = true;
     const unsigned previous = PresentCompatibilitySnapshot().code[1];
     if (previous == PC_SR_ENTRY_UNAVAILABLE || previous == PC_HOOK_INSTALL_FAILED) PresentCompatibilityIssue(PC_OK, "");
@@ -393,6 +438,10 @@ static void PresentAdapterFrame(reshade::api::effect_runtime* rt, reshade::api::
     if (in_frame) return;
     if (rt == nullptr || cmd == nullptr || rtv.handle == 0) return;
     if (PresentAdapterFgInput()) return;
+    if (PresentAdapterStageProtocol()) {
+        uint32_t plan = 0;
+        if (!PresentAdapterStagePlan(&plan) || ((plan >> 6) & 7u) == 0) return;
+    }
     device* dev = rt->get_device();
     if (dev == nullptr || dev->get_api() != device_api::vulkan) return;
     if (!TryEnterCriticalSection(&g_bridge_cs)) return;
@@ -514,11 +563,12 @@ static void PresentAdapterFrame(reshade::api::effect_runtime* rt, reshade::api::
     if (g_present_adapter.run_nr) {
         PresentAdapterWitness();
         g_present_nr_entries = g_present_sr_entries = g_present_sr_copies = 0;
-        g_present_nr_scope = true;
-        if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
-        ok = Synth12EvaluateShared(&params, 1000);
-        if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
-        g_present_nr_scope = false;
+        {
+            if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
+            PresentAdapterNrScope scope;
+            ok = Synth12EvaluateShared(&params, 1000);
+            if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
+        }
         nr_entries = g_present_nr_entries;
         sr_entries = g_present_sr_entries;
         sr_copies = g_present_sr_copies;

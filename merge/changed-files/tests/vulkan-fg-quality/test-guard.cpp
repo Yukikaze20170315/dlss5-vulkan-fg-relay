@@ -11,6 +11,16 @@ static void Check(bool ok, const char *why)
     else std::printf("ok: %s\n", why);
 }
 
+static void ReportForeground(const char *stage)
+{
+    const HWND window = GetForegroundWindow();
+    DWORD pid = 0;
+    GetWindowThreadProcessId(window, &pid);
+    wchar_t name[128] = {};
+    if (window != nullptr) GetClassNameW(window, name, _countof(name));
+    std::printf("foreground %s: hwnd=%p pid=%lu class=%ls\n", stage, static_cast<void *>(window), pid, name);
+}
+
 static volatile LONG pump_evaluates = 1;
 static DWORD WINAPI EvaluatePump(LPVOID)
 {
@@ -27,6 +37,20 @@ static void WriteIni(int on, int alpha)
     wchar_t v[16];
     swprintf_s(v, L"%d", on);    WritePrivateProfileStringW(L"Adapter", L"HoldComposition", v, path);
     swprintf_s(v, L"%d", alpha); WritePrivateProfileStringW(L"Adapter", L"HoldCompositionAlpha", v, path);
+}
+
+// nullptr removes the key, which leaves the default.
+static void WriteHideCapture(const wchar_t *value)
+{
+    wchar_t path[1024];
+    PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
+    WritePrivateProfileStringW(L"Adapter", L"HoldCompositionHideCapture", value, path);
+}
+
+static DWORD Affinity(HWND window)
+{
+    DWORD affinity = 0xFFFFFFFF;
+    return GetWindowDisplayAffinity(window, &affinity) ? affinity : 0xFFFFFFFF;
 }
 
 static HWND FindGuard()
@@ -85,6 +109,7 @@ static int Run()
         m0.left + 10, m0.top + 10, 1, 1, nullptr, nullptr, wc.hInstance, nullptr);
     Check(game != nullptr, "stand-in game window created");
     const HWND foreground_before = GetForegroundWindow();
+    ReportForeground("baseline");
 
     AcquireSRWLockExclusive(&g_focus_fg_lock);
     g_focus_fg_window.window = game;
@@ -114,8 +139,7 @@ static int Run()
     Check(GetWindowTextW(guard, title, _countof(title)) == 0, "empty title");
     BYTE alpha = 0; DWORD flags = 0;
     Check(GetLayeredWindowAttributes(guard, nullptr, &alpha, &flags) && (flags & LWA_ALPHA) && alpha == 1, "opacity 1/255");
-    DWORD affinity = 0;
-    Check(GetWindowDisplayAffinity(guard, &affinity) && affinity == WDA_EXCLUDEFROMCAPTURE, "excluded from screen capture");
+    Check(Affinity(guard) == WDA_NONE, "not excluded from screen capture by default");
     Check(GetForegroundWindow() == foreground_before, "foreground window unchanged");
     RECT gr; GetWindowRect(guard, &gr);
     Check(WindowFromPoint(POINT{ gr.left, gr.top }) != guard, "hit testing passes through the guard pixel");
@@ -125,6 +149,14 @@ static int Run()
     Sleep(1600);
     Check(GetLayeredWindowAttributes(guard, nullptr, &alpha, &flags) && alpha == 5, "opacity follows HoldCompositionAlpha live");
     WriteIni(1, 1);
+
+    WriteHideCapture(L"1");
+    Sleep(1600);
+    Check(Affinity(guard) == WDA_EXCLUDEFROMCAPTURE, "HoldCompositionHideCapture=1 excludes it from screen capture live");
+    WriteHideCapture(L"0");
+    Sleep(1600);
+    Check(Affinity(guard) == WDA_NONE, "HoldCompositionHideCapture=0 lets screen capture see it again live");
+    WriteHideCapture(nullptr);
 
     if (mons.n >= 2) {
         const RECT m1 = mons.r[1];
@@ -138,10 +170,13 @@ static int Run()
     InterlockedExchange(&pump_evaluates, 1);
     Check(WaitFor(true, 1500), "shown again when FG evaluates resume");
 
+    ReportForeground("before-minimize");
     ShowWindow(game, SW_SHOWMINNOACTIVE);
     Check(WaitFor(false, 1000), "hidden while the game window is minimized");
+    ReportForeground("after-minimize");
     ShowWindow(game, SW_SHOWNOACTIVATE);
     Check(WaitFor(true, 1500), "shown after restore");
+    ReportForeground("after-restore");
 
     InterlockedExchange(&g_focus_fg_enabled, 0);
     Check(WaitFor(false, 1000), "hidden when NR is not at the FG input");
@@ -153,6 +188,7 @@ static int Run()
     WriteIni(1, 1);
     Check(WaitFor(true, 2000), "HoldComposition=1 restores it live");
 
+    ReportForeground("final");
     Check(GetForegroundWindow() == foreground_before, "foreground window still unchanged at the end");
     DestroyWindow(game);
     Check(WaitFor(false, 1000), "hidden once the game window is gone");

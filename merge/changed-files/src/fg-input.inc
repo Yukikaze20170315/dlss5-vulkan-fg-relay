@@ -7,6 +7,8 @@
 static void FgGuideRequestReset();
 static bool FgRelayPrepareRelease();
 static bool FgRelayRecoveryReady();
+static void FgRelayObserveGroup(unsigned index, unsigned count, bool count_known);
+static bool FgRelayBlocksSerialFeed();
 
 struct FgComposite {
     ID3D12RootSignature *rs;
@@ -278,11 +280,12 @@ static bool FgInputWorker()
     unsigned nr_entries = 0, sr_entries = 0, sr_copies = 0;
     if (g_present_adapter.run_nr) {
         g_present_nr_entries = g_present_sr_entries = g_present_sr_copies = 0;
-        g_present_nr_scope = true;
-        if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
-        ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs);
-        if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
-        g_present_nr_scope = false;
+        {
+            if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
+            PresentAdapterNrScope scope;
+            ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs);
+            if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
+        }
         nr_entries = g_present_nr_entries; sr_entries = g_present_sr_entries; sr_copies = g_present_sr_copies;
         PresentCompatibilityFrame(ok, nr_entries, sr_entries, sr_copies);
         if (ok && (sr_entries != 1 || sr_copies != 1)) {
@@ -530,8 +533,15 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
         g_present_adapter.deadline = ULLONG_MAX;
         g_present_adapter.token = 1;
         g_s12.need_reset = true;
+        const int pipeline = PresentAdapterPipeline();
         Log("[fg-input] AutoRun: continuous NR at the frame-generation input; a request with frames=0 stops it. pipeline=%s",
-            PresentAdapterPipeline() == 1 ? "probe (NR concurrent, result discarded, picture carries no NR)" : "serial park");
+            pipeline == 1 ? "probe (NR concurrent, result discarded, picture carries no NR)" :
+            pipeline == 2 ? "GPU relay at the FG evaluate" :
+            pipeline == 3 ? "GPU relay at the game's present" : "serial park");
+        if (pipeline == 0)
+            Log("[fg-input] WARNING: Pipeline=0 (serial feed) is for diagnosis. The real frame is parked inside the FG "
+                "command buffer for the whole NR, so the generated frames reach the screen in bursts: a high frame "
+                "counter with uneven display. Set Pipeline=2 in vk-present-adapter.ini for normal use.");
     }
     if (g_present_adapter.remaining == 0 || g_present_adapter.refused) return;
     if (g_fg_input.census_left != 0) {
@@ -554,6 +564,11 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
     }
     unsigned index = 0;
     const bool indexed = FgInputReadU(p, "DLSSG.MultiFrameIndex", &index);
+    unsigned count = 0;
+    const bool count_known = FgInputReadU(p, "DLSSG.MultiFrameCount", &count);
+    // Observe every indexed callback so the relay can identify a completed
+    // native group. Interpolation callbacks still return directly to native FG.
+    if (indexed) FgRelayObserveGroup(index, count, count_known);
     if (indexed && index != 1) {
         InterlockedIncrement(&g_fg_input.eval_index_skipped);
         return;
@@ -574,6 +589,9 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
         // and the serial feed below runs as it always has.
         const int rel = FgRelayEvaluate(cmd_raw, p);
         if (rel != 0) return;
+        // A relay that stood down keeps its frames from the serial feed unless
+        // SerialFallback=1; until it reopens, FG interpolates the game's own frames.
+        if (FgRelayBlocksSerialFeed()) return;
     }
     if (g_vkm_rt == nullptr) return;
     reshade::api::device *rdev = g_vkm_rt->get_device();

@@ -3,6 +3,9 @@
 // (sr-fixture.rc). Built twice: as SR, and with /DRR_FIXTURE as Ray Reconstruction.
 #include <windows.h>
 
+#ifdef SR_LOW_FIXTURE
+#define NVSDK_NGX_D3D12_EvaluateFeature SrFixtureBody
+#endif
 extern "C" __declspec(dllexport) int NVSDK_NGX_D3D12_EvaluateFeature(void *list, void *handle, void *params, void *callback)
 {
     volatile int seen = 0;

@@ -1,0 +1,8 @@
+Rebuild of renodx-dlss5.addon64 on 2026-10-05 06:35 +0800: tree ItsTheSewerRat/renodx 7b6ff8f with src/addons/dlss5 at the source of the tested build; all 96 files of that source have the same Git blob IDs as branch rc10-stages1 (c3dc63c).
+tested build : ccaecb3559cc4ba3b42c2ffebedf5c655914945a9c2488237e9c3d5dd1a95f7c  FileVersion 0.2026.1004.1906
+rebuild      : 87ca12bb83b6a4a2af6bfb165e6992c826d653d3378c481c591bb5ccc4cccb6d  FileVersion 0.2026.1004.2233
+size equal: 3159040 bytes each; 10 bytes differ:
+  0x110-0x111    PE header TimeDateStamp
+  0x2c2dc4-0x2c2dc5 debug directory TimeDateStamp (.rdata)
+  0x2f86d4-0x2f86d5 and 0x2f87c4-0x2f87ca version resource: build time HHMM (CMake TIMESTAMP fallback)
+No byte in .text or other .rdata/.data differs.

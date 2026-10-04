@@ -84,7 +84,9 @@ def validate_logs(result: dict, nr: str, bridge: str) -> dict:
                                                for s in grouped[t]) for t in (3, 4)),
         'sample_timings_valid': bool(samples) and all(math.isfinite(s[k]) and s[k] >= 0
                                                       for s in samples for k in ('cpu_ms', 'input_wait_ms')),
-        'author_two_pass_success': bool(re.search(r'inline feature 18 evaluation succeeded[^\r\n]*2 stack pass\(es\)', nr)),
+        # 8.5.0-rc10 logs "2 stack pass(es)"; the stage-protocol build logs the carrier's stage and count.
+        'author_two_pass_success': bool(re.search(
+            r'inline feature 18 evaluation succeeded[^\r\n]*(?:2 stack pass\(es\)|stage=present requested=2 )', nr)),
         'fixed_input_workset_stable': created == 1,
         'no_adapter_processing_failure': not failures,
     }

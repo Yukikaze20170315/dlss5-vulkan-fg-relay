@@ -1,0 +1,9 @@
+GENERIC registered module=00007FFBC6A90000 thread=58636 count=1
+BRIDGE pinned Generic thread=71124
+INSTANCE created=0000000000655B00 result=0 registered=1
+BEFORE destroy registered=1 acquisitions=0 gated=0
+AFTER destroy registered=1 module=00007FFBC6A90000
+PINNED Generic stays loaded and registered across the instance cycle
+N/A late-ref: a pinned stage-protocol Generic never registers again; run late-ref with a Generic that has no stage protocol
+
+exit_code=15 expected=12 -> NOT APPLICABLE

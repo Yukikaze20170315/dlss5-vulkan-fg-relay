@@ -1,11 +1,14 @@
 """Run the Vulkan adapter's Source=present path in an isolated, off-screen host.
 
 Requires an assets directory holding the third-party files this repository does
-not ship: renodx-dlss5.addon64 (Generic 8.5.0-rc10), nvngx_dlss.dll,
-nvngx_dlssnr.dll, optionally nvngx_dlssd.dll (for --with-rr-module), plus a
-ReShade.ini with a [RenoDX.DLSS5] section (EnableHooks=1, NRHookPoint=0,
-NRSourceEncoding=0) and a TestPreset.ini. ReShade 6.8 must be installed as the
-VK_LAYER_reshade layer. Exit 0 means the bounded transport/NR/workset checks in
+not ship: renodx-dlss5.addon64 (Generic 8.5.0-rc10 or 8.5.0-rc10-stages1),
+nvngx_dlss.dll, nvngx_dlssnr.dll, optionally nvngx_dlssd.dll (for
+--with-rr-module), plus a ReShade.ini with a [RenoDX.DLSS5] section
+(EnableHooks=1, NRHookPoint=0, NRSourceEncoding=0) and a TestPreset.ini.
+ReShade 6.8 must be installed as the VK_LAYER_reshade layer. With the
+stage-protocol Generic the run adds an explicit stage plan (--stage-plan,
+default Render 0 / Upscaled 0 / Present 2), because the carrier serves only the
+Present layers. Exit 0 means the bounded transport/NR/workset checks in
 validate-roundtrip.py passed; it says nothing about game quality or FG coverage.
 """
 import argparse
@@ -21,7 +24,11 @@ from pathlib import Path
 
 validate = runpy.run_path(str(Path(__file__).with_name('validate-roundtrip.py')))['validate']
 
-GENERIC_SHA256 = 'dcd93881e976ad033d83c2bb01f4bc3e4ddc59c15fe0dd4ca165bc5fc7d1ac68'
+# The Generic binaries this test is written for. The stage-protocol build needs a plan.
+GENERIC_BUILDS = {
+    'dcd93881e976ad033d83c2bb01f4bc3e4ddc59c15fe0dd4ca165bc5fc7d1ac68': ('8.5.0-rc10', False),
+    'ccaecb3559cc4ba3b42c2ffebedf5c655914945a9c2488237e9c3d5dd1a95f7c': ('8.5.0-rc10-stages1', True),
+}
 
 
 def digest(path: Path) -> str:
@@ -38,6 +45,8 @@ def main() -> int:
     parser.add_argument('--with-rr-module', action='store_true', help='also load nvngx_dlssd.dll as a game process does')
     parser.add_argument('--source-encoding', type=int, choices=(0, 1), default=0)
     parser.add_argument('--hook-point', type=int, choices=(0, 1, 2), default=0)
+    parser.add_argument('--stage-plan', default='0,0,2',
+                        help='Render,Upscaled,Present layer counts for the stage-protocol Generic (Present must be 2)')
     args = parser.parse_args()
     if args.full_resolution:
         processes = subprocess.run(['tasklist.exe', '/FI', 'IMAGENAME eq Endfield.exe', '/FO', 'CSV', '/NH'],
@@ -68,13 +77,24 @@ def main() -> int:
         if digest(target) != expected:
             raise RuntimeError(f'Copy verification failed: {name}')
         identities[name] = {'source': str(original), 'sha256': expected}
-    if identities['renodx-dlss5.addon64']['sha256'] != GENERIC_SHA256:
-        raise RuntimeError('The isolated test requires the unmodified Generic 8.5.0-rc10 binary')
+    generic = GENERIC_BUILDS.get(identities['renodx-dlss5.addon64']['sha256'])
+    if generic is None:
+        raise RuntimeError('The isolated test requires Generic 8.5.0-rc10 or 8.5.0-rc10-stages1, unmodified')
+    generic_name, stage_protocol = generic
+    stage_plan = [int(v) for v in args.stage_plan.split(',')] if stage_protocol else None
+    if stage_plan is not None and (len(stage_plan) != 3 or stage_plan[2] != 2
+                                   or not all(0 <= v <= 4 for v in stage_plan)):
+        parser.error('--stage-plan must be three counts 0-4 with Present=2 (the validator expects two NR passes)')
     ini = (assets / 'ReShade.ini').read_text(encoding='utf-8-sig')
     for key, value in (('NRSourceEncoding', args.source_encoding), ('NRHookPoint', args.hook_point)):
         if ini.count(f'{key}=0') != 1:
             raise RuntimeError(f'Expected exactly one baseline {key}=0 setting in the assets ReShade.ini')
         ini = ini.replace(f'{key}=0', f'{key}={value}')
+    if stage_plan is not None:
+        if ini.count('[RenoDX.DLSS5]\n') != 1 or 'NRPresentPasses=' in ini:
+            raise RuntimeError('Expected one [RenoDX.DLSS5] section without a stage plan in the assets ReShade.ini')
+        ini = ini.replace('[RenoDX.DLSS5]\n', '[RenoDX.DLSS5]\nNRRenderPasses=%d\nNRUpscaledPasses=%d\nNRPresentPasses=%d\n'
+                          % tuple(stage_plan))
     (directory / 'ReShade.ini').write_text(ini, encoding='utf-8')
     (directory / 'dlss5-bridge.cfg').write_text('# dlss5-bridge keep\nmode=2\nstage=3\nunwrap=1\nvk_mirror=1\nsynth=0\n', encoding='ascii')
     (directory / 'vk-present-adapter.ini').write_text('[Adapter]\nEnabled=1\n', encoding='ascii')
@@ -99,7 +119,7 @@ def main() -> int:
     }
     parameters = {
         'hdr': args.hdr, 'source_encoding': args.source_encoding, 'rr_module_loaded': args.with_rr_module,
-        'nr_hook_point': args.hook_point,
+        'nr_hook_point': args.hook_point, 'generic_build': generic_name, 'stage_plan': stage_plan,
         'requested_extent': [5120, 2160] if args.full_resolution else [800, 600],
         'fixture': 'gray-colour-stripes-v1',
         'roi_extent': [16, 16], 'roi_offset_from_bottom_right': [-48, -48],

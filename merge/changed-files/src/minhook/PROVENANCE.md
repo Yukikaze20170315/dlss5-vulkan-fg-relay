@@ -1,0 +1,39 @@
+# Vendored MinHook
+
+The hook engine, buffer allocator and trampoline builder match
+[m417z/minhook at 4f18d1809a81e6c700bcc4a21aeb43ade72bbf8b](https://github.com/m417z/minhook/tree/4f18d1809a81e6c700bcc4a21aeb43ade72bbf8b),
+with these local differences (ignoring UTF-8 BOMs and line endings):
+
+- `hook.c`: `TEXT("ntdll.dll")` works in both ANSI and Unicode builds; added
+  `MH_RetireHook` / `MH_RetireHookEx` remove records for unmapped targets without
+  touching target memory or freeing executable buffers. Those buffers remain
+  allocated until process exit in the bridge. Retirement runs outside loader notifications.
+- `hook.c`: on `WAIT_ABANDONED`, release the mutex ownership granted by Windows
+  before returning `MH_ERROR_MUTEX_FAILURE`. All guarded APIs use the same helper.
+- `buffer.c` / `hook.c` / `MinHook.h`: the SR carrier alone opts into
+  `MH_CreateHookPrologueExtended`, retaining ±1 GiB allocation first and trying
+  ±0x7FFF0000 only when that fails. The wider path requires the live five-byte
+  `mov [rsp+8], rbx` prologue at creation and again under thread freeze at enable;
+  it rejects existing jumps that might hide a different underlying prologue.
+  Ordinary hooks keep the original range and the five-byte E9 chain ABI.
+- `trampoline.c` / `hook.c`: reject out-of-range RIP-relative relocation and
+  relay jump displacements instead of truncating them to 32 bits.
+- `MinHook.h`: declarations/documentation for retirement; omitted an upstream
+  comment about a possible future thread-freeze method.
+- `src/hde/*`: the complete HDE directory instead matches
+  [TsudaKageyu/minhook v1.3.4, c3fcafdc10146beb5919319d0683e44e3c30d537](https://github.com/TsudaKageyu/minhook/tree/c3fcafdc10146beb5919319d0683e44e3c30d537/src/hde).
+  Its decoder is used as a consistent set; no newer m417z decoder changes are mixed in.
+
+The bridge uses the default documented thread enumeration method. It does not
+enable the optional `NtGetNextThread` optimization. This integration makes no
+claim of improved FPS or universal compatibility with third-party detours.
+
+`tests/build-module-lifetime-test.cmd` tests two independently loaded copies of
+this engine on the same target and removes them in both orders. The hook tests
+also cover concurrent forwarding, retirement and address reuse.
+
+Original licensing is retained in `LICENSE.txt` and `AUTHORS.txt`.
+
+Security review on 2026-09-13 corrected the reference above from the upstream
+master commit to the multihook commit actually matching the vendored engine.
+This corrects the documentation only; the shipped source and binary are unchanged.

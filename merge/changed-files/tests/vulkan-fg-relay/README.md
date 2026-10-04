@@ -10,7 +10,7 @@ DLSS-G evaluate.
 | --- | --- | --- | --- |
 | CPU contracts of the observers and hooks (whole add-on source compiled in) | MSVC | `test-fg-trace.cmd <new-dir>` | `PASS: checks=7382 failures=0` |
 | `ngx-module-scan.h` against the real Windows loader | MSVC | `scan\build-scan-test.cmd <new-dir>` then `<new-dir>\scan-test.exe` | `PASS scan-test: 20705 assertions` |
-| Add-on unload/reload with the real ReShade and Generic | MSVC, `VULKAN_SDK`, ReShade 6.8 at `C:\ProgramData\ReShade\ReShade64.dll`, `renodx-dlss5.addon64` (8.5.0-rc10) | `lifetime\build.cmd`, then `python lifetime\run-lifetime.py <new-dir> --mode stable --bridge <addon> --generic <renodx-dlss5.addon64>` (also `control`, `late-ref`; `race` with an older bridge) | last line `PASS` |
+| Add-on unload/reload with the real ReShade and Generic | MSVC, `VULKAN_SDK`, ReShade 6.8 at `C:\ProgramData\ReShade\ReShade64.dll`, `renodx-dlss5.addon64` (8.5.0-rc10 or 8.5.0-rc10-stages1) | `lifetime\build.cmd`, then `python lifetime\run-lifetime.py <new-dir> --mode stable --bridge <addon> --generic <renodx-dlss5.addon64>` (also `control`, `late-ref`; `race` with an older bridge) | last line `PASS`. With 8.5.0-rc10-stages1 the host also prints `PINNED`: the bridge pins a Generic that has the stage protocol, and ReShade keeps it registered across the instance cycle. `late-ref` needs 8.5.0-rc10 and reports `NOT APPLICABLE` with stages1 |
 | Device-extension injection and both shared-fence directions | MSVC, `VULKAN_SDK`, NVIDIA GPU, ReShade 6.8 as `VK_LAYER_reshade` | `inject\build.cmd`, then `python inject\run-injection-probe.py <new-dir> --bridge <addon>` | `exit_code=0` |
 
 `inject\template\` holds the small ReShade/bridge configuration files the probe

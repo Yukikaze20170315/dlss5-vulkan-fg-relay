@@ -6,7 +6,10 @@
 // calling FG, and NR runs only inside FG -- the visible "NR off" flash
 // (measured 2026-10-01 in Arknights: Endfield with PresentMon and the [fg-transition] log).
 // The window belongs to this process: no taskbar, Alt+Tab, tray or separate
-// Task Manager entry, and it is excluded from screen capture where Windows allows.
+// Task Manager entry. It is not excluded from screen capture by default: while it
+// carried WDA_EXCLUDEFROMCAPTURE, the NVIDIA overlay refused to take screenshots of
+// the game and reported a protected application blocking desktop recording
+// (2026-10-02, Endfield). HoldCompositionHideCapture=1 restores the exclusion.
 
 #ifndef WDA_EXCLUDEFROMCAPTURE
 #define WDA_EXCLUDEFROMCAPTURE 0x00000011
@@ -16,14 +19,14 @@ struct CompositionGuardConfig { bool on; BYTE alpha; bool hide_capture; };
 
 static CompositionGuardConfig CompositionGuardReadConfig()
 {
-    CompositionGuardConfig c = { true, 1, true };
+    CompositionGuardConfig c = { true, 1, false };
     wchar_t path[1024] = {};
     PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
     if (path[0] == 0) return c;
     c.on = GetPrivateProfileIntW(L"Adapter", L"HoldComposition", 1, path) == 1;
     const UINT alpha = GetPrivateProfileIntW(L"Adapter", L"HoldCompositionAlpha", 1, path);
     c.alpha = static_cast<BYTE>(alpha < 1 ? 1 : (alpha > 255 ? 255 : alpha));
-    c.hide_capture = GetPrivateProfileIntW(L"Adapter", L"HoldCompositionHideCapture", 1, path) == 1;
+    c.hide_capture = GetPrivateProfileIntW(L"Adapter", L"HoldCompositionHideCapture", 0, path) == 1;
     return c;
 }
 

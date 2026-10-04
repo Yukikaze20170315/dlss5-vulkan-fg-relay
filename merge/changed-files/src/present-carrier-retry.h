@@ -34,8 +34,7 @@ static bool PresentCarrierRetryAfterFailure(PresentCarrierRetry &retry, PresentC
     return true;
 }
 
-// MinHook status 9 (MH_ERROR_MEMORY_ALLOC): no free block within +-1 GB of the
-// target at this moment. Address space near the target can be released later.
+// Allocation can recover when reachable address space becomes available.
 static PresentCarrierResult PresentCarrierHookStatusResult(int minhook_status)
 {
     return minhook_status == 9 ? PCR_TRANSIENT : PCR_FATAL;

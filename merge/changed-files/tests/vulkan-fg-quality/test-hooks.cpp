@@ -52,6 +52,54 @@ static void CheckTransitionObservation()
     Check(p.reset == 1 && p.writes == 0, "post-evaluate observation leaves parameter block untouched");
     g_cfg.stage = 0;
 }
+static void CheckRelayGroupState()
+{
+    g_fgr.group = {};
+    FgRelayObserveGroup(1, 5, true);
+    Check(g_fgr.group.valid && g_fgr.group.serial == 1 && g_fgr.group.phase == 1 &&
+              g_fgr.group.count == 5 && g_fgr.group.terminal_serial == 0,
+          "group observation starts a fresh native MFG group");
+    FgRelayObserveGroup(2, 5, true);
+    FgRelayObserveGroup(3, 5, true);
+    FgRelayObserveGroup(4, 5, true);
+    FgRelayObserveGroup(5, 5, true);
+    Check(g_fgr.group.valid && g_fgr.group.phase == 5 &&
+              g_fgr.group.terminal_serial == g_fgr.group.serial,
+          "group observation publishes completion only at the terminal index");
+    FgRelayPublishGroupRelease(g_fgr.group.serial, 17);
+    Check(g_fgr.group.released_serial == g_fgr.group.serial && g_fgr.group.released_nr == 17,
+          "successful release binds its NR value to the completed group");
+    FgrLock();
+    const bool first_claim = FgRelayClaimCompletedGroupLocked(g_fgr.group);
+    const bool second_claim = FgRelayClaimCompletedGroupLocked(g_fgr.group);
+    FgrUnlock();
+    Check(first_claim && !second_claim,
+          "a completed group permits exactly one shared gate claim");
+    FgRelayObserveGroup(1, 5, true);
+    Check(g_fgr.group.serial == 2 && g_fgr.group.phase == 1 && g_fgr.group.terminal_serial == 0,
+          "a new group does not inherit the prior terminal marker");
+    Check(g_fgr.group.released_serial == 0 && g_fgr.group.released_nr == 0 &&
+              g_fgr.group.gate_attempted_serial == 0,
+          "a new group clears the prior release and gate claim");
+    FgRelayObserveGroup(2, 5, true);
+    FgRelayObserveGroup(3, 5, true);
+    FgRelayObserveGroup(4, 5, true);
+    FgRelayObserveGroup(5, 5, true);
+    FgrLock();
+    const bool stale_claim = FgRelayClaimCompletedGroupLocked(g_fgr.group);
+    FgrUnlock();
+    Check(!stale_claim, "an unreleased completed group cannot claim the prior fence");
+    FgRelayObserveGroup(1, 5, true);
+    FgRelayObserveGroup(3, 5, true);
+    Check(!g_fgr.group.valid && g_fgr.group.terminal_serial == 0,
+          "out-of-order group members invalidate the partial group");
+    FgRelayObserveGroup(1, 0, true);
+    Check(!g_fgr.group.valid && g_fgr.group.phase == 0,
+          "zero group count is rejected");
+    FgRelayObserveGroup(1, 5, false);
+    Check(!g_fgr.group.valid && g_fgr.group.phase == 0,
+          "unknown group count is rejected");
+}
 static NVSDK_NGX_Result CreateLeaf(void *, void *, int, NVSDK_NGX_Parameter *, NVSDK_NGX_Handle **out)
 {
     ++creates;
@@ -143,6 +191,7 @@ int main()
     Check(PresentAdapterRelay() && g_cfg.stage < 2, "CPU fixture tests relay lifecycle without GPU processing");
     FgRelayInit();
     CheckTransitionObservation();
+    CheckRelayGroupState();
     CheckEmptyRuntimeRestart("cold startup with repeated runtime replacement");
     g_layer_count = 2;
     g_layer[0].mod = reinterpret_cast<HMODULE>(Ptr(0x300000));

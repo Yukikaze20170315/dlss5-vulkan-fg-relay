@@ -1,0 +1,11 @@
+GENERIC registered module=00007FFBC6A90000 thread=48984 count=1
+BRIDGE pinned Generic thread=50068
+INSTANCE created=0000000000566270 result=0 registered=1
+BEFORE destroy registered=1 acquisitions=0 gated=0
+AFTER destroy registered=1 module=00007FFBC6A90000
+PINNED Generic stays loaded and registered across the instance cycle
+INSTANCE created=0000000000566270 result=0 registered=1
+VERDICT stable=1 pinned=1 registrations=1 acquisitions=0 registered=1 control=0
+FINAL cleanup=1 acquisitions=0
+
+exit_code=0 expected=0 -> PASS

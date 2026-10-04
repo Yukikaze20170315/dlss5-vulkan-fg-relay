@@ -1,7 +1,7 @@
 # Install guide / 安装教程
 
-**DLSS 5 neural rendering for Arknights: Endfield (Vulkan), build `vk-fgrelay-20261002`**
-**《明日方舟：终末地》Vulkan 版 DLSS 5 神经渲染，版本 `vk-fgrelay-20261002`**
+**DLSS 5 neural rendering for Arknights: Endfield (Vulkan), build `vk-fgrelay-20261005`**
+**《明日方舟：终末地》Vulkan 版 DLSS 5 神经渲染，版本 `vk-fgrelay-20261005`**
 
 ## What this does / 这是什么
 
@@ -67,7 +67,7 @@ On the GitHub pages (downloads 2 to 5), scroll down to "Assets" and click the fi
 | 1 | ReShade 6.8.0 with full add-on support / 带完整插件支持的 ReShade 6.8.0 | https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe (the same file as the button "Download ReShade 6.8.0 with full add-on support" on https://reshade.me / 与 https://reshade.me 上 “Download ReShade 6.8.0 with full add-on support” 按钮是同一个文件) | `ReShade_Setup_6.8.0_Addon.exe` (the installer / 安装程序) |
 | 2 | Generic 8.5.0-rc10 | https://github.com/RankFTW/rhi-repo/releases/tag/renodx-dlss5-8.5.0-rc10 → `renodx-dlss5_8.5.0-rc10.zip` | `renodx-dlss5.addon64` |
 | 3 | NR runtime 310.8.0 / 神经渲染运行库 310.8.0 | https://github.com/RankFTW/rhi-repo/releases/tag/dlssnr-310.8.0 → `nvngx_dlssnr_310.8.0.zip` | `nvngx_dlssnr.dll` |
-| 4 | This add-on / 本插件 | https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/releases/tag/vk-fgrelay-20261002 → `dlss5-bridge-vk-fgrelay-20261002.zip` | `dlss5-bridge.addon64`, `vk-present-adapter.ini` |
+| 4 | This add-on / 本插件 | https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/releases/tag/vk-fgrelay-20261005 → `dlss5-bridge-vk-fgrelay-20261005.zip` | `dlss5-bridge.addon64`, `renodx-dlss5.addon64`, `vk-present-adapter.ini` |
 | 5 | Optional: EndfieldFGSwitch / 可选：EndfieldFGSwitch | Same page as download 4 → `EndfieldFGSwitch.exe` / 与第 4 项同一页面 → `EndfieldFGSwitch.exe` | `EndfieldFGSwitch.exe` (one file, nothing to extract / 单个文件，无需解压) |
 
 Downloads 2 and 3 are hosted by the RHI project; you do not need to install the RHI program. This package was tested with exactly these versions; the links above always give these versions, even after newer ones come out.

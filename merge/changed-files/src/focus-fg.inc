@@ -194,9 +194,14 @@ static void FocusFgMaintenance()
         state.next_poll = now + 1000;
         wchar_t path[1024] = {};
         PresentAdapterPath(path, _countof(path), L"ReShade.ini");
+        // A stage-protocol Generic selects the FG-input feed by its Present layer
+        // count; NRHookPoint is only its legacy single-point setting.
+        uint32_t plan = 0;
+        const bool present_selected = PresentAdapterStagePlan(&plan)
+            ? ((plan >> 6) & 7u) != 0
+            : GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint", -1, path) == 2;
         const bool enabled = GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NeuralUplift", 0, path) == 1 &&
-            GetPrivateProfileIntW(L"RenoDX.DLSS5", L"EnableHooks", 0, path) == 1 &&
-            GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint", -1, path) == 2;
+            GetPrivateProfileIntW(L"RenoDX.DLSS5", L"EnableHooks", 0, path) == 1 && present_selected;
         InterlockedExchange(&g_focus_fg_enabled, enabled ? 1 : 0);
         if (enabled) CompositionGuardStart();
         static unsigned report_count;

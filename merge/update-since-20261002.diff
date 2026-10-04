@@ -1,0 +1,2263 @@
+diff --git a/VULKAN-FG-INPUT-NR.md b/VULKAN-FG-INPUT-NR.md
+index 6cb8b8e..db40764 100644
+--- a/VULKAN-FG-INPUT-NR.md
++++ b/VULKAN-FG-INPUT-NR.md
+@@ -5,8 +5,10 @@ Status: verified in one title (Arknights: Endfield, Vulkan, RTX 5090, Generic
+ 5120x2160, native DLSS-G fixed 6x and DLAA; the 2026-10-01 update was verified
+ with the game's own 4x, every DLSS Super Resolution mode, several output
+ resolutions, fullscreen and windowed; the 2026-10-02 build was run with
+-Streamline 2.14.1 and with the game's own Streamline 2.10.3. Not yet tested
+-with other Vulkan games, HDR swapchains, or without native Frame Generation.
++Streamline 2.14.1 and with the game's own Streamline 2.10.3; the 2026-10-05
++update was measured with 5120x2160, two NR layers (one Upscaled, one Present)
++and 6x. Not yet tested with other Vulkan games, HDR swapchains, or without
++native Frame Generation.
+ 
+ Two stages are described here:
+ 
+@@ -18,6 +20,83 @@ Two stages are described here:
+   the GPU; the game is held at the start of its frame so frames do not queue in
+   front of the neural pass.
+ 
++## Update 2026-10-05
++
++Four changes in the bridge. They come with a Generic build that chooses NR
++layers per stage, 8.5.0-rc10-stages1, which is published as source in
++PEQHUB/RenoDX-DLSS5-Generic (branch `rc10-stages1`).
++
++1. **GPU relay by default.** An absent `Pipeline` key used to select the
++   serial feed. A configuration that had lost the key, or an install script
++   that wrote `Pipeline=0`, then produced a high frame counter with uneven
++   display. Measured in Arknights: Endfield (5120x2160, two NR layers, 6x,
++   120 Hz, PresentMon, first 3 s dropped):
++
++   | | serial feed | relay, throttle of the 2026-10-04 test build | **relay, this throttle** |
++   | --- | --- | --- | --- |
++   | presents / s | 121.2 | 126.9 | **120.7** |
++   | displayed / s | 88.3 | 112.4 | **108.4** |
++   | real frames / s | 20.2 | 21.2 | **20.1** |
++   | present interval p95 / max (ms) | 17.9 / 19.1 | 8.8 / 59.7 | **8.9 / 11.1** |
++   | display intervals >= 25 ms | 0.53 % | 0.23 % | **0 %** |
++   | PC latency p50 / p95 (ms) | 119.5 / 147.5 | 218.6 / 246.2 | **161.9 / 184.6** |
++
++   In the serial feed every sixth present interval was 17.6 ms, and two
++   presents came 0.26 ms apart, so the compositor showed only the second.
++   `Pipeline` now defaults to 2 and `Import` to 1; `Pipeline=0` still works
++   for diagnosis and the log warns. When the relay stands down, NR at the FG
++   input pauses (frame generation keeps the game's own frames), the private
++   session is rebuilt and the relay is retried, up to 3 times per process.
++   It no longer switches to the serial feed; `SerialFallback=1` restores that.
++2. **Throttle.** The 2026-10-04 test build waited for a completed native FG
++   group. With the relay, Streamline issues indices 2..N right before the next
++   group starts, so that gate almost never held the game (middle column). The
++   throttle again waits after `slReflexSleep` for the newest NR value whose
++   Signal is already on the private queue, never for one that is armed but
++   not queued. Each wait is bounded to 250 ms (two NR layers came close to the
++   old 100 ms bound: process maximum 99.3 ms). Five timeouts in a row stand
++   the throttle down for 5 s, then it re-arms itself; before, it stayed off
++   for the process. The relay records the native FG group in the rate log
++   for diagnosis only.
++3. **Stage protocol v1.** A Generic that exports
++   `DLSS5StageProtocolVersion()` returning 1 and `DLSS5GetStagePlan()`
++   chooses 0-4 NR layers each for Render, Upscaled and Present (9 bits). With
++   it, the bridge serves only the Present layers, and only when their count
++   is not 0. Render and Upscaled run inside Generic on the game's own Vulkan
++   evaluate, and the bridge no longer mirrors the game's SR evaluate. The
++   bridge freezes the plan for each carrier evaluate and exports
++   `DLSS5BridgeActiveStagePlan()`; bit 31 tells Generic that the call is the
++   carrier, so it runs the Present layers of that plan only. An invalid plan
++   (reserved bits, a count above 4) pauses the carrier. The focus gate and
++   the composition guard follow the Present count. The bridge never hooks
++   `nvngx_dlssnr.dll`, so Generic's NR calls keep their own caller. Once the
++   bridge has found the plan query, it pins Generic (the module stays loaded
++   until the process exits), so the cached query cannot outlive it. A
++   Generic without these exports keeps the `NRHookPoint` behaviour.
++4. **Composition guard visible to screen capture by default.** While the
++   guard window was excluded from capture (`WDA_EXCLUDEFROMCAPTURE`), the
++   NVIDIA overlay refused to take screenshots of the game and reported a
++   protected application. `HoldCompositionHideCapture` now defaults to 0;
++   1 restores the exclusion. The guard still keeps DWM composing the
++   game's monitor.
++
++Also: the SR carrier hook may use a wider allocation range. In one session it
++failed 30 times in a row with MinHook status 9 (no free 4 KiB block within
+++-1 GiB of the SR entry). `MH_CreateHookPrologueExtended`, for the SR carrier
++only, tries +-1 GiB first and then +-0x7FFF0000, and only for the exact
++five-byte `mov [rsp+8], rbx` prologue, which is checked again under thread
++freeze at enable. RIP-relative displacements that do not fit are refused
++instead of truncated. `Trace=1` adds a bounded observer of the FG command
++buffer's submits (diagnostics only). `vk-present-adapter.ini.example` lists
++every key with its current default.
++
++The measurements in the table were taken with bridge and Generic test builds
++whose code equals the published builds except for diagnostic-only code removed
++before release: a read-only count of DLSS-G's `OutputDisableInterpolation`
++(the bridge read a resource pointer as a flag, so the count was meaningless),
++and an unused Generic encode variant. Fix 4 was confirmed in the game on
++2026-10-02.
++
+ ## Update 2026-10-01
+ 
+ Six problems found after the 2026-09-29 release, all in the bridge:
+@@ -366,14 +445,17 @@ Source=fg-input
+ Follow=1
+ Pipeline=2
+ Import=1
+-Trace=0
+ ; Throttle=1 is the default
+-; FocusKeepFG=1 and HoldComposition=1 are the defaults (2026-10-01)
++Trace=0
++; HoldComposition=1, HoldCompositionHideCapture=0, FocusKeepFG=1 are defaults (2026-10-01/05)
++; SerialFallback=0 is the default (2026-10-05)
+ ```
+ 
+ With `Follow=1`, Generic's own hook-point control is the switch: **Present** runs
+ this feed, **Upscaled/Render** keep the existing Vulkan mirror; the session is
+-handed over on the render thread.
++handed over on the render thread. With a stage-protocol Generic (8.5.0-rc10-stages1
++and later), `Follow=1` is still respected but the switch is Generic's Present count
++rather than the hook-point setting, and Render/Upscaled run inside Generic regardless.
+ 
+ ## Files
+ 
+@@ -385,7 +467,7 @@ handed over on the render thread.
+ | `src/ngx-module-scan.h` | Export-table pre-check before a module is referenced. |
+ | `src/fg-composite-shader.h` | UI-preserving composite (cs_5_0). |
+ | `src/present-adapter.inc` | Identity-carrier hook on the SR runtime, NR entry witness, configuration checks, the reference present-stream feed. |
+-| `src/present-adapter-config.h` | `vk-present-adapter.ini` keys: `Enabled`, `Source`, `Follow`, `AutoRun`, `Pipeline`, `Import`, `Throttle`, `Trace`. |
++| `src/present-adapter-config.h` | `vk-present-adapter.ini` keys: `Enabled`, `Source`, `Follow`, `AutoRun`, `Pipeline`, `Import`, `Throttle`, `Trace`, `HoldComposition`, `HoldCompositionAlpha`, `HoldCompositionHideCapture`, `FocusKeepFG`, `SerialFallback`. Stage protocol v1: `PresentAdapterStageQuery()`, `PresentAdapterStageProtocol()`, `PresentAdapterStagePlan()`. |
+ | `src/present-nr-witness.asm` | Tail-forwarding thunks that preserve the four arguments and the caller's return address. |
+ | `src/vkmirror.inc` | Worker dispatch (relay first, then `fg_arm`), FG handle tracking, mirror/feed arbitration. |
+ | `src/synth.inc`, `src/bridge.inc`, `src/bridge.h` | sRGB path in the colour pass, submission without a CPU completion wait for the relay, fence-completion proofs, resource retention when completion is unproven. |
+@@ -411,7 +493,8 @@ handed over on the render thread.
+ | `tests/vulkan-fg-relay/scan/` | 20705 assertions of `ngx-module-scan.h` against the real Windows loader: non-candidates, near-miss names, every interface pairing, 20 unload/reload cycles, loader-lock contention, forwarded exports. |
+ | `tests/vulkan-fg-relay/lifetime/` | Real ReShade 6.8 + real Generic, two Vulkan instances: `race` reproduces the Generic unregistration with an older bridge, `stable` / `control` pass, `late-ref` must fail with exit 12. |
+ | `tests/vulkan-fg-relay/inject/` | A device created without the extension gets it through the hook; D3D12 Signal -> Vulkan timeline value, and D3D12 Signal -> `vkWaitSemaphores`, both pass. |
+-| `tests/vulkan-fg-quality/run.cmd SUITE <new-dir>` | 2026-10-01 suites: `registry` (handle table, 188780 checks), `guides` (57), `hooks` (production NGX wrappers, 535), `colour` (sub-rectangle copies, 39), `recovery` (real D3D12 marker, 34), `compatibility` (26), `guard` (real Win32 windows, 28), `focus <sl.dlss_g.dll>` (512 guard combinations and the disk contract), `gpu` (real Vulkan compute scaling; needs `VULKAN_SDK`). 2026-10-02: `carrier` (49), and `racehelper`, which only builds the test-only in-game race add-on. |
++| `tests/vulkan-fg-quality/run.cmd SUITE <new-dir>` | 2026-10-01 suites: `registry` (handle table, 188780 checks), `guides` (57), `hooks` (production NGX wrappers, 545), `colour` (sub-rectangle copies, 39), `recovery` (real D3D12 marker, 34), `compatibility` (26), `guard` (real Win32 windows, 30), `focus <sl.dlss_g.dll>` (512 guard combinations and the disk contract), `gpu` (real Vulkan compute scaling; needs `VULKAN_SDK`). 2026-10-02: `carrier` (49), `carrier-range` (crowded MinHook range, 19), `minhook-range` (global range safety, 34), and `racehelper`, which only builds the test-only in-game race add-on. |
++| `tests/stage-protocol/` | 125 legal and 391 invalid plans (all Pipeline 2/3 and Follow 0/1 combinations) compiled from the production bridge scope and configuration; validates `DLSS5StageProtocolVersion`, `DLSS5BridgeActiveStagePlan`, plan-freeze, bit-31 carrier flag and zero-count gating. `test-focus` stubs the plan query. |
+ 
+ The relay's arm/copy/park/release chain has no offline host: it needs a real
+ DLSS-G evaluate. It was validated in the game (below).
+@@ -448,7 +531,10 @@ scenes are not guaranteed to be identical.
+ * UNORM8 sRGB FG inputs only; other formats are refused with a log line and the
+   game keeps its own image. The valid regions of the HUD-less image and the back
+   buffer must have the same size. The game must supply `DLSSG.HUDLess`.
+-* Any Generic build is tried; only 8.5.0-rc10 has been verified.
++* Any Generic build is tried; 8.5.0-rc10 and 8.5.0-rc10-stages1 have been
++  verified. With 8.5.0-rc10-stages1 the stage protocol is active and the bridge
++  uses the plan that Generic exports; without it, `Follow=1` maps Generic's
++  `NRHookPoint` choice to the feed.
+ * Only `Pipeline=2` with `Import=1` is validated in the game. `Pipeline=3` keeps
+   the older CPU gate and ran with about two thirds of the FG groups unarmed and
+   occasional release-submit failures (host fallback). `Import=0` keeps the CPU
+@@ -463,8 +549,10 @@ scenes are not guaranteed to be identical.
+   only shows while FG is evaluated, so it stays hidden then. Both builds were
+   run in the game on 2026-10-02; NR worked with both while focused.
+ * One effect runtime / one swapchain.
+-* Generic's layer count and per-layer parameters are global, so the mirror
+-  (Upscaled) and this feed (Present) cannot run different layer configurations.
++* Generic's layer count and per-layer parameters are global, so without the
++  stage protocol the mirror (Upscaled) and this feed (Present) cannot run
++  different layer configurations. With the stage protocol each stage has its own
++  count and layers, but per-layer knobs are still shared across stages.
+ * Other Vulkan games are not covered. The automatic rebuild after a lost GPU
+   completion (update item 4) has not been triggered in the game yet. One 1.5 s
+   completion stall was seen once in the game during repeated resolution
+diff --git a/src/composition-guard.inc b/src/composition-guard.inc
+index 8cd0bc0..3ae8e9b 100644
+--- a/src/composition-guard.inc
++++ b/src/composition-guard.inc
+@@ -6,7 +6,10 @@
+ // calling FG, and NR runs only inside FG -- the visible "NR off" flash
+ // (measured 2026-10-01 in Arknights: Endfield with PresentMon and the [fg-transition] log).
+ // The window belongs to this process: no taskbar, Alt+Tab, tray or separate
+-// Task Manager entry, and it is excluded from screen capture where Windows allows.
++// Task Manager entry. It is not excluded from screen capture by default: while it
++// carried WDA_EXCLUDEFROMCAPTURE, the NVIDIA overlay refused to take screenshots of
++// the game and reported a protected application blocking desktop recording
++// (2026-10-02, Endfield). HoldCompositionHideCapture=1 restores the exclusion.
+ 
+ #ifndef WDA_EXCLUDEFROMCAPTURE
+ #define WDA_EXCLUDEFROMCAPTURE 0x00000011
+@@ -16,14 +19,14 @@ struct CompositionGuardConfig { bool on; BYTE alpha; bool hide_capture; };
+ 
+ static CompositionGuardConfig CompositionGuardReadConfig()
+ {
+-    CompositionGuardConfig c = { true, 1, true };
++    CompositionGuardConfig c = { true, 1, false };
+     wchar_t path[1024] = {};
+     PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
+     if (path[0] == 0) return c;
+     c.on = GetPrivateProfileIntW(L"Adapter", L"HoldComposition", 1, path) == 1;
+     const UINT alpha = GetPrivateProfileIntW(L"Adapter", L"HoldCompositionAlpha", 1, path);
+     c.alpha = static_cast<BYTE>(alpha < 1 ? 1 : (alpha > 255 ? 255 : alpha));
+-    c.hide_capture = GetPrivateProfileIntW(L"Adapter", L"HoldCompositionHideCapture", 1, path) == 1;
++    c.hide_capture = GetPrivateProfileIntW(L"Adapter", L"HoldCompositionHideCapture", 0, path) == 1;
+     return c;
+ }
+ 
+diff --git a/src/dlss5-bridge.cpp b/src/dlss5-bridge.cpp
+index 13441ef..7907fe0 100644
+--- a/src/dlss5-bridge.cpp
++++ b/src/dlss5-bridge.cpp
+@@ -67,7 +67,7 @@
+ #pragma comment(lib, "version.lib")
+ 
+ // Kept in step with version.rc, which is where ReShade's overlay reads it from.
+-#define BRIDGE_VERSION "1.4.13-pre8-vk-fgrelay-20261002"
++#define BRIDGE_VERSION "1.4.13-pre8-vk-fgrelay-20261005"
+ 
+ extern "C" __declspec(dllexport) const char *NAME =
+     "DLSS 5 Bridge " BRIDGE_VERSION;
+@@ -2836,6 +2836,13 @@ static int HookNewNgxModules(ScanModuleRefs &held)
+             RememberRejected(mods[i]);
+             continue;
+         }
++        // NR needs its original caller identity; the private witness is separate.
++        if (_wcsicmp(leaf, L"nvngx_dlssnr.dll") == 0)
++        {
++            Log("  leaving %ls untouched: Neural Rendering is not an SR entry point.", leaf);
++            RememberRejected(mods[i]);
++            continue;
++        }
+ 
+         // A game that links the NGX client statically exports these from its own
+         // executable, and hooking them writes into the game's code section. The
+diff --git a/src/fg-input.inc b/src/fg-input.inc
+index 823423a..d3caf1b 100644
+--- a/src/fg-input.inc
++++ b/src/fg-input.inc
+@@ -7,6 +7,8 @@
+ static void FgGuideRequestReset();
+ static bool FgRelayPrepareRelease();
+ static bool FgRelayRecoveryReady();
++static void FgRelayObserveGroup(unsigned index, unsigned count, bool count_known);
++static bool FgRelayBlocksSerialFeed();
+ 
+ struct FgComposite {
+     ID3D12RootSignature *rs;
+@@ -278,11 +280,12 @@ static bool FgInputWorker()
+     unsigned nr_entries = 0, sr_entries = 0, sr_copies = 0;
+     if (g_present_adapter.run_nr) {
+         g_present_nr_entries = g_present_sr_entries = g_present_sr_copies = 0;
+-        g_present_nr_scope = true;
+-        if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
+-        ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs);
+-        if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
+-        g_present_nr_scope = false;
++        {
++            if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
++            PresentAdapterNrScope scope;
++            ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs);
++            if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
++        }
+         nr_entries = g_present_nr_entries; sr_entries = g_present_sr_entries; sr_copies = g_present_sr_copies;
+         PresentCompatibilityFrame(ok, nr_entries, sr_entries, sr_copies);
+         if (ok && (sr_entries != 1 || sr_copies != 1)) {
+@@ -530,8 +533,15 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
+         g_present_adapter.deadline = ULLONG_MAX;
+         g_present_adapter.token = 1;
+         g_s12.need_reset = true;
++        const int pipeline = PresentAdapterPipeline();
+         Log("[fg-input] AutoRun: continuous NR at the frame-generation input; a request with frames=0 stops it. pipeline=%s",
+-            PresentAdapterPipeline() == 1 ? "probe (NR concurrent, result discarded, picture carries no NR)" : "serial park");
++            pipeline == 1 ? "probe (NR concurrent, result discarded, picture carries no NR)" :
++            pipeline == 2 ? "GPU relay at the FG evaluate" :
++            pipeline == 3 ? "GPU relay at the game's present" : "serial park");
++        if (pipeline == 0)
++            Log("[fg-input] WARNING: Pipeline=0 (serial feed) is for diagnosis. The real frame is parked inside the FG "
++                "command buffer for the whole NR, so the generated frames reach the screen in bursts: a high frame "
++                "counter with uneven display. Set Pipeline=2 in vk-present-adapter.ini for normal use.");
+     }
+     if (g_present_adapter.remaining == 0 || g_present_adapter.refused) return;
+     if (g_fg_input.census_left != 0) {
+@@ -554,6 +564,11 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
+     }
+     unsigned index = 0;
+     const bool indexed = FgInputReadU(p, "DLSSG.MultiFrameIndex", &index);
++    unsigned count = 0;
++    const bool count_known = FgInputReadU(p, "DLSSG.MultiFrameCount", &count);
++    // Observe every indexed callback so the relay can identify a completed
++    // native group. Interpolation callbacks still return directly to native FG.
++    if (indexed) FgRelayObserveGroup(index, count, count_known);
+     if (indexed && index != 1) {
+         InterlockedIncrement(&g_fg_input.eval_index_skipped);
+         return;
+@@ -574,6 +589,9 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
+         // and the serial feed below runs as it always has.
+         const int rel = FgRelayEvaluate(cmd_raw, p);
+         if (rel != 0) return;
++        // A relay that stood down keeps its frames from the serial feed unless
++        // SerialFallback=1; until it reopens, FG interpolates the game's own frames.
++        if (FgRelayBlocksSerialFeed()) return;
+     }
+     if (g_vkm_rt == nullptr) return;
+     reshade::api::device *rdev = g_vkm_rt->get_device();
+diff --git a/src/fg-relay.inc b/src/fg-relay.inc
+index 24619d6..2c9bb30 100644
+--- a/src/fg-relay.inc
++++ b/src/fg-relay.inc
+@@ -115,6 +115,7 @@ struct FgrArm
+     bool     valid;
+     uint64_t hud, back, depth, mv;
+     uint64_t copy_val, nr_val;
++    uint64_t group_serial;
+     uint32_t w, h, vk_fmt;
+     uint32_t hud_x, hud_y, back_x, back_y;
+     FgGuideContract guides;
+@@ -129,6 +130,21 @@ struct FgrPool
+     SVkCommandBuffer cb_copy[kFgrSlots], cb_release[kFgrSlots];
+ };
+ 
++// All group members are read and written under FgrLock. The group serial
++// identifies the real-frame evaluate (idx=1); terminal_serial is published
++// only after the native group has reached idx=count.
++struct FgrGroupState
++{
++    uint64_t serial;
++    uint64_t terminal_serial;
++    uint64_t released_serial;
++    uint64_t released_nr;
++    uint64_t gate_attempted_serial;
++    unsigned count;
++    unsigned phase;
++    bool valid;
++};
++
+ struct FgrState
+ {
+     CRITICAL_SECTION cs;
+@@ -184,8 +200,10 @@ struct FgrState
+     volatile LONG arm_seq, worker_seq, eval_seq, next_slot, pending_slot, last_eval_tick;
+     volatile LONG armed, unarmed, skipped, busy, mismatched, writes, copies_failed;
+     unsigned  unarmed_streak, mismatch_streak;
++    unsigned  relay_retries;       // stand-downs retried by a session rebuild, per process
+     uint64_t  copy_val, nr_val;    // the last values actually submitted / signalled for
+     uint64_t  last_release_nr;     // the nr value the frame before this one waited
++    FgrGroupState group;
+     uint64_t  nr_progress_value;   // watchdog, evaluate thread only: the shared fence's
+     LONG      nr_progress_tick;    // completed value and when it last moved or caught up
+     bool      have_last_group, last_group_served;   // evaluate thread only
+@@ -197,11 +215,14 @@ struct FgrState
+ 
+     // Throttle (FgRelayThrottle), indexed by site: 0 the game's present, 1 the
+     // game's Reflex sleep. Each site is one game thread, so each has its own
+-    // event. thr_off is set once waits time out repeatedly and stays set for the
+-    // process. last_sleep_ms says the sleep site is live, which retires the
+-    // present site.
++    // event. thr_off holds the tick at which repeated timeouts stood the throttle
++    // down (0 = active); it re-arms itself after kFgrThrottleRearmMs.
++    // last_sleep_ms says the sleep site is live, which retires the present site.
++    // nr_queued is the newest NR value whose Signal the worker has actually put on
++    // the private queue; a wait never targets a value that is not queued yet.
+     HANDLE    thr_ev[2];
+-    volatile LONG thr_off, thr_streak;
++    volatile LONG thr_off, thr_streak[2];
++    volatile LONG64 nr_queued;
+     volatile LONG thr_calls[2], thr_waits[2], thr_clear[2], thr_timeouts[2];
+     volatile LONG64 thr_sum[2], thr_max, last_sleep_ms;
+     volatile LONG presents, p_pipeline_skip, p_notready, p_fallback, p_inactive;
+@@ -232,6 +253,7 @@ struct FgrState
+     PFN_FgrResetCommandBuffer     ResetCommandBuffer;
+     PFN_FgrQueueSubmit            QueueSubmit;
+ };
++
+ static FgrState g_fgr;
+ static const unsigned kFgrAtPresent = 0, kFgrAtSleep = 1;   // throttle sites
+ 
+@@ -258,6 +280,74 @@ static void FgrMax64(volatile LONG64 &value, LONG64 candidate)
+ static void FgrLock()   { EnterCriticalSection(&g_fgr.cs); }
+ static void FgrUnlock() { LeaveCriticalSection(&g_fgr.cs); }
+ 
++static void FgRelayObserveGroup(unsigned index, unsigned count, bool count_known)
++{
++    FgrState &f = g_fgr;
++    if (!f.cs_ready) return;
++
++    FgrLock();
++    FgrGroupState &group = f.group;
++    if (!count_known || count == 0 || index == 0 || index > count) {
++        group.valid = false;
++        group.count = group.phase = 0;
++        group.terminal_serial = 0;
++    } else if (index == 1) {
++        group.valid = true;
++        ++group.serial;
++        group.count = count;
++        group.phase = 1;
++        group.terminal_serial = count == 1 ? group.serial : 0;
++        group.released_serial = 0;
++        group.released_nr = 0;
++        group.gate_attempted_serial = 0;
++    } else if (!group.valid || group.count != count || group.phase + 1 != index) {
++        // Do not carry a partly observed group into a future throttle point.
++        group.valid = false;
++        group.count = group.phase = 0;
++        group.terminal_serial = 0;
++    } else {
++        group.phase = index;
++        if (index == count) group.terminal_serial = group.serial;
++    }
++    FgrUnlock();
++}
++
++static uint64_t FgRelayCurrentGroupSerial()
++{
++    FgrState &f = g_fgr;
++    if (!f.cs_ready) return 0;
++    FgrLock();
++    const uint64_t serial = f.group.valid && f.group.phase == 1 ? f.group.serial : 0;
++    FgrUnlock();
++    return serial;
++}
++
++static void FgRelayPublishGroupRelease(uint64_t serial, uint64_t nr_val)
++{
++    FgrState &f = g_fgr;
++    if (serial == 0 || nr_val == 0 || !f.cs_ready) return;
++    FgrLock();
++    if (f.group.valid && f.group.serial == serial) {
++        f.group.released_serial = serial;
++        f.group.released_nr = nr_val;
++    }
++    FgrUnlock();
++}
++
++// The caller holds FgrLock. Present and Reflex sleep both use this one claim,
++// so a completed native group can produce at most one host-side throttle wait.
++static bool FgRelayClaimCompletedGroupLocked(FgrGroupState &group)
++{
++    if (!group.valid || group.terminal_serial == 0 ||
++        group.terminal_serial != group.serial ||
++        group.released_serial != group.serial || group.released_nr == 0 ||
++        group.gate_attempted_serial == group.serial)
++        return false;
++    group.gate_attempted_serial = group.serial;
++    return true;
++}
++
++
+ // Called once from FgtInit (the hook registration path); every entry point
+ // refuses until it has run.
+ static void FgRelayInit()
+@@ -293,18 +383,40 @@ static bool FgRelayQueueFamily(void *queue, uint32_t *family)
+     return false;
+ }
+ 
++static const unsigned kFgrRelayRetries = 3;
++
+ static bool FgRelayFallback(const char *why)
+ {
+     if (!g_fgr.fell_back) {
+         g_fgr.fell_back = true;
+         g_fgr.why = why;
+         PresentCompatibilityIssue(PC_PROCESSING_FAILED, why);
+-        Log("[fg-relay] %s. The GPU relay is unavailable; the serial FG-input feed may run. "
+-            "This is a degraded path and does not guarantee the same frame pacing.", why);
++        if (PresentAdapterSerialFallback()) {
++            Log("[fg-relay] %s. The GPU relay is unavailable; SerialFallback=1, so the serial FG-input feed runs. "
++                "That feed presents the generated frames in bursts: expect a high frame counter with uneven display.", why);
++        } else if (g_fgr.relay_retries < kFgrRelayRetries) {
++            ++g_fgr.relay_retries;
++            // The rebuild drains the private session on the render thread; its
++            // release clears fell_back, and the next valid FG input opens the relay again.
++            g_fg_input.want_release = true;
++            Log("[fg-relay] %s. NR at the FG input pauses instead of using the serial feed; the private session "
++                "is rebuilt and the relay retried (attempt %u of %u).", why, g_fgr.relay_retries, kFgrRelayRetries);
++        } else {
++            Log("[fg-relay] %s. The relay stood down %u times in this process; NR at the FG input stays paused "
++                "(frame generation keeps the game's own frames). SerialFallback=1 would run the serial feed, "
++                "which presents in bursts.", why, kFgrRelayRetries + 1);
++        }
+     }
+     return false;
+ }
+ 
++// True while a configured relay has stood down and the serial feed must not
++// take its frames: the FG input then runs without NR until the relay reopens.
++static bool FgRelayBlocksSerialFeed()
++{
++    return PresentAdapterRelay() && g_fgr.cs_ready && g_fgr.fell_back && !PresentAdapterSerialFallback();
++}
++
+ // ---------------------------------------------------------------------------
+ // Device extension injection: VK_KHR_external_semaphore_win32
+ // ---------------------------------------------------------------------------
+@@ -677,12 +789,15 @@ static void FgRelayEnsure()
+         memset(f.pools, 0, sizeof(f.pools));
+         for (unsigned i = 0; i < kFgrSlots; ++i) { f.ev_out[i] = f.ev_mark[i] = 0; f.slot_used[i] = false; }
+         f.arm_seq = f.worker_seq = f.eval_seq = 0;
+-        f.copy_val = f.nr_val = f.last_release_nr = f.nr_progress_value = 0;
++        f.copy_val = f.nr_val = f.last_release_nr = f.nr_progress_value = 0; InterlockedExchange64(&f.nr_queued, 0);
+         for (unsigned i = 0; i < kFgrSlots; ++i) {
+             f.copy_in_flight[i] = f.release_in_flight[i] = false;
+             InterlockedExchange64(&f.copy_submit_qpc[i], 0);
+         }
+         f.have_last_group = false;
++        FgrLock();
++        f.group = {};
++        FgrUnlock();
+         f.have_last = f.have_present = false;
+         memset(f.idx_map, 0, sizeof(f.idx_map));
+         f.copy_fence12 = nullptr;   // the old device's objects went with it
+@@ -1198,8 +1313,19 @@ static void FgRelayPeriodic()
+             ps(timeouts - prev_timeouts[s]), avg_ms(sum - prev_sum[s], waits - prev_waits[s]));
+         prev_calls[s] = calls; prev_waits[s] = waits; prev_clear[s] = clear; prev_timeouts[s] = timeouts; prev_sum[s] = sum;
+     }
+-    Log("[fg-relay] rate4: throttle depth=%d off=%ld | sleep %s | present %s | max=%.2fms (process)",
++    FgrGroupState group = {};
++    FgrLock();
++    group = f.group;
++    FgrUnlock();
++    Log("[fg-relay] rate4: throttle depth=%d off=%ld | "
++        "group=%llu phase=%u/%u terminal=%llu released=%llu/%llu gate=%llu | "
++        "sleep %s | present %s | max=%.2fms (process)",
+         PresentAdapterRelayThrottle(), static_cast<long>(InterlockedCompareExchange(&f.thr_off, 0, 0)),
++        static_cast<unsigned long long>(group.serial), group.phase, group.count,
++        static_cast<unsigned long long>(group.terminal_serial),
++        static_cast<unsigned long long>(group.released_serial),
++        static_cast<unsigned long long>(group.released_nr),
++        static_cast<unsigned long long>(group.gate_attempted_serial),
+         site_text[kFgrAtSleep], site_text[kFgrAtPresent], ms(FgrCountRead64(f.thr_max)));
+ 
+     prev = cur;
+@@ -1221,6 +1347,10 @@ struct FgrPresentInfo
+ // queued or about to be (the worker queues it without waiting on anything the
+ // game does next), so the wait cannot depend on the waiting thread; it is bounded
+ // anyway, and a throttle that keeps timing out turns itself off for the process.
++// The wait must not depend on the native MFG group having reached its last index:
++// with the relay, Streamline issues indices 2..N about one real frame after index 1,
++// right before the next group starts, so a "completed group" gate almost never
++// held the game (measured: 0 waits per second, PC latency 216 ms instead of ~158).
+ // The fence is referenced under the lock because the session release frees it
+ // under the lock.
+ //
+@@ -1231,8 +1361,13 @@ struct FgrPresentInfo
+ // (2026-09-29: PCL 246 -> 209 ms, against 132 ms for a frame cap that sleeps
+ // before simulation). The present site is therefore only the fallback for a game
+ // that does not call slReflexSleep; it stands down while the sleep site is live.
+-static const DWORD    kFgrThrottleMs = 100;
++// Bounded per wait. Several Present layers make the steady wait itself approach the
++// old 100 ms bound, and a new layer's NR feature creation stalls the worker for
++// ~170 ms once; both used to trip the give-up and leave the game unthrottled for the
++// rest of the session (PC latency 246 instead of ~158 ms).
++static const DWORD    kFgrThrottleMs = 250;
+ static const unsigned kFgrThrottleGiveUp = 5;
++static const DWORD    kFgrThrottleRearmMs = 5000;
+ static void FgRelayThrottle(unsigned site)
+ {
+     FgrState &f = g_fgr;
+@@ -1245,13 +1380,26 @@ static void FgRelayThrottle(unsigned site)
+         const LONG64 last_sleep = FgrCountRead64(f.last_sleep_ms);
+         if (last_sleep != 0 && now_ms - last_sleep < 500) return;
+     }
+-    if (!f.ready || f.fell_back || !f.import_ok || f.thr_ev[site] == nullptr ||
+-        InterlockedCompareExchange(&f.thr_off, 0, 0) != 0)
+-        return;
++    if (!f.ready || f.fell_back || !f.import_ok || f.thr_ev[site] == nullptr) return;
++    const LONG off_tick = InterlockedCompareExchange(&f.thr_off, 0, 0);
++    if (off_tick != 0) {
++        if (static_cast<DWORD>(GetTickCount() - static_cast<DWORD>(off_tick)) < kFgrThrottleRearmMs) return;
++        if (InterlockedCompareExchange(&f.thr_off, 0, off_tick) == off_tick) {
++            InterlockedExchange(&f.thr_streak[0], 0);
++            InterlockedExchange(&f.thr_streak[1], 0);
++            Log("[fg-relay] throttle re-armed after %lu ms.", kFgrThrottleRearmMs);
++        }
++    }
+     FgrLock();
+     ID3D12Fence *fence = f.nr_fence12;
+-    const uint64_t newest = f.nr_val;
+-    if (fence != nullptr) fence->AddRef();
++    const uint64_t armed_nr = f.nr_val;
++    const uint64_t queued_nr = static_cast<uint64_t>(FgrCountRead64(f.nr_queued));
++    const uint64_t newest = armed_nr < queued_nr ? armed_nr : queued_nr;
++    if (fence != nullptr) {
++        fence->AddRef();
++        // Bookkeeping for the rate log only; the wait below does not depend on it.
++        (void)FgRelayClaimCompletedGroupLocked(f.group);
++    }
+     FgrUnlock();
+     if (fence == nullptr) return;
+     const uint64_t back = static_cast<uint64_t>(depth - 1);
+@@ -1259,6 +1407,7 @@ static void FgRelayThrottle(unsigned site)
+     if (target == 0 || fence->GetCompletedValue() >= target) {
+         fence->Release();
+         FgrCount(f.thr_clear[site]);
++        InterlockedExchange(&f.thr_streak[site], 0);
+         return;
+     }
+     const LONG64 start = FgrQpcNow();
+@@ -1281,12 +1430,15 @@ static void FgRelayThrottle(unsigned site)
+     FgrCount(f.thr_waits[site]);
+     FgrAdd64(f.thr_sum[site], waited);
+     FgrMax64(f.thr_max, waited);
+-    if (done) { InterlockedExchange(&f.thr_streak, 0); return; }
++    if (done) { InterlockedExchange(&f.thr_streak[site], 0); return; }
+     FgrCount(f.thr_timeouts[site]);
+-    if (static_cast<unsigned>(InterlockedIncrement(&f.thr_streak)) >= kFgrThrottleGiveUp &&
+-        InterlockedExchange(&f.thr_off, 1) == 0)
+-        Log("[fg-relay] throttle: the NR fence missed %u consecutive %lu ms waits; the present throttle is off "
+-            "for this process (frames may queue ahead of the NR again).", kFgrThrottleGiveUp, kFgrThrottleMs);
++    if (static_cast<unsigned>(InterlockedIncrement(&f.thr_streak[site])) >= kFgrThrottleGiveUp) {
++        const LONG tick = static_cast<LONG>(GetTickCount() | 1u);
++        if (InterlockedCompareExchange(&f.thr_off, tick, 0) == 0)
++            Log("[fg-relay] throttle: the NR fence missed %u consecutive %lu ms waits; the throttle stands down "
++                "for %lu ms (frames may queue ahead of the NR meanwhile).", kFgrThrottleGiveUp, kFgrThrottleMs,
++                kFgrThrottleRearmMs);
++    }
+ }
+ 
+ // Called from the interposer's vkQueuePresentKHR detour, on the thread that owns
+@@ -1414,6 +1566,9 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
+     FgRelayEnsure();
+     if (!f.ready) { FgrCount(f.eval_notready); return 0; }
+     FgrCount(f.evals);
++    // Capture the idx=1 group before the rest of the evaluate can yield to a
++    // subsequent native interpolation callback on an unusual scheduling path.
++    const uint64_t group_serial = FgRelayCurrentGroupSerial();
+ 
+     if (p != nullptr) {
+         void *q = nullptr;
+@@ -1580,6 +1735,9 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
+         return -1;
+     }
+     f.mismatch_streak = 0;
++    // Bind this evaluate's release to the real native group observed by fg-input.
++    // A missing serial leaves the existing relay behavior unchanged.
++    a.group_serial = group_serial;
+ 
+     // The slot's release batch is re-recorded when the slot comes round again, so
+     // its previous release must be over before its fence is touched. A failed
+@@ -1637,6 +1795,7 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
+                 f.nr_progress_tick = static_cast<LONG>(GetTickCount());
+             }
+             f.last_release_nr = a.nr_val;
++            FgRelayPublishGroupRelease(a.group_serial, a.nr_val);
+         } else {
+             FgrCount(f.rel_fail);
+             // The park is recorded and nothing on the GPU will release it: let it
+@@ -1719,14 +1878,15 @@ static bool FgRelayWorker()
+         FgrCount(f.w_copy_fail);
+     } else if (g_present_adapter.run_nr) {
+         g_present_nr_entries = g_present_sr_entries = g_present_sr_copies = 0;
+-        g_present_nr_scope = true;
+-        if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
+-        // No trailing wait: the release is signalled by the queue below and the
+-        // next frame's Synth12Begin waits the allocator's retire fence, which is
+-        // this submission's own fence value.
+-        ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs, SLOT_OUTPUT, &wrote, false);
+-        if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
+-        g_present_nr_scope = false;
++        {
++            if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
++            PresentAdapterNrScope scope;
++            // No trailing wait: the release is signalled by the queue below and the
++            // next frame's Synth12Begin waits the allocator's retire fence, which is
++            // this submission's own fence value.
++            ok = Synth12EvaluateShared(&g_vkm.sp, kVkmEvaluateMs, SLOT_OUTPUT, &wrote, false);
++            if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
++        }
+         nr_entries = g_present_nr_entries; sr_entries = g_present_sr_entries; sr_copies = g_present_sr_copies;
+         PresentCompatibilityFrame(ok, nr_entries, sr_entries, sr_copies);
+         if (ok && (sr_entries != 1 || sr_copies != 1)) {
+@@ -1747,7 +1907,12 @@ static bool FgRelayWorker()
+     // Signalled on every path. A frame whose NR failed still has a command
+     // buffer parked on this value, and the identity copy above is what makes
+     // letting it through harmless.
+-    if (f.nr_fence12 != nullptr) g_s12.queue->Signal(f.nr_fence12, a.nr_val);
++    if (f.nr_fence12 != nullptr) {
++        g_s12.queue->Signal(f.nr_fence12, a.nr_val);
++        // Published after the Signal is queued: the throttle may wait for it now.
++        if (static_cast<LONG64>(a.nr_val) > FgrCountRead64(f.nr_queued))
++            InterlockedExchange64(&f.nr_queued, static_cast<LONG64>(a.nr_val));
++    }
+     if (!f.import_ok) {
+         // No shared object to signal through: the CPU stands in, waiting the
+         // session's own fences -- the composite's, then the NR submission's --
+@@ -1960,17 +2125,19 @@ static void FgRelayOnSessionRelease()
+     f.npools = 0;
+     memset(f.pools, 0, sizeof(f.pools));
+     f.cmd_queue = nullptr;
+-    f.copy_val = f.nr_val = f.last_release_nr = f.nr_progress_value = 0;
++    f.copy_val = f.nr_val = f.last_release_nr = f.nr_progress_value = 0; InterlockedExchange64(&f.nr_queued, 0);
+     for (unsigned i = 0; i < kFgrSlots; ++i) {
+         f.copy_in_flight[i] = f.release_in_flight[i] = false;
+         InterlockedExchange64(&f.copy_submit_qpc[i], 0);
+     }
+     f.have_last_group = false;
++    f.group = {};
+     f.mismatch_streak = 0;
+     f.unarmed_streak = 0;
+     f.last_eval_tick = 0;
+     InterlockedExchange(&f.thr_off, 0);
+-    InterlockedExchange(&f.thr_streak, 0);
++    for (unsigned i = 0; i < 2; ++i)
++        InterlockedExchange(&f.thr_streak[i], 0);
+     FgGuideRequestReset();
+     if (f.copy_fence12 != nullptr) { f.copy_fence12->Release(); f.copy_fence12 = nullptr; }
+     if (f.nr_fence12 != nullptr) { f.nr_fence12->Release(); f.nr_fence12 = nullptr; }
+diff --git a/src/fg-submit-observation.h b/src/fg-submit-observation.h
+new file mode 100644
+index 0000000..da3690f
+--- /dev/null
++++ b/src/fg-submit-observation.h
+@@ -0,0 +1,263 @@
++#pragma once
++
++#include <cstddef>
++#include <cstdint>
++
++// CPU evidence only. The caller serializes access; this type never calls an API,
++// allocates, logs, waits, or treats missing ReShade events as an empty recording.
++namespace fg_submit_observation {
++
++constexpr unsigned kSamples = 8;
++constexpr unsigned kCommandLists = 512;
++constexpr unsigned kLocations = 8;
++enum class Command : unsigned { dispatch, copy, barrier, draw, secondary, indirect, clear, render_pass, bind, query, count };
++enum class Coverage : unsigned { untracked, init_only, begin_observed, partial };
++enum class State : unsigned { pending, in_submit, returned, reset, destroyed, reinitialized, device_destroyed };
++
++inline void Add(uint64_t &value, uint64_t count = 1)
++{
++    const uint64_t max = ~uint64_t(0);
++    value = count > max - value ? max : value + count;
++}
++
++struct Counts {
++    uint64_t kind[static_cast<unsigned>(Command::count)]{};
++    uint64_t total = 0;
++};
++struct Images { uint64_t hud = 0, back = 0, depth = 0, mv = 0; unsigned known = 0; };
++struct Sample {
++    uint64_t id = 0, cb = 0, generation = 0, eval_queue = 0, qpc = 0;
++    Images images{};
++    Counts prefix{};
++    Coverage coverage = Coverage::untracked;
++    State state = State::pending;
++    unsigned index = 0;
++    bool indexed = false;
++};
++struct Location { uint32_t batch = 0, cb_index = 0, batch_cbs = 0, waits = 0, signals = 0; };
++struct Match {
++    Sample sample{};
++    Location locations[kLocations]{};
++    uint64_t occurrences = 0, omitted_locations = 0, submit_generation = 0;
++    unsigned stored = 0;
++    bool claimed = false, generation_changed = false;
++};
++struct Submit {
++    uint64_t id = 0, queue = 0, fence = 0;
++    uint64_t batches_read = 0, cbs_read = 0, waits = 0, signals = 0, declared_cbs = 0, read_faults = 0;
++    Match matches[kSamples]{};
++    uint32_t batches = 0, result = 0;
++    unsigned candidates = 0;
++    bool submit2 = false;
++};
++struct Stats {
++    uint64_t inits = 0, resets = 0, destroys = 0, device_destroys = 0;
++    uint64_t events = 0, partial_starts = 0, capacity_misses = 0, generation_exhausted = 0;
++    uint64_t firsts = 0, prefixes = 0, untracked_firsts = 0, partial_firsts = 0, invalidated = 0;
++    uint64_t submits = 0, submits2 = 0, nested_suppressed = 0, batches = 0, cbs = 0, read_faults = 0;
++    uint64_t returned = 0, handle_only = 0, duplicate_occurrences = 0, omitted_locations = 0, failed_results = 0;
++};
++
++class Observer {
++    struct Entry {
++        uint64_t cb = 0, device = 0, generation = 0;
++        Counts commands{};
++        Coverage coverage = Coverage::untracked;
++        bool used = false; // A cleared, previously used slot is a probe-chain tombstone.
++    };
++    Entry entries_[kCommandLists]{};
++    Sample samples_[kSamples]{};
++    uint64_t generation_ = 0;
++    unsigned sample_count_ = 0;
++    Stats stats_{};
++
++    static unsigned Hash(uint64_t cb) { return static_cast<unsigned>((cb >> 4) ^ (cb >> 32)) % kCommandLists; }
++    Entry *Find(uint64_t cb)
++    {
++        if (cb == 0) return nullptr;
++        for (unsigned n = 0, i = Hash(cb); n < kCommandLists; ++n, i = (i + 1) % kCommandLists) {
++            Entry &e = entries_[i];
++            if (e.cb == cb) return &e;
++            if (!e.used) break;
++        }
++        return nullptr;
++    }
++    Entry *Acquire(uint64_t cb)
++    {
++        if (cb == 0) return nullptr;
++        Entry *free = nullptr;
++        for (unsigned n = 0, i = Hash(cb); n < kCommandLists; ++n, i = (i + 1) % kCommandLists) {
++            Entry &e = entries_[i];
++            if (e.cb == cb) return &e;
++            if (e.cb == 0 && free == nullptr) free = &e;
++            if (!e.used) break;
++        }
++        if (free == nullptr) { Add(stats_.capacity_misses); return nullptr; }
++        *free = {};
++        free->used = true;
++        free->cb = cb;
++        return free;
++    }
++    uint64_t NextGeneration()
++    {
++        // Never wrap into an old recording identity, including after destruction.
++        if (generation_ == ~uint64_t(0)) { Add(stats_.generation_exhausted); return 0; }
++        return ++generation_;
++    }
++    void Invalidate(uint64_t cb, State state)
++    {
++        for (unsigned i = 0; i < sample_count_; ++i) {
++            Sample &s = samples_[i];
++            if (s.cb == cb && (s.state == State::pending || s.state == State::in_submit)) {
++                s.state = state;
++                Add(stats_.invalidated);
++            }
++        }
++    }
++    void Start(uint64_t cb, uint64_t device, Coverage coverage, State reason)
++    {
++        if (cb == 0) return;
++        Invalidate(cb, reason);
++        Entry *e = Acquire(cb);
++        if (e == nullptr) return;
++        e->device = device;
++        e->generation = NextGeneration();
++        e->coverage = e->generation != 0 ? coverage : Coverage::untracked;
++        e->commands = {};
++    }
++
++public:
++    void Init(uint64_t cb, uint64_t device)
++    {
++        Add(stats_.inits);
++        Start(cb, device, Coverage::init_only, State::reinitialized);
++    }
++    void Reset(uint64_t cb, uint64_t device)
++    {
++        // ReShade's Vulkan reset_command_list is before vkBeginCommandBuffer,
++        // not a promise that all native reset/pool/recording paths are visible.
++        Add(stats_.resets);
++        Start(cb, device, Coverage::begin_observed, State::reset);
++    }
++    void Destroy(uint64_t cb)
++    {
++        Add(stats_.destroys);
++        if (cb == 0) return;
++        Invalidate(cb, State::destroyed);
++        if (Entry *e = Find(cb)) { *e = {}; e->used = true; }
++    }
++    void DestroyDevice(uint64_t device)
++    {
++        Add(stats_.device_destroys);
++        for (Entry &e : entries_) {
++            if (e.cb == 0 || e.device != device) continue;
++            Invalidate(e.cb, State::device_destroyed);
++            e = {}; e.used = true;
++        }
++    }
++    void Activity(uint64_t cb, uint64_t device, Command command)
++    {
++        if (cb == 0 || command >= Command::count) return;
++        Add(stats_.events);
++        Entry *e = Find(cb);
++        if (e == nullptr) {
++            e = Acquire(cb);
++            if (e == nullptr) return;
++            e->device = device;
++            e->generation = NextGeneration();
++            e->coverage = e->generation != 0 ? Coverage::partial : Coverage::untracked;
++            Add(stats_.partial_starts);
++        }
++        Add(e->commands.kind[static_cast<unsigned>(command)]);
++        Add(e->commands.total);
++    }
++    Sample First(uint64_t cb, uint64_t queue, const Images &images, uint64_t qpc, unsigned index, bool indexed)
++    {
++        Add(stats_.firsts);
++        Sample s{};
++        s.id = stats_.firsts; s.cb = cb; s.eval_queue = queue; s.images = images;
++        s.qpc = qpc; s.index = index; s.indexed = indexed;
++        if (const Entry *e = Find(cb)) {
++            s.generation = e->generation; s.coverage = e->coverage; s.prefix = e->commands;
++        }
++        if (s.prefix.total != 0) Add(stats_.prefixes);
++        if (s.coverage == Coverage::untracked) Add(stats_.untracked_firsts);
++        else if (s.coverage != Coverage::begin_observed) Add(stats_.partial_firsts);
++        if (sample_count_ < kSamples) samples_[sample_count_++] = s;
++        else s.id = 0; // All later firsts contribute only to summary counters.
++        return s;
++    }
++    void BeginSubmit(Submit &out, uint64_t queue, uint32_t batches, uint64_t fence, bool submit2)
++    {
++        out = {};
++        Add(stats_.submits);
++        if (submit2) Add(stats_.submits2);
++        out.id = stats_.submits; out.queue = queue; out.batches = batches;
++        out.fence = fence; out.submit2 = submit2;
++        for (unsigned i = 0; i < sample_count_; ++i) {
++            const Sample &s = samples_[i];
++            if (s.state == State::pending && s.cb != 0) out.matches[out.candidates++].sample = s;
++        }
++    }
++    // Walks the entire caller-owned batch/CB arrays through the guarded adapter.
++    // Only matching locations have a storage cap; traversal is never capped at it.
++    static void MatchCommand(Submit &out, uint64_t cb, const Location &location)
++    {
++        Add(out.cbs_read);
++        if (cb == 0) return;
++        for (unsigned i = 0; i < out.candidates; ++i) {
++            Match &m = out.matches[i];
++            if (m.sample.cb != cb) continue;
++            Add(m.occurrences);
++            if (m.stored < kLocations) m.locations[m.stored++] = location;
++            else Add(m.omitted_locations);
++        }
++    }
++    void Claim(Submit &out)
++    {
++        Add(stats_.batches, out.batches_read); Add(stats_.cbs, out.cbs_read); Add(stats_.read_faults, out.read_faults);
++        for (unsigned i = 0; i < out.candidates; ++i) {
++            Match &m = out.matches[i];
++            if (m.occurrences == 0) continue;
++            Sample &s = samples_[static_cast<unsigned>(m.sample.id - 1)];
++            const Entry *e = Find(s.cb);
++            m.submit_generation = e != nullptr ? e->generation : 0;
++            if (s.state != State::pending || s.generation != m.submit_generation) continue;
++            // generation==0 is deliberately only a handle match, not a recording match.
++            s.state = State::in_submit;
++            m.claimed = true;
++        }
++    }
++    void Finish(Submit &out, uint32_t result)
++    {
++        out.result = result; // Preserve VkResult bits; no success/GPU-completion inference.
++        if (result != 0) Add(stats_.failed_results);
++        for (unsigned i = 0; i < out.candidates; ++i) {
++            Match &m = out.matches[i];
++            if (!m.claimed) continue;
++            Sample &s = samples_[static_cast<unsigned>(m.sample.id - 1)];
++            const Entry *e = Find(s.cb);
++            m.generation_changed = s.state != State::in_submit || (e != nullptr ? e->generation : 0) != m.submit_generation;
++            if (s.state == State::in_submit) s.state = State::returned;
++            Add(stats_.returned);
++            if (m.sample.generation == 0) Add(stats_.handle_only);
++            if (m.occurrences > 1) Add(stats_.duplicate_occurrences, m.occurrences - 1);
++            Add(stats_.omitted_locations, m.omitted_locations);
++        }
++    }
++    void NestedSubmitSkipped() { Add(stats_.nested_suppressed); }
++    Stats Summary() const { return stats_; }
++    unsigned SampleCount() const { return sample_count_; }
++    Sample GetSample(unsigned index) const { return index < sample_count_ ? samples_[index] : Sample{}; }
++};
++
++inline const char *CoverageName(Coverage coverage)
++{
++    switch (coverage) {
++    case Coverage::begin_observed: return "reshade-begin-observed/native-coverage-incomplete";
++    case Coverage::init_only: return "reshade-init-only/recording-boundary-unknown";
++    case Coverage::partial: return "partial/late-or-missed-lifecycle";
++    default: return "untracked/no-same-CB-event-coverage";
++    }
++}
++} // namespace fg_submit_observation
+diff --git a/src/fg-trace.inc b/src/fg-trace.inc
+index 44281ea..04286a4 100644
+--- a/src/fg-trace.inc
++++ b/src/fg-trace.inc
+@@ -1,4 +1,6 @@
+ // Observations are CPU-side and unpaired: stable handles do not establish frame identity or GPU readiness.
++#include "fg-submit-observation.h"
++namespace fso = fg_submit_observation;
+ 
+ static const unsigned kFgtDistinct = 12;
+ struct FgtSet { uint64_t v[kFgtDistinct]; unsigned n, overflow, hits; };
+@@ -111,7 +113,8 @@ struct FgtTagType {
+ 
+ struct FgtQueue {
+     uint64_t queue;
+-    unsigned submits, submits2, cbs, waits, signals, fences, timeline;
++    unsigned submits, submits2, fences, timeline;
++    uint64_t cbs, waits, signals;
+     FgtSet threads;
+ };
+ 
+@@ -150,6 +153,8 @@ struct FgtControl {
+ };
+ static FgTrace g_fgt;
+ static FgtControl g_fgt_control;
++static fso::Observer g_fgt_observer;
++static bool g_fgt_command_events_registered, g_fgt_submit_observed, g_fgt_submit2_observed;
+ static void *volatile g_fgt_submit_target;
+ static void *volatile g_fgt_submit2_target;
+ static void *volatile g_fgt_queue_target;
+@@ -210,6 +215,126 @@ static const char *FgtLifecycleName(unsigned l)
+     return l == 0 ? "OnlyValidNow" : l == 1 ? "ValidUntilPresent" : l == 2 ? "ValidUntilEvaluate" : "?";
+ }
+ 
++// ReShade SDK authority: reshade/reshade_events.hpp addon_event_traits. In Vulkan,
++// reset_command_list is emitted before vkBeginCommandBuffer. A generation is an
++// observed recording boundary, never proof that native/bypassed commands are covered.
++static bool FgtCommandIdentity(reshade::api::command_list *cmd, uint64_t *cb, uint64_t *device)
++{
++    if (!FgtEnabled() || !g_fgt_control.cs_ready || cmd == nullptr) return false;
++    auto *dev = cmd->get_device();
++    if (dev == nullptr || dev->get_api() != reshade::api::device_api::vulkan) return false;
++    *cb = cmd->get_native(); *device = dev->get_native();
++    return *cb != 0;
++}
++static void OnFgtInitCommandList(reshade::api::command_list *cmd)
++{
++    uint64_t cb, device;
++    if (!FgtCommandIdentity(cmd, &cb, &device)) return;
++    FgtLock(); g_fgt_observer.Init(cb, device); FgtUnlock();
++}
++static void OnFgtResetCommandList(reshade::api::command_list *cmd)
++{
++    uint64_t cb, device;
++    if (!FgtCommandIdentity(cmd, &cb, &device)) return;
++    FgtLock(); g_fgt_observer.Reset(cb, device); FgtUnlock();
++}
++static void OnFgtDestroyCommandList(reshade::api::command_list *cmd)
++{
++    uint64_t cb, device;
++    if (!FgtCommandIdentity(cmd, &cb, &device)) return;
++    FgtLock(); g_fgt_observer.Destroy(cb); FgtUnlock();
++}
++static void OnFgtDestroyCommandDevice(reshade::api::device *dev)
++{
++    if (!FgtEnabled() || !g_fgt_control.cs_ready || dev == nullptr || dev->get_api() != reshade::api::device_api::vulkan) return;
++    const uint64_t device = dev->get_native();
++    FgtLock(); g_fgt_observer.DestroyDevice(device); FgtUnlock();
++}
++static void FgtCommandActivity(reshade::api::command_list *cmd, fso::Command kind)
++{
++    uint64_t cb, device;
++    if (!FgtCommandIdentity(cmd, &cb, &device)) return;
++    FgtLock(); g_fgt_observer.Activity(cb, device, kind); FgtUnlock();
++}
++
++// Derive the complete callback ABI from the vendored trait instead of repeating
++// parameter lists. Counts are callback occurrences, not workgroup/resource counts.
++// Bool events always return false: observing must never consume a game command.
++// Secondary events count the execute site only; their contents are not flattened.
++template <fso::Command Kind, typename Signature> struct FgtCommandEvent;
++template <fso::Command Kind, typename Return, typename... Args>
++struct FgtCommandEvent<Kind, Return (*)(reshade::api::command_list *, Args...)> {
++    static Return Callback(reshade::api::command_list *cmd, Args...)
++    {
++        FgtCommandActivity(cmd, Kind);
++        return Return();
++    }
++};
++template <reshade::addon_event Event>
++static void FgtRegisterTyped(PFN_ReShadeRegisterEvent reg, typename reshade::addon_event_traits<Event>::decl callback)
++{
++    reg(Event, reinterpret_cast<void *>(callback));
++}
++template <reshade::addon_event Event, fso::Command Kind>
++static void FgtRegisterCommand(PFN_ReShadeRegisterEvent reg)
++{
++    FgtRegisterTyped<Event>(reg, &FgtCommandEvent<Kind, typename reshade::addon_event_traits<Event>::decl>::Callback);
++}
++static void FgtRegisterCommandEvents(PFN_ReShadeRegisterEvent reg)
++{
++    FgtRegisterTyped<reshade::addon_event::init_command_list>(reg, &OnFgtInitCommandList);
++    FgtRegisterTyped<reshade::addon_event::reset_command_list>(reg, &OnFgtResetCommandList);
++    FgtRegisterTyped<reshade::addon_event::destroy_command_list>(reg, &OnFgtDestroyCommandList);
++    FgtRegisterTyped<reshade::addon_event::destroy_device>(reg, &OnFgtDestroyCommandDevice);
++    FgtRegisterCommand<reshade::addon_event::dispatch, fso::Command::dispatch>(reg);
++    FgtRegisterCommand<reshade::addon_event::dispatch_mesh, fso::Command::dispatch>(reg);
++    FgtRegisterCommand<reshade::addon_event::dispatch_rays, fso::Command::dispatch>(reg);
++    FgtRegisterCommand<reshade::addon_event::draw, fso::Command::draw>(reg);
++    FgtRegisterCommand<reshade::addon_event::draw_indexed, fso::Command::draw>(reg);
++    FgtRegisterCommand<reshade::addon_event::draw_or_dispatch_indirect, fso::Command::indirect>(reg);
++    FgtRegisterCommand<reshade::addon_event::barrier, fso::Command::barrier>(reg);
++    FgtRegisterCommand<reshade::addon_event::execute_secondary_command_list, fso::Command::secondary>(reg);
++    FgtRegisterCommand<reshade::addon_event::copy_resource, fso::Command::copy>(reg);
++    FgtRegisterCommand<reshade::addon_event::copy_buffer_region, fso::Command::copy>(reg);
++    FgtRegisterCommand<reshade::addon_event::copy_buffer_to_texture, fso::Command::copy>(reg);
++    FgtRegisterCommand<reshade::addon_event::copy_texture_region, fso::Command::copy>(reg);
++    FgtRegisterCommand<reshade::addon_event::copy_texture_to_buffer, fso::Command::copy>(reg);
++    FgtRegisterCommand<reshade::addon_event::resolve_texture_region, fso::Command::copy>(reg);
++    FgtRegisterCommand<reshade::addon_event::update_buffer_region_command, fso::Command::copy>(reg);
++    FgtRegisterCommand<reshade::addon_event::update_texture_region_command, fso::Command::copy>(reg);
++    FgtRegisterCommand<reshade::addon_event::clear_depth_stencil_view, fso::Command::clear>(reg);
++    FgtRegisterCommand<reshade::addon_event::clear_render_target_view, fso::Command::clear>(reg);
++    FgtRegisterCommand<reshade::addon_event::clear_unordered_access_view_uint, fso::Command::clear>(reg);
++    FgtRegisterCommand<reshade::addon_event::clear_unordered_access_view_float, fso::Command::clear>(reg);
++    FgtRegisterCommand<reshade::addon_event::begin_render_pass, fso::Command::render_pass>(reg);
++    FgtRegisterCommand<reshade::addon_event::end_render_pass, fso::Command::render_pass>(reg);
++    FgtRegisterCommand<reshade::addon_event::bind_pipeline, fso::Command::bind>(reg);
++    FgtRegisterCommand<reshade::addon_event::bind_descriptor_tables, fso::Command::bind>(reg);
++    FgtRegisterCommand<reshade::addon_event::bind_render_targets_and_depth_stencil, fso::Command::bind>(reg);
++    FgtRegisterCommand<reshade::addon_event::push_constants, fso::Command::bind>(reg);
++    FgtRegisterCommand<reshade::addon_event::push_descriptors, fso::Command::bind>(reg);
++    FgtRegisterCommand<reshade::addon_event::begin_query, fso::Command::query>(reg);
++    FgtRegisterCommand<reshade::addon_event::end_query, fso::Command::query>(reg);
++    FgtRegisterCommand<reshade::addon_event::copy_query_heap_results, fso::Command::query>(reg);
++    FgtLock(); g_fgt_command_events_registered = true; FgtUnlock();
++    FgtLog("[fg-submit-observer] coverage=events-registered-not-proven-on-FG-CB; first_limit=%u cb_capacity=%u locations_per_sample=%u; "
++        "generations=observed-init/begin; counts=callback-occurrences secondary=execute-site-only; matches=first-observed-direct-submit-attempt/retries-summary-only; "
++        "native/addon commands may bypass ReShade; late-load/missed-lifecycle/capacity are incomplete; count0 never proves empty; observed prefix does not prove input production or GPU readiness",
++        fso::kSamples, fso::kCommandLists, fso::kLocations);
++}
++static void FgtLogFirstSample(const fso::Sample &s)
++{
++    if (s.id == 0) return;
++    const uint64_t *c = s.prefix.kind;
++    FgtLog("[fg-submit-observer] first=%llu eval_qpc=%llu idx=%u%s cb=%llx generation=%llu eval_queue=%llx coverage=%s "
++        "hud=%llx back=%llx depth=%llx mv=%llx images_known=0x%x prefix=%s total=%llu "
++        "dispatch=%llu copy=%llu barrier=%llu draw=%llu execute_secondary=%llu indirect=%llu clear=%llu render_pass=%llu bind=%llu query=%llu",
++        s.id, s.qpc, s.index, s.indexed ? "" : "(OutputReal-fallback)", s.cb, s.generation, s.eval_queue, fso::CoverageName(s.coverage),
++        s.images.hud, s.images.back, s.images.depth, s.images.mv, s.images.known,
++        s.prefix.total != 0 ? "PRESENT(observed-events-before-FG;not-input-producer-proof)" : "NOT-CAPTURED(does-not-prove-absent-or-empty)",
++        s.prefix.total, c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9]);
++}
++
+ #include "focus-fg.inc"
+ 
+ // ---------------------------------------------------------------------------
+@@ -365,49 +490,150 @@ static FgtQueue *FgtQueueSlot(uint64_t q)
+     return nullptr;
+ }
+ 
++// The observer copies only scalar metadata from borrowed arrays. SEH is confined
++// to a trivial leaf, so unreadable application memory cannot strand our lock or
++// suppress the original submit. Neither semaphore payloads nor pNext are needed
++// for recording-identity matching; the original receives every pointer unchanged.
++template <typename T>
++static bool FgtReadArray(const T *source, uint32_t index, T *out)
++{
++    const uintptr_t base = reinterpret_cast<uintptr_t>(source);
++    const uintptr_t max = ~uintptr_t(0);
++    if (base == 0 || base > max - (sizeof(T) - 1) ||
++        static_cast<uintptr_t>(index) > (max - base - (sizeof(T) - 1)) / sizeof(T)) return false;
++    __try { memcpy(out, reinterpret_cast<const void *>(base + static_cast<uintptr_t>(index) * sizeof(T)), sizeof(T)); return true; }
++    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
++}
++struct FgtSubmitBatch {
++    uint32_t waits, signals, cbs;
++    void *const *commands;
++    const FgtCommandBufferSubmitInfo *commands2;
++};
++static bool FgtReadSubmitBatch(const FgtSubmitInfo *subs, const FgtSubmitInfo2 *subs2, uint32_t index,
++    bool submit2, FgtSubmitBatch *out)
++{
++    if (submit2) {
++        FgtSubmitInfo2 s = {};
++        if (!FgtReadArray(subs2, index, &s)) return false;
++        out->waits = s.waitSemaphoreInfoCount; out->signals = s.signalSemaphoreInfoCount;
++        out->cbs = s.commandBufferInfoCount; out->commands2 = s.pCommandBufferInfos;
++    } else {
++        FgtSubmitInfo s = {};
++        if (!FgtReadArray(subs, index, &s)) return false;
++        out->waits = s.waitSemaphoreCount; out->signals = s.signalSemaphoreCount;
++        out->cbs = s.commandBufferCount; out->commands = s.pCommandBuffers;
++    }
++    return true;
++}
++static void FgtObserveSubmit(fso::Submit *out, const FgtSubmitInfo *subs, const FgtSubmitInfo2 *subs2)
++{
++    for (uint32_t batch = 0; batch < out->batches; ++batch) {
++        FgtSubmitBatch s = {};
++        if (!FgtReadSubmitBatch(subs, subs2, batch, out->submit2, &s)) { fso::Add(out->read_faults); break; }
++        fso::Add(out->batches_read); fso::Add(out->waits, s.waits);
++        fso::Add(out->signals, s.signals); fso::Add(out->declared_cbs, s.cbs);
++        for (uint32_t cb = 0; cb < s.cbs; ++cb) {
++            void *command = nullptr;
++            if (out->submit2) {
++                FgtCommandBufferSubmitInfo item = {};
++                if (!FgtReadArray(s.commands2, cb, &item)) { fso::Add(out->read_faults); break; }
++                command = item.commandBuffer;
++            } else if (!FgtReadArray(s.commands, cb, &command)) { fso::Add(out->read_faults); break; }
++            fso::Observer::MatchCommand(*out, reinterpret_cast<uint64_t>(command), { batch, cb, s.cbs, s.waits, s.signals });
++        }
++    }
++}
++static void FgtFinishObservedSubmit(fso::Submit *s, uint32_t result)
++{
++    FgtLock(); g_fgt_observer.Finish(*s, result); FgtUnlock();
++    for (unsigned i = 0; i < s->candidates; ++i) {
++        const fso::Match &m = s->matches[i];
++        if (!m.claimed) continue;
++        FgtLog("[fg-submit-observer] first=%llu submit=%llu api=%s queue=%llx fence=%llx cb=%llx "
++            "eval_generation=%llu submit_generation=%llu match=%s coverage=%s generation_changed_during_call=%u "
++            "batches=%u read=%llu cbs=%llu/%llu waits=%llu signals=%llu read_faults=%llu occurrences=%llu locations_omitted=%llu "
++            "result_bits=0x%08x (submit-return-not-GPU-completion)",
++            m.sample.id, s->id, s->submit2 ? "vkQueueSubmit2/KHR" : "vkQueueSubmit", s->queue, s->fence, m.sample.cb,
++            m.sample.generation, m.submit_generation, m.sample.generation != 0 ? "same-observed-generation" : "HANDLE-ONLY-untracked",
++            fso::CoverageName(m.sample.coverage), m.generation_changed ? 1u : 0u,
++            s->batches, s->batches_read, s->cbs_read, s->declared_cbs, s->waits, s->signals, s->read_faults,
++            m.occurrences, m.omitted_locations, s->result);
++        for (unsigned j = 0; j < m.stored; ++j) {
++            const fso::Location &p = m.locations[j];
++            FgtLog("[fg-submit-observer] first=%llu submit=%llu occurrence=%u batch=%u cb_index=%u batch_cbs=%u waits=%u signals=%u",
++                m.sample.id, s->id, j, p.batch, p.cb_index, p.batch_cbs, p.waits, p.signals);
++        }
++    }
++}
++
+ struct FgtSubmitView {
+-    uint32_t waits, cbs, signals; bool timeline, has_fg_cmd;
++    uint32_t waits, cbs, signals; bool timeline, has_fg_cmd, incomplete;
+     uint64_t wait_sem[3], signal_sem[3]; uint64_t wait_val[3], signal_val[3]; void *cb[3];
+ };
+ 
+-static void FgtViewSubmit(const FgtSubmitInfo *s, void *fg_cmd, FgtSubmitView *v)
++static void FgtViewSubmit(const FgtSubmitInfo *source, void *fg_cmd, FgtSubmitView *v)
+ {
+-    v->waits = s->waitSemaphoreCount; v->cbs = s->commandBufferCount; v->signals = s->signalSemaphoreCount;
+-    for (uint32_t i = 0; s->pWaitSemaphores != nullptr && i < v->waits && i < 3; ++i) v->wait_sem[i] = s->pWaitSemaphores[i];
+-    for (uint32_t i = 0; s->pSignalSemaphores != nullptr && i < v->signals && i < 3; ++i) v->signal_sem[i] = s->pSignalSemaphores[i];
+-    for (uint32_t i = 0; s->pCommandBuffers != nullptr && i < v->cbs; ++i) {
+-        if (i < 3) v->cb[i] = s->pCommandBuffers[i];
+-        if (s->pCommandBuffers[i] == fg_cmd && fg_cmd != nullptr) v->has_fg_cmd = true;
++    FgtSubmitInfo s = {};
++    if (!FgtReadArray(source, 0, &s)) { v->incomplete = true; return; }
++    v->waits = s.waitSemaphoreCount; v->cbs = s.commandBufferCount; v->signals = s.signalSemaphoreCount;
++    for (uint32_t i = 0; i < v->waits && i < 3; ++i)
++        if (!FgtReadArray(s.pWaitSemaphores, i, &v->wait_sem[i])) { v->incomplete = true; break; }
++    for (uint32_t i = 0; i < v->signals && i < 3; ++i)
++        if (!FgtReadArray(s.pSignalSemaphores, i, &v->signal_sem[i])) { v->incomplete = true; break; }
++    for (uint32_t i = 0; i < v->cbs; ++i) {
++        void *cb = nullptr;
++        if (!FgtReadArray(s.pCommandBuffers, i, &cb)) { v->incomplete = true; break; }
++        if (i < 3) v->cb[i] = cb;
++        if (cb == fg_cmd && fg_cmd != nullptr) v->has_fg_cmd = true;
+     }
+-    for (const uint32_t *ext = static_cast<const uint32_t *>(s->pNext); ext != nullptr;
+-         ext = static_cast<const uint32_t *>(*reinterpret_cast<const void *const *>(ext + 2))) {
+-        if (*ext != kFgtStTimelineSubmitInfo) continue;
+-        const FgtTimelineSubmitInfo *tl = reinterpret_cast<const FgtTimelineSubmitInfo *>(ext);
+-        v->timeline = true;
+-        for (uint32_t i = 0; tl->pWaitValues != nullptr && i < tl->waitValueCount && i < 3; ++i) v->wait_val[i] = tl->pWaitValues[i];
+-        for (uint32_t i = 0; tl->pSignalValues != nullptr && i < tl->signalValueCount && i < 3; ++i) v->signal_val[i] = tl->pSignalValues[i];
+-        break;
++    struct Extension { uint32_t sType; const void *pNext; };
++    const void *next = s.pNext;
++    for (unsigned depth = 0; next != nullptr && depth < 16; ++depth) {
++        Extension ext = {};
++        if (!FgtReadArray(static_cast<const Extension *>(next), 0, &ext)) { v->incomplete = true; return; }
++        if (ext.sType == kFgtStTimelineSubmitInfo) {
++            FgtTimelineSubmitInfo tl = {};
++            if (!FgtReadArray(static_cast<const FgtTimelineSubmitInfo *>(next), 0, &tl)) { v->incomplete = true; return; }
++            v->timeline = true;
++            for (uint32_t i = 0; i < tl.waitValueCount && i < 3; ++i)
++                if (!FgtReadArray(tl.pWaitValues, i, &v->wait_val[i])) { v->incomplete = true; break; }
++            for (uint32_t i = 0; i < tl.signalValueCount && i < 3; ++i)
++                if (!FgtReadArray(tl.pSignalValues, i, &v->signal_val[i])) { v->incomplete = true; break; }
++            return;
++        }
++        next = ext.pNext;
+     }
++    if (next != nullptr) v->incomplete = true; // Bounded even for a cyclic legacy-detail pNext chain.
+ }
+ 
+-static void FgtViewSubmit2(const FgtSubmitInfo2 *s, void *fg_cmd, FgtSubmitView *v)
++static void FgtViewSubmit2(const FgtSubmitInfo2 *source, void *fg_cmd, FgtSubmitView *v)
+ {
+-    v->waits = s->waitSemaphoreInfoCount; v->cbs = s->commandBufferInfoCount; v->signals = s->signalSemaphoreInfoCount;
++    FgtSubmitInfo2 s = {};
++    if (!FgtReadArray(source, 0, &s)) { v->incomplete = true; return; }
++    v->waits = s.waitSemaphoreInfoCount; v->cbs = s.commandBufferInfoCount; v->signals = s.signalSemaphoreInfoCount;
+     v->timeline = false;
+-    for (uint32_t i = 0; s->pWaitSemaphoreInfos != nullptr && i < v->waits && i < 3; ++i) {
+-        v->wait_sem[i] = s->pWaitSemaphoreInfos[i].semaphore; v->wait_val[i] = s->pWaitSemaphoreInfos[i].value;
++    for (uint32_t i = 0; i < v->waits && i < 3; ++i) {
++        FgtSemaphoreSubmitInfo sem = {};
++        if (!FgtReadArray(s.pWaitSemaphoreInfos, i, &sem)) { v->incomplete = true; break; }
++        v->wait_sem[i] = sem.semaphore; v->wait_val[i] = sem.value;
+     }
+-    for (uint32_t i = 0; s->pSignalSemaphoreInfos != nullptr && i < v->signals && i < 3; ++i) {
+-        v->signal_sem[i] = s->pSignalSemaphoreInfos[i].semaphore; v->signal_val[i] = s->pSignalSemaphoreInfos[i].value;
++    for (uint32_t i = 0; i < v->signals && i < 3; ++i) {
++        FgtSemaphoreSubmitInfo sem = {};
++        if (!FgtReadArray(s.pSignalSemaphoreInfos, i, &sem)) { v->incomplete = true; break; }
++        v->signal_sem[i] = sem.semaphore; v->signal_val[i] = sem.value;
+     }
+-    for (uint32_t i = 0; s->pCommandBufferInfos != nullptr && i < v->cbs; ++i) {
+-        if (i < 3) v->cb[i] = s->pCommandBufferInfos[i].commandBuffer;
+-        if (s->pCommandBufferInfos[i].commandBuffer == fg_cmd && fg_cmd != nullptr) v->has_fg_cmd = true;
++    for (uint32_t i = 0; i < v->cbs; ++i) {
++        FgtCommandBufferSubmitInfo cb = {};
++        if (!FgtReadArray(s.pCommandBufferInfos, i, &cb)) { v->incomplete = true; break; }
++        if (i < 3) v->cb[i] = cb.commandBuffer;
++        if (cb.commandBuffer == fg_cmd && fg_cmd != nullptr) v->has_fg_cmd = true;
+     }
+ }
+ 
+-static void FgtNoteSubmit(void *queue, uint32_t count, const FgtSubmitInfo *subs, const FgtSubmitInfo2 *subs2, uint64_t fence, bool is_submit2)
++static void FgtNoteSubmit(void *queue, uint32_t count, const FgtSubmitInfo *subs, const FgtSubmitInfo2 *subs2,
++    uint64_t fence, bool is_submit2, const fso::Submit &observation)
+ {
++    if (!FgtEnabled() || !g_fgt_control.cs_ready) return;
+     FgTrace &t = g_fgt;
+     const uint64_t q = reinterpret_cast<uint64_t>(queue);
+     const LONGLONG now = FgtNow();
+@@ -416,10 +642,19 @@ static void FgtNoteSubmit(void *queue, uint32_t count, const FgtSubmitInfo *subs
+     const uint32_t n = count < _countof(views) ? count : static_cast<uint32_t>(_countof(views));
+     FgtLock();
+     void *const fg_cmd = t.last_fg_cmd;
++    const bool sample_window = g_fgt_observer.Summary().firsts <= fso::kSamples;
+     FgtUnlock();
+     for (uint32_t i = 0; i < n; ++i) {
+-        if (subs != nullptr) FgtViewSubmit(subs + i, fg_cmd, &views[i]);
+-        else if (subs2 != nullptr) FgtViewSubmit2(subs2 + i, fg_cmd, &views[i]);
++        if (!sample_window) break;
++        if (is_submit2) {
++            FgtSubmitInfo2 s = {};
++            if (FgtReadArray(subs2, i, &s)) FgtViewSubmit2(&s, fg_cmd, &views[i]);
++            else views[i].incomplete = true;
++        } else {
++            FgtSubmitInfo s = {};
++            if (FgtReadArray(subs, i, &s)) FgtViewSubmit(&s, fg_cmd, &views[i]);
++            else views[i].incomplete = true;
++        }
+     }
+     bool detail = false;
+     const char *why = "";
+@@ -430,10 +665,9 @@ static void FgtNoteSubmit(void *queue, uint32_t count, const FgtSubmitInfo *subs
+         if (is_submit2) ++slot->submits2;
+         if (fence != 0) ++slot->fences;
+         FgtNote(slot->threads, tid);
+-        for (uint32_t i = 0; i < n; ++i) {
+-            slot->cbs += views[i].cbs; slot->waits += views[i].waits; slot->signals += views[i].signals;
++        fso::Add(slot->cbs, observation.cbs_read); fso::Add(slot->waits, observation.waits); fso::Add(slot->signals, observation.signals);
++        for (uint32_t i = 0; i < n; ++i)
+             if (views[i].timeline) ++slot->timeline;
+-        }
+     }
+     if (q == t.cmd_queue && t.cmd_queue != 0 && t.cmdqueue_detail_left != 0) { --t.cmdqueue_detail_left; detail = true; why = "FG queue"; }
+     else if (q == t.present_queue && t.present_queue != 0 && t.present_queue_detail_left != 0) { --t.present_queue_detail_left; detail = true; why = "game present queue"; }
+@@ -441,30 +675,61 @@ static void FgtNoteSubmit(void *queue, uint32_t count, const FgtSubmitInfo *subs
+     const LONGLONG eval1 = t.last_eval1_qpc;
+     const LONGLONG present = t.last_present_qpc;
+     FgtUnlock();
+-    if (!detail) return;
+-    FgtLog("[fg-trace] %s (%s) queue=%p thread=%lu batches=%u fence=%llx since_present=%.2fms since_eval1=%.2fms",
++    if (!detail || !sample_window) return;
++    FgtLog("[fg-trace] %s (%s; legacy-preview-only/max4-batches/max3-printed-CBs/not-recording-identity) queue=%p thread=%lu batches=%u fence=%llx since_present=%.2fms since_eval1=%.2fms",
+         is_submit2 ? "vkQueueSubmit2" : "vkQueueSubmit", why, queue, tid, count, fence,
+         present != 0 ? FgtMs(present, now) : -1.0, eval1 != 0 ? FgtMs(eval1, now) : -1.0);
+     for (uint32_t i = 0; i < n; ++i) {
+         const FgtSubmitView &v = views[i];
+-        FgtLog("[fg-trace]   batch[%u] waits=%u [%llx:%llu %llx:%llu %llx:%llu] cbs=%u [%p %p %p]%s signals=%u [%llx:%llu %llx:%llu %llx:%llu]%s",
++        FgtLog("[fg-trace]   batch[%u] waits=%u [%llx:%llu %llx:%llu %llx:%llu] cbs=%u [%p %p %p]%s signals=%u [%llx:%llu %llx:%llu %llx:%llu]%s%s",
+             i, v.waits, v.wait_sem[0], v.wait_val[0], v.wait_sem[1], v.wait_val[1], v.wait_sem[2], v.wait_val[2],
+-            v.cbs, v.cb[0], v.cb[1], v.cb[2], v.has_fg_cmd ? " <FG evaluate cmd>" : "",
++            v.cbs, v.cb[0], v.cb[1], v.cb[2], v.has_fg_cmd ? " <last-FG-handle-only>" : "",
+             v.signals, v.signal_sem[0], v.signal_val[0], v.signal_sem[1], v.signal_val[1], v.signal_sem[2], v.signal_val[2],
+-            v.timeline ? " timeline" : "");
++            v.timeline ? " timeline" : "", v.incomplete ? " incomplete-read" : "");
+     }
+ }
+ 
++static thread_local bool g_fgt_in_submit_observer;
++static bool FgtBeginSubmitObservation()
++{
++    if (!FgtEnabled() || !g_fgt_control.cs_ready) return false;
++    if (g_fgt_in_submit_observer) {
++        FgtLock(); g_fgt_observer.NestedSubmitSkipped(); FgtUnlock();
++        return false; // Layer forwarding may re-enter another observed dispatch target.
++    }
++    g_fgt_in_submit_observer = true;
++    return true;
++}
+ static uint32_t FgtQueueSubmitDetour(void *queue, uint32_t count, const FgtSubmitInfo *subs, uint64_t fence)
+ {
+-    FgtNoteSubmit(queue, count, subs, nullptr, fence, false);
+-    return reinterpret_cast<PFN_FgtQueueSubmit>(g_fgt_control.submit_hook.original)(queue, count, subs, fence);
++    if (!FgtBeginSubmitObservation())
++        return reinterpret_cast<PFN_FgtQueueSubmit>(g_fgt_control.submit_hook.original)(queue, count, subs, fence);
++    fso::Submit observation;
++    FgtLock(); g_fgt_observer.BeginSubmit(observation, reinterpret_cast<uint64_t>(queue), count, fence, false); FgtUnlock();
++    FgtObserveSubmit(&observation, subs, nullptr);
++    FgtLock(); g_fgt_observer.Claim(observation); FgtUnlock();
++    FgtNoteSubmit(queue, count, subs, nullptr, fence, false, observation);
++    // Borrowed pointers and scalar arguments are forwarded exactly once, unchanged.
++    // No observation/log lock spans this call (including any ReShade callbacks).
++    const uint32_t result = reinterpret_cast<PFN_FgtQueueSubmit>(g_fgt_control.submit_hook.original)(queue, count, subs, fence);
++    FgtFinishObservedSubmit(&observation, result);
++    g_fgt_in_submit_observer = false;
++    return result;
+ }
+ 
+ static uint32_t FgtQueueSubmit2Detour(void *queue, uint32_t count, const FgtSubmitInfo2 *subs, uint64_t fence)
+ {
+-    FgtNoteSubmit(queue, count, nullptr, subs, fence, true);
+-    return reinterpret_cast<PFN_FgtQueueSubmit2>(g_fgt_control.submit2_hook.original)(queue, count, subs, fence);
++    if (!FgtBeginSubmitObservation())
++        return reinterpret_cast<PFN_FgtQueueSubmit2>(g_fgt_control.submit2_hook.original)(queue, count, subs, fence);
++    fso::Submit observation;
++    FgtLock(); g_fgt_observer.BeginSubmit(observation, reinterpret_cast<uint64_t>(queue), count, fence, true); FgtUnlock();
++    FgtObserveSubmit(&observation, nullptr, subs);
++    FgtLock(); g_fgt_observer.Claim(observation); FgtUnlock();
++    FgtNoteSubmit(queue, count, nullptr, subs, fence, true, observation);
++    const uint32_t result = reinterpret_cast<PFN_FgtQueueSubmit2>(g_fgt_control.submit2_hook.original)(queue, count, subs, fence);
++    FgtFinishObservedSubmit(&observation, result);
++    g_fgt_in_submit_observer = false;
++    return result;
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -594,7 +859,8 @@ static void FgtRegisterEvents(PFN_ReShadeRegisterEvent reg)
+     if (!FgtHooksWanted() || reg == nullptr) return;
+     FgtInit();
+     if (!FgtEnabled()) return;   // relay-only: nothing to register, the hooks come from the worker
+-    reg(reshade::addon_event::init_command_queue, reinterpret_cast<void *>(&OnFgtInitCommandQueue));
++    FgtRegisterTyped<reshade::addon_event::init_command_queue>(reg, &OnFgtInitCommandQueue);
++    FgtRegisterCommandEvents(reg);
+     FgtLog("[fg-trace] Trace=1: asynchronous log; hook installation deferred to the NGX hook worker. Early calls may be missed.");
+ }
+ 
+@@ -652,7 +918,10 @@ static void FgtMaintenance()
+             void *submit2 = InterlockedCompareExchangePointer(&g_fgt_submit2_target, nullptr, nullptr);
+             const bool a = HookInstall(t.submit_hook, submit, reinterpret_cast<void *>(&FgtQueueSubmitDetour));
+             const bool b = submit2 != nullptr && submit2 != submit && HookInstall(t.submit2_hook, submit2, reinterpret_cast<void *>(&FgtQueueSubmit2Detour));
++            FgtLock(); g_fgt_submit_observed = a; g_fgt_submit2_observed = b; FgtUnlock();
+             FgtLog("[fg-trace] queue observers: submit=%p %s submit2=%p %s", submit, a ? "hooked" : "FAILED", submit2, b ? "hooked" : "unavailable");
++            FgtLog("[fg-submit-observer] submit-coverage=%s submit2-coverage=%s; selected-dispatch-targets-only, early/other-target/secondary-only submissions may be missed; original waits/signals unchanged",
++                a ? "hooked" : "unavailable", b ? "hooked" : "unavailable");
+         }
+         // The relay's own device-creation hook (Import=1 only; it logs its
+         // verdict). Here rather than at the top because it is the same kind of
+@@ -669,12 +938,35 @@ static void FgtSummary()
+ {
+     FgTrace t;
+     FgtQueueId queue_ids[16];
+-    unsigned queue_id_count;
++    unsigned queue_id_count, pending = 0, in_submit = 0;
++    fso::Stats observer;
++    bool events_registered, submit_hooked, submit2_hooked;
+     FgtLock();
+     t = g_fgt;
+     queue_id_count = g_fgt_queue_id_count;
+     memcpy(queue_ids, g_fgt_queue_ids, sizeof(queue_ids));
++    observer = g_fgt_observer.Summary();
++    events_registered = g_fgt_command_events_registered;
++    submit_hooked = g_fgt_submit_observed; submit2_hooked = g_fgt_submit2_observed;
++    for (unsigned i = 0; i < g_fgt_observer.SampleCount(); ++i) {
++        const fso::Sample s = g_fgt_observer.GetSample(i);
++        if (s.state == fso::State::pending) ++pending;
++        if (s.state == fso::State::in_submit) ++in_submit;
++    }
+     FgtUnlock();
++    FgtLog("[fg-submit-observer] summary coverage events_registered=%u submit_hooked=%u submit2_hooked=%u "
++        "init=%llu begin/reset=%llu destroy=%llu device_destroy=%llu events=%llu partial_starts=%llu capacity_misses=%llu generation_exhausted=%llu "
++        "firsts=%llu observed_prefix=%llu untracked=%llu partial=%llu; no-prefix-is-not-empty/native-coverage-incomplete",
++        events_registered ? 1u : 0u, submit_hooked ? 1u : 0u, submit2_hooked ? 1u : 0u,
++        observer.inits, observer.resets, observer.destroys, observer.device_destroys, observer.events,
++        observer.partial_starts, observer.capacity_misses, observer.generation_exhausted,
++        observer.firsts, observer.prefixes, observer.untracked_firsts, observer.partial_firsts);
++    FgtLog("[fg-submit-observer] summary submits=%llu submit2=%llu batches_read=%llu cbs_read=%llu read_faults=%llu nested_suppressed=%llu "
++        "sample_returns=%llu handle_only=%llu pending=%u in_submit=%u invalidated=%llu duplicates=%llu locations_omitted=%llu nonzero_results=%llu log_dropped_all_trace=%ld; "
++        "detail_limit=8-firsts/8-locations-each; unobserved-submit-is-not-no-submit; success-is-not-GPU-readiness",
++        observer.submits, observer.submits2, observer.batches, observer.cbs, observer.read_faults, observer.nested_suppressed,
++        observer.returned, observer.handle_only, pending, in_submit, observer.invalidated,
++        observer.duplicate_occurrences, observer.omitted_locations, observer.failed_results, InterlockedCompareExchange(&g_fgt_log_dropped, 0, 0));
+     char a[512], b[256];
+     FgtLog("[fg-trace] ---- summary at %u FG groups / %u evaluates / %u game presents; log_dropped=%ld ----",
+         t.eval_groups, t.eval_calls, t.present_calls, InterlockedCompareExchange(&g_fgt_log_dropped, 0, 0));
+@@ -719,7 +1011,7 @@ static void FgtSummary()
+         char fam[48] = "family=? index=?";
+         for (unsigned k = 0; k < queue_id_count; ++k)
+             if (queue_ids[k].queue == q.queue) { _snprintf_s(fam, sizeof(fam), _TRUNCATE, "family=%u index=%u", queue_ids[k].family, queue_ids[k].index); break; }
+-        FgtLog("[fg-trace] queue %llx%s%s %s reshade_type=%s0x%x submits=%u (submit2 %u, timeline %u, fenced %u) cbs=%u waits=%u signals=%u threads %s",
++        FgtLog("[fg-trace] queue %llx%s%s %s reshade_type=%s0x%x submits=%u (submit2 %u, timeline-preview-only %u, fenced %u) cbs=%llu waits=%llu signals=%llu threads %s",
+             q.queue, label, label2, fam, rs >= 0 ? "" : "unknown ", rs >= 0 && rs < static_cast<int>(kFgtDistinct) ? t.reshade_queue_types[rs] : 0u,
+             q.submits, q.submits2, q.timeline, q.fences, q.cbs, q.waits, q.signals, a);
+     }
+@@ -802,6 +1094,7 @@ static void FgTraceEvaluate(void *cmd, const NVSDK_NGX_Parameter *p)
+     const bool have_real = VkmGetRes(p, "DLSSG.OutputReal", &oreal, &why);
+     const bool have_interp = VkmGetRes(p, "DLSSG.OutputInterpolated", &ointerp, &why);
+     const bool first = indexed ? idx == 1 : have_real;
++    fso::Sample first_sample;
+     unsigned groups = 0, calls = 0;
+     double since_present = -1.0;
+     FgtLock();
+@@ -814,6 +1107,11 @@ static void FgTraceEvaluate(void *cmd, const NVSDK_NGX_Parameter *p)
+     if (first) {
+         ++t.eval_groups;
+         t.last_fg_cmd = cmd;
++        const fso::Images images = { have_hud ? hud.image : 0ull, have_back ? back.image : 0ull,
++            have_depth ? depth.image : 0ull, have_mv ? mv.image : 0ull,
++            (have_hud ? 1u : 0u) | (have_back ? 2u : 0u) | (have_depth ? 4u : 0u) | (have_mv ? 8u : 0u) };
++        first_sample = g_fgt_observer.First(reinterpret_cast<uint64_t>(cmd), reinterpret_cast<uint64_t>(queue),
++            images, static_cast<uint64_t>(now), idx, indexed);
+         if (present != 0 && now >= present) { since_present = FgtMs(present, now); FgtStatAdd(t.present_to_eval, since_present); }
+         if (t.last_eval1_qpc != 0) FgtStatAdd(t.eval_interval, FgtMs(t.last_eval1_qpc, now));
+         t.last_eval1_qpc = now;
+@@ -829,7 +1127,8 @@ static void FgTraceEvaluate(void *cmd, const NVSDK_NGX_Parameter *p)
+     if (have_interp) FgtNote(t.out_interp, ointerp.image);
+     groups = t.eval_groups;
+     FgtUnlock();
+-    if (groups <= 3 || (first && groups % 1800 == 0)) {
++    FgtLogFirstSample(first_sample);
++    if (groups <= 3) {
+         FgtLog("[fg-trace] evaluate #%u idx=%u%s thread=%lu cmd=%p queue=%p since_present=%.2fms hud=%llx back=%llx depth=%llx mv=%llx real=%llx interp=%llx",
+             calls, idx, indexed ? "" : "(unindexed)", GetCurrentThreadId(), cmd, queue,
+             first ? since_present : (present != 0 ? FgtMs(present, now) : -1.0),
+diff --git a/src/focus-fg.inc b/src/focus-fg.inc
+index 506be81..f7fe265 100644
+--- a/src/focus-fg.inc
++++ b/src/focus-fg.inc
+@@ -194,9 +194,14 @@ static void FocusFgMaintenance()
+         state.next_poll = now + 1000;
+         wchar_t path[1024] = {};
+         PresentAdapterPath(path, _countof(path), L"ReShade.ini");
++        // A stage-protocol Generic selects the FG-input feed by its Present layer
++        // count; NRHookPoint is only its legacy single-point setting.
++        uint32_t plan = 0;
++        const bool present_selected = PresentAdapterStagePlan(&plan)
++            ? ((plan >> 6) & 7u) != 0
++            : GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint", -1, path) == 2;
+         const bool enabled = GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NeuralUplift", 0, path) == 1 &&
+-            GetPrivateProfileIntW(L"RenoDX.DLSS5", L"EnableHooks", 0, path) == 1 &&
+-            GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint", -1, path) == 2;
++            GetPrivateProfileIntW(L"RenoDX.DLSS5", L"EnableHooks", 0, path) == 1 && present_selected;
+         InterlockedExchange(&g_focus_fg_enabled, enabled ? 1 : 0);
+         if (enabled) CompositionGuardStart();
+         static unsigned report_count;
+diff --git a/src/minhook/PROVENANCE.md b/src/minhook/PROVENANCE.md
+index 17cac3f..3f44748 100644
+--- a/src/minhook/PROVENANCE.md
++++ b/src/minhook/PROVENANCE.md
+@@ -10,6 +10,14 @@ with these local differences (ignoring UTF-8 BOMs and line endings):
+   allocated until process exit in the bridge. Retirement runs outside loader notifications.
+ - `hook.c`: on `WAIT_ABANDONED`, release the mutex ownership granted by Windows
+   before returning `MH_ERROR_MUTEX_FAILURE`. All guarded APIs use the same helper.
++- `buffer.c` / `hook.c` / `MinHook.h`: the SR carrier alone opts into
++  `MH_CreateHookPrologueExtended`, retaining ±1 GiB allocation first and trying
++  ±0x7FFF0000 only when that fails. The wider path requires the live five-byte
++  `mov [rsp+8], rbx` prologue at creation and again under thread freeze at enable;
++  it rejects existing jumps that might hide a different underlying prologue.
++  Ordinary hooks keep the original range and the five-byte E9 chain ABI.
++- `trampoline.c` / `hook.c`: reject out-of-range RIP-relative relocation and
++  relay jump displacements instead of truncating them to 32 bits.
+ - `MinHook.h`: declarations/documentation for retirement; omitted an upstream
+   comment about a possible future thread-freeze method.
+ - `src/hde/*`: the complete HDE directory instead matches
+diff --git a/src/minhook/include/MinHook.h b/src/minhook/include/MinHook.h
+index b28e155..ad1e08a 100644
+--- a/src/minhook/include/MinHook.h
++++ b/src/minhook/include/MinHook.h
+@@ -139,6 +139,8 @@ extern "C" {
+     //                     This parameter can be NULL.
+     MH_STATUS WINAPI MH_CreateHook(LPVOID pTarget, LPVOID pDetour, LPVOID *ppOriginal);
+     MH_STATUS WINAPI MH_CreateHookEx(ULONG_PTR hookIdent, LPVOID pTarget, LPVOID pDetour, LPVOID *ppOriginal);
++    // Opt-in wider allocation for the exact five-byte mov [rsp+8], rbx prologue, checked again on enable.
++    MH_STATUS WINAPI MH_CreateHookPrologueExtended(LPVOID pTarget, LPVOID pDetour, LPVOID *ppOriginal);
+ 
+     // Creates a hook for the specified API function, in disabled state.
+     // Parameters:
+diff --git a/src/minhook/src/buffer.c b/src/minhook/src/buffer.c
+index d2850bf..70c8da0 100644
+--- a/src/minhook/src/buffer.c
++++ b/src/minhook/src/buffer.c
+@@ -34,6 +34,7 @@
+ 
+ // Max range for seeking a memory block. (= 1024MB)
+ #define MAX_MEMORY_RANGE 0x40000000
++#define FALLBACK_MEMORY_RANGE 0x7FFF0000
+ 
+ // Memory protection flags to check the executable address.
+ #define PAGE_EXECUTE_FLAGS \
+@@ -148,7 +149,7 @@ static LPVOID FindNextFreeRegion(LPVOID pAddress, LPVOID pMaxAddr, DWORD dwAlloc
+ #endif
+ 
+ //-------------------------------------------------------------------------
+-static PMEMORY_BLOCK GetMemoryBlock(LPVOID pOrigin)
++static PMEMORY_BLOCK GetMemoryBlock(LPVOID pOrigin, ULONG_PTR range)
+ {
+     PMEMORY_BLOCK pBlock;
+ #if defined(_M_X64) || defined(__x86_64__)
+@@ -160,12 +161,11 @@ static PMEMORY_BLOCK GetMemoryBlock(LPVOID pOrigin)
+     minAddr = (ULONG_PTR)si.lpMinimumApplicationAddress;
+     maxAddr = (ULONG_PTR)si.lpMaximumApplicationAddress;
+ 
+-    // pOrigin ± 512MB
+-    if ((ULONG_PTR)pOrigin > MAX_MEMORY_RANGE && minAddr < (ULONG_PTR)pOrigin - MAX_MEMORY_RANGE)
+-        minAddr = (ULONG_PTR)pOrigin - MAX_MEMORY_RANGE;
++    if ((ULONG_PTR)pOrigin > range && minAddr < (ULONG_PTR)pOrigin - range)
++        minAddr = (ULONG_PTR)pOrigin - range;
+ 
+-    if (maxAddr > (ULONG_PTR)pOrigin + MAX_MEMORY_RANGE)
+-        maxAddr = (ULONG_PTR)pOrigin + MAX_MEMORY_RANGE;
++    if (maxAddr > (ULONG_PTR)pOrigin + range)
++        maxAddr = (ULONG_PTR)pOrigin + range;
+ 
+     // Make room for MEMORY_BLOCK_SIZE bytes.
+     maxAddr -= MEMORY_BLOCK_SIZE - 1;
+@@ -244,10 +244,10 @@ static PMEMORY_BLOCK GetMemoryBlock(LPVOID pOrigin)
+ }
+ 
+ //-------------------------------------------------------------------------
+-LPVOID AllocateBuffer(LPVOID pOrigin)
++static LPVOID AllocateBufferInRange(LPVOID pOrigin, ULONG_PTR range)
+ {
+     PMEMORY_SLOT  pSlot;
+-    PMEMORY_BLOCK pBlock = GetMemoryBlock(pOrigin);
++    PMEMORY_BLOCK pBlock = GetMemoryBlock(pOrigin, range);
+     if (pBlock == NULL)
+         return NULL;
+ 
+@@ -262,6 +262,16 @@ LPVOID AllocateBuffer(LPVOID pOrigin)
+     return pSlot;
+ }
+ 
++LPVOID AllocateBuffer(LPVOID pOrigin)
++{
++    return AllocateBufferInRange(pOrigin, MAX_MEMORY_RANGE);
++}
++
++LPVOID AllocateBufferExtended(LPVOID pOrigin)
++{
++    return AllocateBufferInRange(pOrigin, FALLBACK_MEMORY_RANGE);
++}
++
+ //-------------------------------------------------------------------------
+ VOID FreeBuffer(LPVOID pBuffer)
+ {
+diff --git a/src/minhook/src/buffer.h b/src/minhook/src/buffer.h
+index a4ac028..7725748 100644
+--- a/src/minhook/src/buffer.h
++++ b/src/minhook/src/buffer.h
+@@ -38,5 +38,6 @@
+ VOID   InitializeBuffer(VOID);
+ VOID   UninitializeBuffer(VOID);
+ LPVOID AllocateBuffer(LPVOID pOrigin);
++LPVOID AllocateBufferExtended(LPVOID pOrigin);
+ VOID   FreeBuffer(LPVOID pBuffer);
+ BOOL   IsExecutableAddress(LPVOID pAddress);
+diff --git a/src/minhook/src/hook.c b/src/minhook/src/hook.c
+index 6b2056e..c7aad15 100644
+--- a/src/minhook/src/hook.c
++++ b/src/minhook/src/hook.c
+@@ -105,6 +105,7 @@ typedef struct _HOOK_ENTRY
+     UINT8  patchAbove  : 1;     // Uses the hot patch area.
+     UINT8  isEnabled   : 1;     // Enabled.
+     UINT8  queueEnable : 1;     // Queued for enabling/disabling when != isEnabled.
++    UINT8  extendedPrologue : 1;
+ 
+     UINT   nIP : 4;             // Count of the instruction boundaries.
+     UINT8  oldIPs[8];           // Instruction boundaries of the target function.
+@@ -493,9 +494,28 @@ static VOID Unfreeze(PFROZEN_THREADS pThreads)
+ }
+ 
+ //-------------------------------------------------------------------------
++static BOOL MatchesExtendedPrologue(LPVOID target)
++{
++#if defined(_M_X64) || defined(__x86_64__)
++    static const BYTE prologue[] = {0x48, 0x89, 0x5C, 0x24, 0x08};
++    MEMORY_BASIC_INFORMATION region;
++    if (VirtualQuery(target, &region, sizeof(region)) == 0 || region.State != MEM_COMMIT ||
++        (region.Protect & (PAGE_NOACCESS | PAGE_GUARD)) != 0 ||
++        (ULONG_PTR)target + sizeof(prologue) > (ULONG_PTR)region.BaseAddress + region.RegionSize)
++        return FALSE;
++    return memcmp(target, prologue, sizeof(prologue)) == 0;
++#else
++    (void)target;
++    return FALSE;
++#endif
++}
++
+ static MH_STATUS CreateHookTrampoline(UINT pos)
+ {
+     PHOOK_ENTRY pHook = &g_hooks.pItems[pos];
++    // An existing jump can hide a RIP-relative prologue that reappears when a lower hook is removed.
++    if (pHook->extendedPrologue && !MatchesExtendedPrologue(pHook->pTarget))
++        return MH_ERROR_UNSUPPORTED_FUNCTION;
+ 
+     TRAMPOLINE ct;
+     ct.pTarget = pHook->pTarget;
+@@ -562,6 +582,15 @@ static MH_STATUS WINAPI EnableHookLL(UINT pos, BOOL enable, PFROZEN_THREADS pThr
+         }
+     }
+ 
++#if defined(_M_X64) || defined(__x86_64__)
++    if (enable)
++    {
++        const INT64 displacement = (INT64)(ULONG_PTR)&pHook->pExecBuffer->jmpRelay
++                                 - (INT64)(ULONG_PTR)(pPatchTarget + sizeof(JMP_REL));
++        if (displacement < INT_MIN || displacement > INT_MAX)
++            return MH_ERROR_UNSUPPORTED_FUNCTION;
++    }
++#endif
+     if (!VirtualProtect(pPatchTarget, patchSize, PAGE_EXECUTE_READWRITE, &oldProtect))
+         return MH_ERROR_MEMORY_PROTECT;
+ 
+@@ -773,7 +802,7 @@ MH_STATUS WINAPI MH_SetThreadFreezeMethod(MH_THREAD_FREEZE_METHOD method)
+ }
+ 
+ //-------------------------------------------------------------------------
+-MH_STATUS WINAPI MH_CreateHookEx(ULONG_PTR hookIdent, LPVOID pTarget, LPVOID pDetour, LPVOID *ppOriginal)
++static MH_STATUS CreateHook(ULONG_PTR hookIdent, LPVOID pTarget, LPVOID pDetour, LPVOID *ppOriginal, BOOL allowExtended)
+ {
+     if (g_hMutex == NULL)
+         return MH_ERROR_NOT_INITIALIZED;
+@@ -788,7 +817,13 @@ MH_STATUS WINAPI MH_CreateHookEx(ULONG_PTR hookIdent, LPVOID pTarget, LPVOID pDe
+         UINT pos = FindHookEntry(hookIdent, pTarget);
+         if (pos == INVALID_HOOK_POS)
+         {
++            BOOL extended = FALSE;
+             PEXEC_BUFFER pBuffer = (PEXEC_BUFFER)AllocateBuffer(pTarget);
++            if (pBuffer == NULL && allowExtended && MatchesExtendedPrologue(pTarget))
++            {
++                pBuffer = (PEXEC_BUFFER)AllocateBufferExtended(pTarget);
++                extended = pBuffer != NULL;
++            }
+             if (pBuffer != NULL)
+             {
+                 PHOOK_ENTRY pHook = AddHookEntry();
+@@ -804,6 +839,7 @@ MH_STATUS WINAPI MH_CreateHookEx(ULONG_PTR hookIdent, LPVOID pTarget, LPVOID pDe
+                     pHook->pExecBuffer = pBuffer;
+                     pHook->isEnabled = FALSE;
+                     pHook->queueEnable = FALSE;
++                    pHook->extendedPrologue = extended;
+ 
+                     if (ppOriginal != NULL)
+                         *ppOriginal = pBuffer->trampoline;
+@@ -839,6 +875,16 @@ MH_STATUS WINAPI MH_CreateHookEx(ULONG_PTR hookIdent, LPVOID pTarget, LPVOID pDe
+ }
+ 
+ //-------------------------------------------------------------------------
++MH_STATUS WINAPI MH_CreateHookEx(ULONG_PTR hookIdent, LPVOID pTarget, LPVOID pDetour, LPVOID *ppOriginal)
++{
++    return CreateHook(hookIdent, pTarget, pDetour, ppOriginal, FALSE);
++}
++
++MH_STATUS WINAPI MH_CreateHookPrologueExtended(LPVOID pTarget, LPVOID pDetour, LPVOID *ppOriginal)
++{
++    return CreateHook(MH_DEFAULT_IDENT, pTarget, pDetour, ppOriginal, TRUE);
++}
++
+ MH_STATUS WINAPI MH_CreateHook(LPVOID pTarget, LPVOID pDetour, LPVOID *ppOriginal)
+ {
+     return MH_CreateHookEx(MH_DEFAULT_IDENT, pTarget, pDetour, ppOriginal);
+diff --git a/src/minhook/src/trampoline.c b/src/minhook/src/trampoline.c
+index 4b38086..7011c2d 100644
+--- a/src/minhook/src/trampoline.c
++++ b/src/minhook/src/trampoline.c
+@@ -27,6 +27,7 @@
+  */
+ 
+ #include <windows.h>
++#include <limits.h>
+ 
+ #if defined(_MSC_VER) && !defined(MINHOOK_DISABLE_INTRINSICS)
+     #define ALLOW_INTRINSICS
+@@ -177,8 +178,11 @@ BOOL CreateTrampolineFunction(PTRAMPOLINE ct)
+ 
+             // Relative address is stored at (instruction length - immediate value length - 4).
+             pRelAddr = (PUINT32)(instBuf + hs.len - ((hs.flags & 0x3C) >> 2) - 4);
+-            *pRelAddr
+-                = (UINT32)((pOldInst + hs.len + (INT32)hs.disp.disp32) - (pNewInst + hs.len));
++            const INT64 displacement = (INT64)pOldInst + hs.len + (INT32)hs.disp.disp32
++                                     - ((INT64)pNewInst + hs.len);
++            if (displacement < INT_MIN || displacement > INT_MAX)
++                return FALSE;
++            *pRelAddr = (UINT32)(INT32)displacement;
+ 
+             // Complete the function if JMP (FF /4).
+             if (hs.opcode == 0xFF && hs.modrm_reg == 4)
+diff --git a/src/present-adapter-config.h b/src/present-adapter-config.h
+index 44cb061..cfb59bc 100644
+--- a/src/present-adapter-config.h
++++ b/src/present-adapter-config.h
+@@ -1,5 +1,46 @@
+ #pragma once
+ 
++// Protocol v1: three 3-bit counts (Render, Upscaled, Present), each 0..4.
++// Do not cache an absent consumer: ReShade may load Generic after the bridge.
++typedef uint32_t (__cdecl *PFN_PresentAdapterStageQuery)();
++static PFN_PresentAdapterStageQuery PresentAdapterStageQuery()
++{
++    static PVOID volatile cached_query = nullptr;
++    auto query = reinterpret_cast<PFN_PresentAdapterStageQuery>(
++        InterlockedCompareExchangePointer(&cached_query, nullptr, nullptr));
++    if (query == nullptr) {
++        const HMODULE consumer = GetModuleHandleW(L"renodx-dlss5.addon64");
++        if (consumer == nullptr) return nullptr;
++        auto version = reinterpret_cast<PFN_PresentAdapterStageQuery>(
++            GetProcAddress(consumer, "DLSS5StageProtocolVersion"));
++        auto candidate = reinterpret_cast<PFN_PresentAdapterStageQuery>(
++            GetProcAddress(consumer, "DLSS5GetStagePlan"));
++        if (version == nullptr || candidate == nullptr) return nullptr;
++        HMODULE keep = nullptr;
++        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
++                                reinterpret_cast<LPCWSTR>(consumer), &keep) || version() != 1) return nullptr;
++        query = candidate;
++        InterlockedCompareExchangePointer(&cached_query, reinterpret_cast<PVOID>(query), nullptr);
++    }
++    return query;
++}
++
++static bool PresentAdapterStageProtocol()
++{
++    return PresentAdapterStageQuery() != nullptr;
++}
++
++static bool PresentAdapterStagePlan(uint32_t* plan)
++{
++    const auto query = PresentAdapterStageQuery();
++    if (query == nullptr) return false;
++    const uint32_t packed = query();
++    if ((packed & ~0x1ffu) != 0 || (packed & 7u) > 4 ||
++        ((packed >> 3) & 7u) > 4 || ((packed >> 6) & 7u) > 4) return false;
++    if (plan != nullptr) *plan = packed;
++    return true;
++}
++
+ // Restart-only opt-in: an in-flight presentation transport must not silently
+ // change back into the game's DLSS mirror during a live configuration reload.
+ static void PresentAdapterPath(wchar_t* path, size_t count, const wchar_t* leaf)
+@@ -60,17 +101,27 @@ static bool PresentAdapterFollow()
+     return PresentAdapterFgInput() && follow;
+ }
+ 
+-// Pipeline=0 (default) parks the FG evaluate until the real frame's NR is done.
++// Pipeline=2 (default) is the GPU relay in fg-relay.inc; see below.
++// Pipeline=0 is the serial feed, kept for diagnosis only: the real frame is parked
++// inside the FG command buffer for the whole NR, the generated frames of the group
++// cannot present meanwhile and then reach the compositor in a burst. Measured in
++// Endfield (5120x2160, two NR passes, 6x, 120 Hz): 121 presents/s but only 88
++// displayed, every sixth interval 17.6 ms and two presents 0.26 ms apart -- a high
++// frame counter that looks and feels like stutter. An absent key must therefore
++// not select it.
+ // Pipeline=1 is a throughput probe: the same NR runs on the private device while
+ // frame generation proceeds on the game's own image, and the result is discarded.
+ // It measures the GPU headroom a one-frame-delayed pipeline could use; the
+ // picture is the game's own, without NR, for the duration.
++static const int kPresentAdapterDefaultPipeline = 2;
+ static int PresentAdapterPipeline()
+ {
+     static const int pipeline = [] {
+         wchar_t path[1024] = {};
+         PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
+-        return path[0] != 0 ? GetPrivateProfileIntW(L"Adapter", L"Pipeline", 0, path) : 0;
++        return path[0] != 0 ? static_cast<int>(GetPrivateProfileIntW(L"Adapter", L"Pipeline",
++                                                                     kPresentAdapterDefaultPipeline, path))
++                            : kPresentAdapterDefaultPipeline;
+     }();
+     return PresentAdapterFgInput() ? pipeline : 0;
+ }
+@@ -79,15 +130,15 @@ static int PresentAdapterPipeline()
+ // fg-relay.inc. 2 copies the FG inputs at the evaluate, as this add-on's own
+ // batch on DLSSG.CmdQueue; 3 copies them at the game's vkQueuePresentKHR, on the
+ // game's present queue and about 5 ms earlier. Both release the evaluate's park
+-// from the D3D12 side. See fg-relay.inc for the chain and its fallbacks.
++// from the D3D12 side. The stage protocol supplies a validated producer handoff, so it may use the relay as well.
+ static bool PresentAdapterRelay()
+ {
+     const int p = PresentAdapterPipeline();
+     return p == 2 || p == 3;
+ }
+ 
+-static bool PresentAdapterRelayAtEvaluate() { return PresentAdapterPipeline() == 2; }
+-static bool PresentAdapterRelayAtPresent()  { return PresentAdapterPipeline() == 3; }
++static bool PresentAdapterRelayAtEvaluate() { return PresentAdapterRelay() && PresentAdapterPipeline() == 2; }
++static bool PresentAdapterRelayAtPresent()  { return PresentAdapterRelay() && PresentAdapterPipeline() == 3; }
+ 
+ // Import=1 lets the relay use the D3D12-fence <-> Vulkan-timeline-semaphore import,
+ // and has it add VK_KHR_external_semaphore_win32 to the game's device at creation
+@@ -96,13 +147,14 @@ static bool PresentAdapterRelayAtPresent()  { return PresentAdapterPipeline() ==
+ // refuses it). The import is taken only for a device that create accepted the name
+ // on: a non-null vkGetDeviceProcAddr answer is not proof the extension is enabled,
+ // so the KHR entry points are never called on a device that was not shown to carry
+-// it. Off by default.
++// it. On by default: without it the relay keeps a CPU gate that left a quarter to a
++// half of the frames unarmed in the game, and the throttle needs it. Import=0 opts out.
+ static bool PresentAdapterRelayImport()
+ {
+     static const bool import = [] {
+         wchar_t path[1024] = {};
+         PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
+-        return path[0] != 0 && GetPrivateProfileIntW(L"Adapter", L"Import", 0, path) == 1;
++        return path[0] == 0 || GetPrivateProfileIntW(L"Adapter", L"Import", 1, path) == 1;
+     }();
+     return PresentAdapterRelay() && import;
+ }
+@@ -136,6 +188,20 @@ static bool PresentAdapterTrace()
+     return PresentAdapterFgInput() && trace;
+ }
+ 
++// SerialFallback=1 lets the serial feed take over when the GPU relay stands down.
++// Off by default: that feed presents the generated frames in bursts (see
++// PresentAdapterPipeline), so a relay failure pauses NR at the FG input instead,
++// and the relay is retried after the private session has been rebuilt.
++static bool PresentAdapterSerialFallback()
++{
++    static const bool allow = [] {
++        wchar_t path[1024] = {};
++        PresentAdapterPath(path, _countof(path), L"vk-present-adapter.ini");
++        return path[0] != 0 && GetPrivateProfileIntW(L"Adapter", L"SerialFallback", 0, path) == 1;
++    }();
++    return allow;
++}
++
+ // Keep the DLSS-G plugin's internal focus check active for a drawable NR
+ // window. This never changes the game's explicit FG mode or OS input focus.
+ // Unknown Streamline focus-gate contracts retain native behaviour.
+@@ -170,5 +236,9 @@ static volatile LONG g_adapter_owner = OWNER_NONE;
+ static bool FgInputActive()
+ {
+     if (!PresentAdapterFgInput()) return false;
++    if (PresentAdapterStageProtocol()) {
++        uint32_t plan = 0;
++        return PresentAdapterStagePlan(&plan) && ((plan >> 6) & 7u) != 0;
++    }
+     return !PresentAdapterFollow() || PresentAdapterHookPoint() == 2;
+ }
+diff --git a/src/present-adapter.inc b/src/present-adapter.inc
+index bbdff57..e63aead 100644
+--- a/src/present-adapter.inc
++++ b/src/present-adapter.inc
+@@ -3,7 +3,7 @@
+ static_assert(MH_ERROR_MEMORY_ALLOC == 9, "present-carrier-retry.h classifies MinHook status 9");
+ 
+ static const char *const kPresentCompatibleGeneric =
+-    u8"Generic builds confirmed to work with this bridge: 8.5.0-rc10 / 已经确定可以正常使用该版本插件的Generic插件：8.5.0-rc10";
++    u8"Generic build confirmed to work with this bridge: 8.5.0-rc10-stages1 (shipped with it) / 已经确定可以正常使用该版本插件的Generic插件：8.5.0-rc10-stages1（与本插件一同提供）";
+ struct PresentCompatibilityStatus {
+     unsigned code[2];
+     char reason[2][384];
+@@ -67,9 +67,40 @@ void PresentAdapterNrHook();
+ void PresentAdapterSrHook();
+ }
+ static thread_local bool g_present_nr_scope;
++static thread_local uint32_t g_present_nr_plan;
+ static thread_local unsigned g_present_nr_entries;
+ static thread_local unsigned g_present_sr_entries;
+ static thread_local unsigned g_present_sr_copies;
++extern "C" __declspec(dllexport) uint32_t __cdecl DLSS5BridgeStageProtocolVersion()
++{
++    return 1;
++}
++extern "C" __declspec(dllexport) uint32_t __cdecl DLSS5BridgeActiveStagePlan()
++{
++    return g_present_nr_scope ? g_present_nr_plan : 0;
++}
++
++// Freeze each carrier's plan and restore an outer scope on re-entry.
++struct PresentAdapterNrScope {
++    bool previous_scope = g_present_nr_scope;
++    uint32_t previous_plan = g_present_nr_plan;
++    PresentAdapterNrScope()
++    {
++        uint32_t plan = 0;
++        g_present_nr_plan = 0;
++        if (PresentAdapterStageProtocol()) {
++            PresentAdapterStagePlan(&plan);
++            // Invalid plans stay in protocol mode with zero passes.
++            g_present_nr_plan = plan | 0x80000000u;
++        }
++        g_present_nr_scope = true;
++    }
++    ~PresentAdapterNrScope()
++    {
++        g_present_nr_scope = previous_scope;
++        g_present_nr_plan = previous_plan;
++    }
++};
+ extern "C" void PresentAdapterNrEnter()
+ {
+     if (g_present_nr_scope) ++g_present_nr_entries;
+@@ -120,8 +151,13 @@ static bool PresentAdapterConfiguration()
+     PresentAdapterPath(ini, _countof(ini), L"ReShade.ini");
+     wchar_t unit[80] = {};
+     GetPrivateProfileStringW(L"RenoDX.DLSS5", L"NRLinearUnitNits", L"0", unit, _countof(unit), ini);
+-    const int hook_point = GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint",
+-                                                PresentAdapterFollow() ? -1 : 0, ini);
++    const bool stage_protocol = PresentAdapterStageProtocol();
++    if (stage_protocol && !PresentAdapterStagePlan(nullptr)) {
++        PresentCompatibilitySet(0, PC_HOOK_POINT_UNAVAILABLE, "Stage protocol plan is invalid; carrier processing is paused.");
++        return false;
++    }
++    const int hook_point = stage_protocol ? 2 : GetPrivateProfileIntW(L"RenoDX.DLSS5", L"NRHookPoint",
++                                                                    PresentAdapterFollow() ? -1 : 0, ini);
+     const auto code = PresentCompatibilityConfigCode(
+         GetModuleHandleW(L"renodx-dlss5.addon64") != nullptr,
+         GetPrivateProfileIntW(L"RenoDX.DLSS5", L"EnableHooks", 2, ini), hook_point,
+@@ -159,7 +195,10 @@ static void PresentCompatibilityPoll()
+         char hash[65] = {};
+         const bool hashed = GetModuleFileNameW(consumer, path, _countof(path)) != 0 &&
+                             Sha256File(path, hash, sizeof(hash));
+-        const bool known = hashed && _stricmp(hash, "DCD93881E976AD033D83C2BB01F4BC3E4DDC59C15FE0DD4CA165BC5FC7D1AC68") == 0;
++        // 8.5.0-rc10 (Present hook point only) and 8.5.0-rc10-stages1 (stage protocol).
++        const bool known = hashed &&
++            (_stricmp(hash, "DCD93881E976AD033D83C2BB01F4BC3E4DDC59C15FE0DD4CA165BC5FC7D1AC68") == 0 ||
++             _stricmp(hash, "CCAECB3559CC4BA3B42C2FFEBEDF5C655914945A9C2488237E9C3D5DD1A95F7C") == 0);
+         AcquireSRWLockExclusive(&g_present_compatibility_lock);
+         g_present_compatibility.unknown_build = !known;
+         ReleaseSRWLockExclusive(&g_present_compatibility_lock);
+@@ -173,9 +212,9 @@ static void PresentCompatibilityPoll()
+         if (PresentAdapterWitness() && PresentCompatibilitySnapshot().code[1] == PC_NR_ENTRY_UNAVAILABLE)
+             PresentCompatibilityIssue(PC_OK, "");
+     }
+-    // Render is a valid user-selected alternate path. Only diagnose carrier
+-    // requirements when Present is selected, or its selector is unavailable.
+-    if (!PresentAdapterFollow() || PresentAdapterHookPoint() == 2 || consumer == nullptr) {
++    // Render is a valid legacy alternate path; protocol plans have independent counts.
++    if (PresentAdapterStageProtocol() || !PresentAdapterFollow() ||
++        PresentAdapterHookPoint() == 2 || consumer == nullptr) {
+         PresentAdapterConfiguration();
+     } else {
+         wchar_t ini[1024] = {};
+@@ -294,7 +333,7 @@ static PresentCarrierResult PresentAdapterCarrier(bool verbose = true)
+         Log("[present-adapter] SR module could not be retained: entry=%p error=%lu.", entry, GetLastError());
+         return PCR_TRANSIENT;
+     }
+-    const MH_STATUS made = MH_CreateHook(entry, reinterpret_cast<void*>(&PresentAdapterSrHook), &g_present_sr_original);
++    const MH_STATUS made = MH_CreateHookPrologueExtended(entry, reinterpret_cast<void*>(&PresentAdapterSrHook), &g_present_sr_original);
+     if (made != MH_OK) {
+         Log("[present-adapter] SR hook creation failed: status=%d entry=%p.", static_cast<int>(made), entry);
+         PresentCompatibilityIssue(PC_HOOK_INSTALL_FAILED, "The private SR carrier hook could not be installed.");
+@@ -307,6 +346,12 @@ static PresentCarrierResult PresentAdapterCarrier(bool verbose = true)
+         g_present_sr_original = nullptr;
+         return PCR_FATAL;
+     }
++    const auto origin = reinterpret_cast<uintptr_t>(entry);
++    const auto trampoline = reinterpret_cast<uintptr_t>(g_present_sr_original);
++    const auto distance = origin > trampoline ? origin - trampoline : trampoline - origin;
++    if (distance > 0x40000000ULL)
++        Log("[present-adapter] SR carrier used extended rel32 allocation: entry=%p trampoline=%p distance=%llu bytes.",
++            entry, g_present_sr_original, static_cast<unsigned long long>(distance));
+     g_present_adapter.sr_hook = true;
+     const unsigned previous = PresentCompatibilitySnapshot().code[1];
+     if (previous == PC_SR_ENTRY_UNAVAILABLE || previous == PC_HOOK_INSTALL_FAILED) PresentCompatibilityIssue(PC_OK, "");
+@@ -393,6 +438,10 @@ static void PresentAdapterFrame(reshade::api::effect_runtime* rt, reshade::api::
+     if (in_frame) return;
+     if (rt == nullptr || cmd == nullptr || rtv.handle == 0) return;
+     if (PresentAdapterFgInput()) return;
++    if (PresentAdapterStageProtocol()) {
++        uint32_t plan = 0;
++        if (!PresentAdapterStagePlan(&plan) || ((plan >> 6) & 7u) == 0) return;
++    }
+     device* dev = rt->get_device();
+     if (dev == nullptr || dev->get_api() != device_api::vulkan) return;
+     if (!TryEnterCriticalSection(&g_bridge_cs)) return;
+@@ -514,11 +563,12 @@ static void PresentAdapterFrame(reshade::api::effect_runtime* rt, reshade::api::
+     if (g_present_adapter.run_nr) {
+         PresentAdapterWitness();
+         g_present_nr_entries = g_present_sr_entries = g_present_sr_copies = 0;
+-        g_present_nr_scope = true;
+-        if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
+-        ok = Synth12EvaluateShared(&params, 1000);
+-        if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
+-        g_present_nr_scope = false;
++        {
++            if (g_ngx_cs_ready) EnterCriticalSection(&g_ngx_cs);
++            PresentAdapterNrScope scope;
++            ok = Synth12EvaluateShared(&params, 1000);
++            if (g_ngx_cs_ready) LeaveCriticalSection(&g_ngx_cs);
++        }
+         nr_entries = g_present_nr_entries;
+         sr_entries = g_present_sr_entries;
+         sr_copies = g_present_sr_copies;
+diff --git a/src/present-carrier-retry.h b/src/present-carrier-retry.h
+index 1081e00..0c1c35d 100644
+--- a/src/present-carrier-retry.h
++++ b/src/present-carrier-retry.h
+@@ -34,8 +34,7 @@ static bool PresentCarrierRetryAfterFailure(PresentCarrierRetry &retry, PresentC
+     return true;
+ }
+ 
+-// MinHook status 9 (MH_ERROR_MEMORY_ALLOC): no free block within +-1 GB of the
+-// target at this moment. Address space near the target can be released later.
++// Allocation can recover when reachable address space becomes available.
+ static PresentCarrierResult PresentCarrierHookStatusResult(int minhook_status)
+ {
+     return minhook_status == 9 ? PCR_TRANSIENT : PCR_FATAL;
+diff --git a/src/version.rc b/src/version.rc
+index 1684139..254ab69 100644
+--- a/src/version.rc
++++ b/src/version.rc
+@@ -3,8 +3,8 @@
+ // ReShade reads the add-on's version from here and shows it in its overlay, so
+ // a bug report can name the exact build instead of describing it.
+ VS_VERSION_INFO VERSIONINFO
+- FILEVERSION    1,4,13,20
+- PRODUCTVERSION 1,4,13,20
++ FILEVERSION    1,4,13,29
++ PRODUCTVERSION 1,4,13,29
+  FILEOS         VOS_NT_WINDOWS32
+  FILETYPE       VFT_DLL
+ BEGIN
+@@ -13,11 +13,11 @@ BEGIN
+         BLOCK "040904b0"
+         BEGIN
+             VALUE "FileDescription",  "DLSS 5 Bridge"
+-            VALUE "FileVersion",      "1.4.13-pre8-vk-fgrelay-20261002"
++            VALUE "FileVersion",      "1.4.13-pre8-vk-fgrelay-20261005"
+             VALUE "InternalName",     "dlss5-bridge"
+             VALUE "OriginalFilename", "dlss5-bridge.addon64"
+             VALUE "ProductName",      "DLSS 5 Bridge"
+-            VALUE "ProductVersion",   "1.4.13-pre8-vk-fgrelay-20261002"
++            VALUE "ProductVersion",   "1.4.13-pre8-vk-fgrelay-20261005"
+         END
+     END
+     BLOCK "VarFileInfo"
+diff --git a/src/vk-present-adapter.ini.example b/src/vk-present-adapter.ini.example
+index 287971f..87bd8bd 100644
+--- a/src/vk-present-adapter.ini.example
++++ b/src/vk-present-adapter.ini.example
+@@ -1,44 +1,61 @@
+ [Adapter]
+-; Experimental, restart-only. No frames run until a fresh request is written.
++; Read once at game start unless a line says otherwise. Without Enabled=1 the add-on
++; keeps its earlier behaviour (mirroring the game's own Vulkan DLSS).
+ Enabled=0
+-; Source=fg-input processes the real frame at the native frame-generation input.
++; Source=fg-input runs Generic's Present layers on the real frame at the native
++; frame-generation input (before DLSS-G interpolates).
+ ;Source=fg-input
+-; Pipeline=0 parks the FG evaluate on the real frame's NR (default).
+-; Pipeline=1 runs the same NR concurrently and discards it (throughput probe; picture carries no NR).
+-; Pipeline=2/3 hand the synchronisation to the GPU relay: the copies become this add-on's
+-;  own Vulkan batch and the park is released as soon as the private D3D12 work is done.
+-;  2 copies at the FG evaluate (on DLSSG.CmdQueue); 3 copies at the game's vkQueuePresentKHR,
+-;  ~5 ms earlier. The relay opens only after the serial feed has built the private session;
+-;  once open it owns every frame (a frame it cannot arm is FG's own image for one group).
+-;Pipeline=0
+-; Import=1 lets the relay release the park on the GPU through a D3D12 fence imported as a
+-;  Vulkan timeline semaphore, and has the add-on add VK_KHR_external_semaphore_win32 to the
+-;  game's device at creation (a hook on the ReShade layer's vkCreateDevice that appends the
+-;  name to a copy of the create info; a driver that refuses the name gets the caller's own
+-;  list retried unchanged, so device creation cannot fail because of it). The import is used
+-;  only for a device that create accepted the name on; every other device keeps the host
+-;  release. A non-null vkGetDeviceProcAddr answer for the two KHR entry points is not proof
+-;  the device carries the extension, so they are never called on one that was not shown to.
+-;  Off by default.
+-;Import=0
+-; Throttle=N (relay with Import=1 only; default 1, 0 off, at most 3) holds the game at the
+-;  top of its frame (after slReflexSleep, before input and simulation) until the NR of the
+-;  newest armed frame, less N-1 frames, has completed; a game that never calls slReflexSleep
+-;  is held at its vkQueuePresentKHR instead, which removes the queue but not the latency.
+-;  Reflex cannot see the NR on the private D3D12 queue, so without this a GPU-bound game runs
+-;  ahead and frames queue in front of the NR, which shows as input latency. Waits are bounded
+-;  (100 ms) and the throttle turns itself off after five consecutive timeouts.
++; Follow=1 runs NR continuously whenever Generic selects this path: a non-zero Present
++;  layer count with a stage-protocol Generic (DLSS5StageProtocolVersion()==1), or
++;  NRHookPoint=Present with an older Generic. Without Follow=1 (or AutoRun=1) NR runs
++;  only for development request files.
++;Follow=1
++; Pipeline=2 (default) is the GPU relay: the input copies become this add-on's own
++;  Vulkan batch on DLSSG.CmdQueue and the FG evaluate's park is released from the GPU
++;  as soon as the private D3D12 NR is done. 3 copies at the game's vkQueuePresentKHR
++;  instead (about 5 ms earlier). 0 is the serial feed, for diagnosis only: it parks the
++;  FG evaluate on the CPU for the whole NR, so the generated frames reach the screen in
++;  bursts (a high frame counter with uneven display); the log warns when it is set.
++;  1 runs the same NR concurrently and discards it (throughput probe; picture carries no NR).
++;Pipeline=2
++; SerialFallback=1 lets the serial feed take over when the relay stands down. By default
++;  NR at the FG input pauses instead, the private session is rebuilt and the relay is
++;  retried, up to 3 times per process.
++;SerialFallback=0
++; Import=1 (default) releases the park on the GPU through a D3D12 fence imported as a
++;  Vulkan timeline semaphore, and adds VK_KHR_external_semaphore_win32 to the game's
++;  device at creation (a hook on the ReShade layer's vkCreateDevice that appends the
++;  name to a copy of the create info; a driver that refuses the name gets the caller's
++;  own list retried unchanged, so device creation cannot fail because of it). The import
++;  is used only for a device that accepted the name. Import=0 keeps a CPU gate that left
++;  a quarter to half of the frames without NR in the game, and disables the throttle.
++;Import=1
++; Throttle=N (default 1, 0 off, at most 3; needs Import=1) holds the game at the top of
++;  its frame (after slReflexSleep, before input and simulation) until the NR of the
++;  newest queued frame, less N-1 frames, has completed; a game that never calls
++;  slReflexSleep is held at its vkQueuePresentKHR instead. Reflex cannot see the NR on
++;  the private D3D12 queue, so without this a GPU-bound game runs ahead and frames queue
++;  in front of the NR, which shows as input latency. Each wait is bounded to 250 ms;
++;  five timeouts in a row stand the throttle down for 5 s, then it re-arms itself.
+ ;Throttle=1
+-; Trace=1 adds pass-through observers (game present, slSetTag, queue submits, FG handles) to the log.
+-; Asynchronous bounded logging; no rendering parameter changes. Restart required.
++; Trace=1 adds pass-through observers (game present, slSetTag, queue submits, FG
++;  handles, FG command-buffer submits) to the log. Asynchronous bounded logging; no
++;  rendering parameter changes.
+ ;Trace=0
+-; HoldComposition=1 (default) keeps DWM composing the game's monitor while NR runs at the FG
+-;  input and the game window is shown: a 2x2, near-transparent, click-through, non-activating
+-;  tool window of this process sits at that monitor's top-left corner. Without it, Windows
+-;  promotes the unfocused game to Independent Flip and back, and Streamline presents ~12 raw
+-;  frames without FG (hence without NR) at each switch. Read every second; 0 removes it.
++; FocusKeepFG=1 (default) keeps DLSS-G running while the game window is visible but not
++;  focused, when NR runs at the FG input and Streamline's focus check can be identified
++;  (Streamline 2.14.1; the 2.10.3 files Endfield ships keep their own behaviour).
++;FocusKeepFG=1
++; HoldComposition=1 (default) keeps DWM composing the game's monitor while NR runs at the
++;  FG input and the game window is shown: a 2x2, near-transparent, click-through,
++;  non-activating tool window of this process sits at that monitor's top-left corner.
++;  Without it, Windows promotes the unfocused game to Independent Flip and back, and
++;  Streamline presents ~12 raw frames without FG (hence without NR) at each switch.
++;  Read every second; 0 removes it.
+ ;HoldComposition=1
+-; HoldCompositionAlpha=1..255 (default 1) is the window's opacity; HoldCompositionHideCapture=1
+-;  (default) excludes it from screenshots and recordings where Windows supports that.
++; HoldCompositionAlpha=1..255 (default 1) is that window's opacity. Read every second.
+ ;HoldCompositionAlpha=1
+-;HoldCompositionHideCapture=1
++; HoldCompositionHideCapture=1 excludes that window from screenshots and recordings.
++;  Off by default: with it, the NVIDIA overlay refused to take screenshots of the game.
++;  Read every second.
++;HoldCompositionHideCapture=0
+diff --git a/src/vkmirror.inc b/src/vkmirror.inc
+index 7b61192..184a8a2 100644
+--- a/src/vkmirror.inc
++++ b/src/vkmirror.inc
+@@ -1878,9 +1878,12 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
+     TrampolineCallGuard call_guard;
+     auto fwd = reinterpret_cast<PFN_VkEvaluate>(h.original ? h.original : h.target);
+ 
+-    // Nested: the layer above already handled this frame and is calling down
+-    // through NGX's own plumbing.
+-    if (g_nest > 0) { VKM_FORWARD(fwd(cmd, handle, p, cb)) }
++    const bool stage_protocol = PresentAdapterStageProtocol();
++    // Native protocol SR owns its locks, including calls nested through NGX.
++    if (g_nest > 0) {
++        if (stage_protocol) return fwd(cmd, handle, p, cb);
++        VKM_FORWARD(fwd(cmd, handle, p, cb))
++    }
+     NestGuard nest;
+ 
+     // The bottom 64 KB of the address space can never be mapped, so an argument
+@@ -1895,6 +1898,7 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
+             Log("[vkmirror] an evaluate arrived with handle=%p params=%p cmd=%p -- none of "
+                 "those can be real. Forwarding it untouched and ignoring it.",
+                 static_cast<const void *>(handle), static_cast<const void *>(p), cmd);
++        if (stage_protocol) return fwd(cmd, handle, p, cb);
+         VKM_FORWARD(fwd(cmd, handle, p, cb))
+     }
+ 
+@@ -1945,6 +1949,17 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
+         if (InterlockedExchange(&previous_source_reset, value) != value)
+             Log("[fg-history] native game SR Reset=%ld; foreground=%u.", value, ForegroundIsThisProcess() ? 1u : 0u);
+     }
++    if (stage_protocol)
++    {
++        // Present=0 does not retire an in-flight FG owner.
++        if (TryEnterCriticalSection(&g_bridge_cs)) {
++            const LONG owner = InterlockedCompareExchange(&g_adapter_owner, 0, 0);
++            if (owner == OWNER_MIRROR) MirrorReleaseForFgInput();
++            else if (owner == OWNER_FG && g_fg_input.want_release) FgInputRelease();
++            LeaveCriticalSection(&g_bridge_cs);
++        }
++        return fwd(cmd, handle, p, cb);
++    }
+     if (PresentAdapterFollow() || PresentAdapterFgInput())
+     {
+         EnterCriticalSection(&g_bridge_cs);
+@@ -2068,7 +2083,7 @@ static void VkmNoteCreated(const Hook &hook, int feature_id, NVSDK_NGX_Result r,
+ static void VkmNoteGameCreate(int feature_id, NVSDK_NGX_Result r,
+                               const NVSDK_NGX_Parameter *p)
+ {
+-    if (PresentationAdapterEnabled() && !PresentAdapterFollow()) return;
++    if (PresentAdapterStageProtocol() || (PresentationAdapterEnabled() && !PresentAdapterFollow())) return;
+     if (r != NGX_SUCCESS || feature_id != 1) return;
+ 
+     unsigned int cw = 0, ch = 0, cow = 0, coh = 0;

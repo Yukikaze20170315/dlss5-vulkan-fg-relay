@@ -1,0 +1,461 @@
+From 9557013c4fea655628ec3502a4202c2eba607ca3 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E7=9B=97=E7=89=88=E3=81=AE=E9=9B=AA=E9=A2=A8=E9=85=B1?=
+ <50561019+Yukikaze20170315@users.noreply.github.com>
+Date: Mon, 5 Oct 2026 02:51:13 +0800
+Subject: [PATCH 4/7] Relay throttle: wait only for queued NR, 250 ms bound,
+ re-arm after 5 s
+
+With several NR layers the throttle's steady wait after slReflexSleep
+comes close to the old 100 ms bound (process maximum 99.3 ms in a two-layer
+session), and creating a new layer's NR feature stalls the worker once for
+longer. Five such timeouts in a row used to switch the throttle off for the
+rest of the process, after which frames queue in front of NR again and PC
+latency rises.
+
+- The wait targets the newest NR value whose Signal is already on the
+  private queue, never a value that is armed but not queued yet.
+- Each wait is bounded to 250 ms; the timeout streak is kept per site and
+  cleared by a wait that was not needed.
+- Five consecutive timeouts stand the throttle down for 5 s, then it re-arms
+  itself and logs it.
+- fg-input reports every indexed DLSS-G callback; the relay records the
+  native frame-generation group (index 1..count) and the rate log prints
+  it. This is bookkeeping only: the throttle does not wait for a group to
+  complete, because Streamline issues indices 2..N right before the next
+  group starts and such a gate would almost never hold the game.
+- tests/vulkan-fg-quality/test-hooks.cpp: group bookkeeping checks.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ src/fg-input.inc                       |   6 +
+ src/fg-relay.inc                       | 183 ++++++++++++++++++++++---
+ tests/vulkan-fg-quality/test-hooks.cpp |  49 +++++++
+ 3 files changed, 218 insertions(+), 20 deletions(-)
+
+diff --git a/src/fg-input.inc b/src/fg-input.inc
+index 1b1580d..d3caf1b 100644
+--- a/src/fg-input.inc
++++ b/src/fg-input.inc
+@@ -7,6 +7,7 @@
+ static void FgGuideRequestReset();
+ static bool FgRelayPrepareRelease();
+ static bool FgRelayRecoveryReady();
++static void FgRelayObserveGroup(unsigned index, unsigned count, bool count_known);
+ static bool FgRelayBlocksSerialFeed();
+ 
+ struct FgComposite {
+@@ -563,6 +564,11 @@ static void FgInputFrame(void *cmd_raw, const NVSDK_NGX_Parameter *p)
+     }
+     unsigned index = 0;
+     const bool indexed = FgInputReadU(p, "DLSSG.MultiFrameIndex", &index);
++    unsigned count = 0;
++    const bool count_known = FgInputReadU(p, "DLSSG.MultiFrameCount", &count);
++    // Observe every indexed callback so the relay can identify a completed
++    // native group. Interpolation callbacks still return directly to native FG.
++    if (indexed) FgRelayObserveGroup(index, count, count_known);
+     if (indexed && index != 1) {
+         InterlockedIncrement(&g_fg_input.eval_index_skipped);
+         return;
+diff --git a/src/fg-relay.inc b/src/fg-relay.inc
+index 5cabe26..2c9bb30 100644
+--- a/src/fg-relay.inc
++++ b/src/fg-relay.inc
+@@ -115,6 +115,7 @@ struct FgrArm
+     bool     valid;
+     uint64_t hud, back, depth, mv;
+     uint64_t copy_val, nr_val;
++    uint64_t group_serial;
+     uint32_t w, h, vk_fmt;
+     uint32_t hud_x, hud_y, back_x, back_y;
+     FgGuideContract guides;
+@@ -129,6 +130,21 @@ struct FgrPool
+     SVkCommandBuffer cb_copy[kFgrSlots], cb_release[kFgrSlots];
+ };
+ 
++// All group members are read and written under FgrLock. The group serial
++// identifies the real-frame evaluate (idx=1); terminal_serial is published
++// only after the native group has reached idx=count.
++struct FgrGroupState
++{
++    uint64_t serial;
++    uint64_t terminal_serial;
++    uint64_t released_serial;
++    uint64_t released_nr;
++    uint64_t gate_attempted_serial;
++    unsigned count;
++    unsigned phase;
++    bool valid;
++};
++
+ struct FgrState
+ {
+     CRITICAL_SECTION cs;
+@@ -187,6 +203,7 @@ struct FgrState
+     unsigned  relay_retries;       // stand-downs retried by a session rebuild, per process
+     uint64_t  copy_val, nr_val;    // the last values actually submitted / signalled for
+     uint64_t  last_release_nr;     // the nr value the frame before this one waited
++    FgrGroupState group;
+     uint64_t  nr_progress_value;   // watchdog, evaluate thread only: the shared fence's
+     LONG      nr_progress_tick;    // completed value and when it last moved or caught up
+     bool      have_last_group, last_group_served;   // evaluate thread only
+@@ -198,11 +215,14 @@ struct FgrState
+ 
+     // Throttle (FgRelayThrottle), indexed by site: 0 the game's present, 1 the
+     // game's Reflex sleep. Each site is one game thread, so each has its own
+-    // event. thr_off is set once waits time out repeatedly and stays set for the
+-    // process. last_sleep_ms says the sleep site is live, which retires the
+-    // present site.
++    // event. thr_off holds the tick at which repeated timeouts stood the throttle
++    // down (0 = active); it re-arms itself after kFgrThrottleRearmMs.
++    // last_sleep_ms says the sleep site is live, which retires the present site.
++    // nr_queued is the newest NR value whose Signal the worker has actually put on
++    // the private queue; a wait never targets a value that is not queued yet.
+     HANDLE    thr_ev[2];
+-    volatile LONG thr_off, thr_streak;
++    volatile LONG thr_off, thr_streak[2];
++    volatile LONG64 nr_queued;
+     volatile LONG thr_calls[2], thr_waits[2], thr_clear[2], thr_timeouts[2];
+     volatile LONG64 thr_sum[2], thr_max, last_sleep_ms;
+     volatile LONG presents, p_pipeline_skip, p_notready, p_fallback, p_inactive;
+@@ -233,6 +253,7 @@ struct FgrState
+     PFN_FgrResetCommandBuffer     ResetCommandBuffer;
+     PFN_FgrQueueSubmit            QueueSubmit;
+ };
++
+ static FgrState g_fgr;
+ static const unsigned kFgrAtPresent = 0, kFgrAtSleep = 1;   // throttle sites
+ 
+@@ -259,6 +280,74 @@ static void FgrMax64(volatile LONG64 &value, LONG64 candidate)
+ static void FgrLock()   { EnterCriticalSection(&g_fgr.cs); }
+ static void FgrUnlock() { LeaveCriticalSection(&g_fgr.cs); }
+ 
++static void FgRelayObserveGroup(unsigned index, unsigned count, bool count_known)
++{
++    FgrState &f = g_fgr;
++    if (!f.cs_ready) return;
++
++    FgrLock();
++    FgrGroupState &group = f.group;
++    if (!count_known || count == 0 || index == 0 || index > count) {
++        group.valid = false;
++        group.count = group.phase = 0;
++        group.terminal_serial = 0;
++    } else if (index == 1) {
++        group.valid = true;
++        ++group.serial;
++        group.count = count;
++        group.phase = 1;
++        group.terminal_serial = count == 1 ? group.serial : 0;
++        group.released_serial = 0;
++        group.released_nr = 0;
++        group.gate_attempted_serial = 0;
++    } else if (!group.valid || group.count != count || group.phase + 1 != index) {
++        // Do not carry a partly observed group into a future throttle point.
++        group.valid = false;
++        group.count = group.phase = 0;
++        group.terminal_serial = 0;
++    } else {
++        group.phase = index;
++        if (index == count) group.terminal_serial = group.serial;
++    }
++    FgrUnlock();
++}
++
++static uint64_t FgRelayCurrentGroupSerial()
++{
++    FgrState &f = g_fgr;
++    if (!f.cs_ready) return 0;
++    FgrLock();
++    const uint64_t serial = f.group.valid && f.group.phase == 1 ? f.group.serial : 0;
++    FgrUnlock();
++    return serial;
++}
++
++static void FgRelayPublishGroupRelease(uint64_t serial, uint64_t nr_val)
++{
++    FgrState &f = g_fgr;
++    if (serial == 0 || nr_val == 0 || !f.cs_ready) return;
++    FgrLock();
++    if (f.group.valid && f.group.serial == serial) {
++        f.group.released_serial = serial;
++        f.group.released_nr = nr_val;
++    }
++    FgrUnlock();
++}
++
++// The caller holds FgrLock. Present and Reflex sleep both use this one claim,
++// so a completed native group can produce at most one host-side throttle wait.
++static bool FgRelayClaimCompletedGroupLocked(FgrGroupState &group)
++{
++    if (!group.valid || group.terminal_serial == 0 ||
++        group.terminal_serial != group.serial ||
++        group.released_serial != group.serial || group.released_nr == 0 ||
++        group.gate_attempted_serial == group.serial)
++        return false;
++    group.gate_attempted_serial = group.serial;
++    return true;
++}
++
++
+ // Called once from FgtInit (the hook registration path); every entry point
+ // refuses until it has run.
+ static void FgRelayInit()
+@@ -700,12 +789,15 @@ static void FgRelayEnsure()
+         memset(f.pools, 0, sizeof(f.pools));
+         for (unsigned i = 0; i < kFgrSlots; ++i) { f.ev_out[i] = f.ev_mark[i] = 0; f.slot_used[i] = false; }
+         f.arm_seq = f.worker_seq = f.eval_seq = 0;
+-        f.copy_val = f.nr_val = f.last_release_nr = f.nr_progress_value = 0;
++        f.copy_val = f.nr_val = f.last_release_nr = f.nr_progress_value = 0; InterlockedExchange64(&f.nr_queued, 0);
+         for (unsigned i = 0; i < kFgrSlots; ++i) {
+             f.copy_in_flight[i] = f.release_in_flight[i] = false;
+             InterlockedExchange64(&f.copy_submit_qpc[i], 0);
+         }
+         f.have_last_group = false;
++        FgrLock();
++        f.group = {};
++        FgrUnlock();
+         f.have_last = f.have_present = false;
+         memset(f.idx_map, 0, sizeof(f.idx_map));
+         f.copy_fence12 = nullptr;   // the old device's objects went with it
+@@ -1221,8 +1313,19 @@ static void FgRelayPeriodic()
+             ps(timeouts - prev_timeouts[s]), avg_ms(sum - prev_sum[s], waits - prev_waits[s]));
+         prev_calls[s] = calls; prev_waits[s] = waits; prev_clear[s] = clear; prev_timeouts[s] = timeouts; prev_sum[s] = sum;
+     }
+-    Log("[fg-relay] rate4: throttle depth=%d off=%ld | sleep %s | present %s | max=%.2fms (process)",
++    FgrGroupState group = {};
++    FgrLock();
++    group = f.group;
++    FgrUnlock();
++    Log("[fg-relay] rate4: throttle depth=%d off=%ld | "
++        "group=%llu phase=%u/%u terminal=%llu released=%llu/%llu gate=%llu | "
++        "sleep %s | present %s | max=%.2fms (process)",
+         PresentAdapterRelayThrottle(), static_cast<long>(InterlockedCompareExchange(&f.thr_off, 0, 0)),
++        static_cast<unsigned long long>(group.serial), group.phase, group.count,
++        static_cast<unsigned long long>(group.terminal_serial),
++        static_cast<unsigned long long>(group.released_serial),
++        static_cast<unsigned long long>(group.released_nr),
++        static_cast<unsigned long long>(group.gate_attempted_serial),
+         site_text[kFgrAtSleep], site_text[kFgrAtPresent], ms(FgrCountRead64(f.thr_max)));
+ 
+     prev = cur;
+@@ -1244,6 +1347,10 @@ struct FgrPresentInfo
+ // queued or about to be (the worker queues it without waiting on anything the
+ // game does next), so the wait cannot depend on the waiting thread; it is bounded
+ // anyway, and a throttle that keeps timing out turns itself off for the process.
++// The wait must not depend on the native MFG group having reached its last index:
++// with the relay, Streamline issues indices 2..N about one real frame after index 1,
++// right before the next group starts, so a "completed group" gate almost never
++// held the game (measured: 0 waits per second, PC latency 216 ms instead of ~158).
+ // The fence is referenced under the lock because the session release frees it
+ // under the lock.
+ //
+@@ -1254,8 +1361,13 @@ struct FgrPresentInfo
+ // (2026-09-29: PCL 246 -> 209 ms, against 132 ms for a frame cap that sleeps
+ // before simulation). The present site is therefore only the fallback for a game
+ // that does not call slReflexSleep; it stands down while the sleep site is live.
+-static const DWORD    kFgrThrottleMs = 100;
++// Bounded per wait. Several Present layers make the steady wait itself approach the
++// old 100 ms bound, and a new layer's NR feature creation stalls the worker for
++// ~170 ms once; both used to trip the give-up and leave the game unthrottled for the
++// rest of the session (PC latency 246 instead of ~158 ms).
++static const DWORD    kFgrThrottleMs = 250;
+ static const unsigned kFgrThrottleGiveUp = 5;
++static const DWORD    kFgrThrottleRearmMs = 5000;
+ static void FgRelayThrottle(unsigned site)
+ {
+     FgrState &f = g_fgr;
+@@ -1268,13 +1380,26 @@ static void FgRelayThrottle(unsigned site)
+         const LONG64 last_sleep = FgrCountRead64(f.last_sleep_ms);
+         if (last_sleep != 0 && now_ms - last_sleep < 500) return;
+     }
+-    if (!f.ready || f.fell_back || !f.import_ok || f.thr_ev[site] == nullptr ||
+-        InterlockedCompareExchange(&f.thr_off, 0, 0) != 0)
+-        return;
++    if (!f.ready || f.fell_back || !f.import_ok || f.thr_ev[site] == nullptr) return;
++    const LONG off_tick = InterlockedCompareExchange(&f.thr_off, 0, 0);
++    if (off_tick != 0) {
++        if (static_cast<DWORD>(GetTickCount() - static_cast<DWORD>(off_tick)) < kFgrThrottleRearmMs) return;
++        if (InterlockedCompareExchange(&f.thr_off, 0, off_tick) == off_tick) {
++            InterlockedExchange(&f.thr_streak[0], 0);
++            InterlockedExchange(&f.thr_streak[1], 0);
++            Log("[fg-relay] throttle re-armed after %lu ms.", kFgrThrottleRearmMs);
++        }
++    }
+     FgrLock();
+     ID3D12Fence *fence = f.nr_fence12;
+-    const uint64_t newest = f.nr_val;
+-    if (fence != nullptr) fence->AddRef();
++    const uint64_t armed_nr = f.nr_val;
++    const uint64_t queued_nr = static_cast<uint64_t>(FgrCountRead64(f.nr_queued));
++    const uint64_t newest = armed_nr < queued_nr ? armed_nr : queued_nr;
++    if (fence != nullptr) {
++        fence->AddRef();
++        // Bookkeeping for the rate log only; the wait below does not depend on it.
++        (void)FgRelayClaimCompletedGroupLocked(f.group);
++    }
+     FgrUnlock();
+     if (fence == nullptr) return;
+     const uint64_t back = static_cast<uint64_t>(depth - 1);
+@@ -1282,6 +1407,7 @@ static void FgRelayThrottle(unsigned site)
+     if (target == 0 || fence->GetCompletedValue() >= target) {
+         fence->Release();
+         FgrCount(f.thr_clear[site]);
++        InterlockedExchange(&f.thr_streak[site], 0);
+         return;
+     }
+     const LONG64 start = FgrQpcNow();
+@@ -1304,12 +1430,15 @@ static void FgRelayThrottle(unsigned site)
+     FgrCount(f.thr_waits[site]);
+     FgrAdd64(f.thr_sum[site], waited);
+     FgrMax64(f.thr_max, waited);
+-    if (done) { InterlockedExchange(&f.thr_streak, 0); return; }
++    if (done) { InterlockedExchange(&f.thr_streak[site], 0); return; }
+     FgrCount(f.thr_timeouts[site]);
+-    if (static_cast<unsigned>(InterlockedIncrement(&f.thr_streak)) >= kFgrThrottleGiveUp &&
+-        InterlockedExchange(&f.thr_off, 1) == 0)
+-        Log("[fg-relay] throttle: the NR fence missed %u consecutive %lu ms waits; the present throttle is off "
+-            "for this process (frames may queue ahead of the NR again).", kFgrThrottleGiveUp, kFgrThrottleMs);
++    if (static_cast<unsigned>(InterlockedIncrement(&f.thr_streak[site])) >= kFgrThrottleGiveUp) {
++        const LONG tick = static_cast<LONG>(GetTickCount() | 1u);
++        if (InterlockedCompareExchange(&f.thr_off, tick, 0) == 0)
++            Log("[fg-relay] throttle: the NR fence missed %u consecutive %lu ms waits; the throttle stands down "
++                "for %lu ms (frames may queue ahead of the NR meanwhile).", kFgrThrottleGiveUp, kFgrThrottleMs,
++                kFgrThrottleRearmMs);
++    }
+ }
+ 
+ // Called from the interposer's vkQueuePresentKHR detour, on the thread that owns
+@@ -1437,6 +1566,9 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
+     FgRelayEnsure();
+     if (!f.ready) { FgrCount(f.eval_notready); return 0; }
+     FgrCount(f.evals);
++    // Capture the idx=1 group before the rest of the evaluate can yield to a
++    // subsequent native interpolation callback on an unusual scheduling path.
++    const uint64_t group_serial = FgRelayCurrentGroupSerial();
+ 
+     if (p != nullptr) {
+         void *q = nullptr;
+@@ -1603,6 +1735,9 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
+         return -1;
+     }
+     f.mismatch_streak = 0;
++    // Bind this evaluate's release to the real native group observed by fg-input.
++    // A missing serial leaves the existing relay behavior unchanged.
++    a.group_serial = group_serial;
+ 
+     // The slot's release batch is re-recorded when the slot comes round again, so
+     // its previous release must be over before its fence is touched. A failed
+@@ -1660,6 +1795,7 @@ static int FgRelayEvaluate(void *cmd_raw, const NVSDK_NGX_Parameter *p)
+                 f.nr_progress_tick = static_cast<LONG>(GetTickCount());
+             }
+             f.last_release_nr = a.nr_val;
++            FgRelayPublishGroupRelease(a.group_serial, a.nr_val);
+         } else {
+             FgrCount(f.rel_fail);
+             // The park is recorded and nothing on the GPU will release it: let it
+@@ -1771,7 +1907,12 @@ static bool FgRelayWorker()
+     // Signalled on every path. A frame whose NR failed still has a command
+     // buffer parked on this value, and the identity copy above is what makes
+     // letting it through harmless.
+-    if (f.nr_fence12 != nullptr) g_s12.queue->Signal(f.nr_fence12, a.nr_val);
++    if (f.nr_fence12 != nullptr) {
++        g_s12.queue->Signal(f.nr_fence12, a.nr_val);
++        // Published after the Signal is queued: the throttle may wait for it now.
++        if (static_cast<LONG64>(a.nr_val) > FgrCountRead64(f.nr_queued))
++            InterlockedExchange64(&f.nr_queued, static_cast<LONG64>(a.nr_val));
++    }
+     if (!f.import_ok) {
+         // No shared object to signal through: the CPU stands in, waiting the
+         // session's own fences -- the composite's, then the NR submission's --
+@@ -1984,17 +2125,19 @@ static void FgRelayOnSessionRelease()
+     f.npools = 0;
+     memset(f.pools, 0, sizeof(f.pools));
+     f.cmd_queue = nullptr;
+-    f.copy_val = f.nr_val = f.last_release_nr = f.nr_progress_value = 0;
++    f.copy_val = f.nr_val = f.last_release_nr = f.nr_progress_value = 0; InterlockedExchange64(&f.nr_queued, 0);
+     for (unsigned i = 0; i < kFgrSlots; ++i) {
+         f.copy_in_flight[i] = f.release_in_flight[i] = false;
+         InterlockedExchange64(&f.copy_submit_qpc[i], 0);
+     }
+     f.have_last_group = false;
++    f.group = {};
+     f.mismatch_streak = 0;
+     f.unarmed_streak = 0;
+     f.last_eval_tick = 0;
+     InterlockedExchange(&f.thr_off, 0);
+-    InterlockedExchange(&f.thr_streak, 0);
++    for (unsigned i = 0; i < 2; ++i)
++        InterlockedExchange(&f.thr_streak[i], 0);
+     FgGuideRequestReset();
+     if (f.copy_fence12 != nullptr) { f.copy_fence12->Release(); f.copy_fence12 = nullptr; }
+     if (f.nr_fence12 != nullptr) { f.nr_fence12->Release(); f.nr_fence12 = nullptr; }
+diff --git a/tests/vulkan-fg-quality/test-hooks.cpp b/tests/vulkan-fg-quality/test-hooks.cpp
+index 2dc3240..00d86ea 100644
+--- a/tests/vulkan-fg-quality/test-hooks.cpp
++++ b/tests/vulkan-fg-quality/test-hooks.cpp
+@@ -52,6 +52,54 @@ static void CheckTransitionObservation()
+     Check(p.reset == 1 && p.writes == 0, "post-evaluate observation leaves parameter block untouched");
+     g_cfg.stage = 0;
+ }
++static void CheckRelayGroupState()
++{
++    g_fgr.group = {};
++    FgRelayObserveGroup(1, 5, true);
++    Check(g_fgr.group.valid && g_fgr.group.serial == 1 && g_fgr.group.phase == 1 &&
++              g_fgr.group.count == 5 && g_fgr.group.terminal_serial == 0,
++          "group observation starts a fresh native MFG group");
++    FgRelayObserveGroup(2, 5, true);
++    FgRelayObserveGroup(3, 5, true);
++    FgRelayObserveGroup(4, 5, true);
++    FgRelayObserveGroup(5, 5, true);
++    Check(g_fgr.group.valid && g_fgr.group.phase == 5 &&
++              g_fgr.group.terminal_serial == g_fgr.group.serial,
++          "group observation publishes completion only at the terminal index");
++    FgRelayPublishGroupRelease(g_fgr.group.serial, 17);
++    Check(g_fgr.group.released_serial == g_fgr.group.serial && g_fgr.group.released_nr == 17,
++          "successful release binds its NR value to the completed group");
++    FgrLock();
++    const bool first_claim = FgRelayClaimCompletedGroupLocked(g_fgr.group);
++    const bool second_claim = FgRelayClaimCompletedGroupLocked(g_fgr.group);
++    FgrUnlock();
++    Check(first_claim && !second_claim,
++          "a completed group permits exactly one shared gate claim");
++    FgRelayObserveGroup(1, 5, true);
++    Check(g_fgr.group.serial == 2 && g_fgr.group.phase == 1 && g_fgr.group.terminal_serial == 0,
++          "a new group does not inherit the prior terminal marker");
++    Check(g_fgr.group.released_serial == 0 && g_fgr.group.released_nr == 0 &&
++              g_fgr.group.gate_attempted_serial == 0,
++          "a new group clears the prior release and gate claim");
++    FgRelayObserveGroup(2, 5, true);
++    FgRelayObserveGroup(3, 5, true);
++    FgRelayObserveGroup(4, 5, true);
++    FgRelayObserveGroup(5, 5, true);
++    FgrLock();
++    const bool stale_claim = FgRelayClaimCompletedGroupLocked(g_fgr.group);
++    FgrUnlock();
++    Check(!stale_claim, "an unreleased completed group cannot claim the prior fence");
++    FgRelayObserveGroup(1, 5, true);
++    FgRelayObserveGroup(3, 5, true);
++    Check(!g_fgr.group.valid && g_fgr.group.terminal_serial == 0,
++          "out-of-order group members invalidate the partial group");
++    FgRelayObserveGroup(1, 0, true);
++    Check(!g_fgr.group.valid && g_fgr.group.phase == 0,
++          "zero group count is rejected");
++    FgRelayObserveGroup(1, 5, false);
++    Check(!g_fgr.group.valid && g_fgr.group.phase == 0,
++          "unknown group count is rejected");
++}
+ static NVSDK_NGX_Result CreateLeaf(void *, void *, int, NVSDK_NGX_Parameter *, NVSDK_NGX_Handle **out)
+ {
+     ++creates;
+@@ -143,6 +191,7 @@ int main()
+     Check(PresentAdapterRelay() && g_cfg.stage < 2, "CPU fixture tests relay lifecycle without GPU processing");
+     FgRelayInit();
+     CheckTransitionObservation();
++    CheckRelayGroupState();
+     CheckEmptyRuntimeRestart("cold startup with repeated runtime replacement");
+     g_layer_count = 2;
+     g_layer[0].mod = reinterpret_cast<HMODULE>(Ptr(0x300000));
+-- 
+2.52.0.windows.1
+

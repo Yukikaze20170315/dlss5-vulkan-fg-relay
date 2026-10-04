@@ -1878,9 +1878,12 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
     TrampolineCallGuard call_guard;
     auto fwd = reinterpret_cast<PFN_VkEvaluate>(h.original ? h.original : h.target);
 
-    // Nested: the layer above already handled this frame and is calling down
-    // through NGX's own plumbing.
-    if (g_nest > 0) { VKM_FORWARD(fwd(cmd, handle, p, cb)) }
+    const bool stage_protocol = PresentAdapterStageProtocol();
+    // Native protocol SR owns its locks, including calls nested through NGX.
+    if (g_nest > 0) {
+        if (stage_protocol) return fwd(cmd, handle, p, cb);
+        VKM_FORWARD(fwd(cmd, handle, p, cb))
+    }
     NestGuard nest;
 
     // The bottom 64 KB of the address space can never be mapped, so an argument
@@ -1895,6 +1898,7 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
             Log("[vkmirror] an evaluate arrived with handle=%p params=%p cmd=%p -- none of "
                 "those can be real. Forwarding it untouched and ignoring it.",
                 static_cast<const void *>(handle), static_cast<const void *>(p), cmd);
+        if (stage_protocol) return fwd(cmd, handle, p, cb);
         VKM_FORWARD(fwd(cmd, handle, p, cb))
     }
 
@@ -1944,6 +1948,17 @@ static NVSDK_NGX_Result ForwardVkEvaluate(Hook &h, const char *tag, void *cmd,
         const LONG value = source_reset != 0 ? 1 : 0;
         if (InterlockedExchange(&previous_source_reset, value) != value)
             Log("[fg-history] native game SR Reset=%ld; foreground=%u.", value, ForegroundIsThisProcess() ? 1u : 0u);
+    }
+    if (stage_protocol)
+    {
+        // Present=0 does not retire an in-flight FG owner.
+        if (TryEnterCriticalSection(&g_bridge_cs)) {
+            const LONG owner = InterlockedCompareExchange(&g_adapter_owner, 0, 0);
+            if (owner == OWNER_MIRROR) MirrorReleaseForFgInput();
+            else if (owner == OWNER_FG && g_fg_input.want_release) FgInputRelease();
+            LeaveCriticalSection(&g_bridge_cs);
+        }
+        return fwd(cmd, handle, p, cb);
     }
     if (PresentAdapterFollow() || PresentAdapterFgInput())
     {
@@ -2068,7 +2083,7 @@ static void VkmNoteCreated(const Hook &hook, int feature_id, NVSDK_NGX_Result r,
 static void VkmNoteGameCreate(int feature_id, NVSDK_NGX_Result r,
                               const NVSDK_NGX_Parameter *p)
 {
-    if (PresentationAdapterEnabled() && !PresentAdapterFollow()) return;
+    if (PresentAdapterStageProtocol() || (PresentationAdapterEnabled() && !PresentAdapterFollow())) return;
     if (r != NGX_SUCCESS || feature_id != 1) return;
 
     unsigned int cw = 0, ch = 0, cow = 0, coh = 0;

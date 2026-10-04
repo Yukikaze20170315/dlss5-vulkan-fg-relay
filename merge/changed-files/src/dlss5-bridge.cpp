@@ -67,7 +67,7 @@
 #pragma comment(lib, "version.lib")
 
 // Kept in step with version.rc, which is where ReShade's overlay reads it from.
-#define BRIDGE_VERSION "1.4.13-pre8-vk-fgrelay-20261002"
+#define BRIDGE_VERSION "1.4.13-pre8-vk-fgrelay-20261005"
 
 extern "C" __declspec(dllexport) const char *NAME =
     "DLSS 5 Bridge " BRIDGE_VERSION;
@@ -2833,6 +2833,13 @@ static int HookNewNgxModules(ScanModuleRefs &held)
         if (_wcsicmp(leaf, L"nvngx_dlssg.dll") == 0)
         {
             Log("  leaving %ls untouched: Frame Generation is not an SR entry point.", leaf);
+            RememberRejected(mods[i]);
+            continue;
+        }
+        // NR needs its original caller identity; the private witness is separate.
+        if (_wcsicmp(leaf, L"nvngx_dlssnr.dll") == 0)
+        {
+            Log("  leaving %ls untouched: Neural Rendering is not an SR entry point.", leaf);
             RememberRejected(mods[i]);
             continue;
         }

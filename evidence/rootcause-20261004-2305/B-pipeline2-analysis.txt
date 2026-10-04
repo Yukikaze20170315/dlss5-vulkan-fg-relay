@@ -1,0 +1,25 @@
+rows=3791 dur=29.94s presents/s=126.62
+MsBetweenPresents: n=3791 mean=7.900 p50=8.024 p90=8.525 p95=8.801 p99=10.440 max=59.713 min=0.332
+MsBetweenDisplayChange: n=3364 mean=8.902 p50=8.335 p90=12.358 p95=16.656 p99=16.697 max=58.368 min=3.854
+MsUntilDisplayed: n=3364 mean=14.364 p50=14.170 p90=18.702 p95=19.405 p99=20.768 max=35.453 min=6.013
+MsBetweenSimulationStart: n=628 mean=47.391 p50=48.008 p90=50.802 p95=51.818 p99=66.756 max=98.712 min=12.408
+not displayed rows: 427 (11.3%)  displayed/s=112.36
+sim markers: 628 rate/s: 20.97508381817173
+index gaps between sim markers: [(6, 626), (5, 1)]
+group=6 phase=0: n=626 betweenPresents mean=8.10 p50=7.90 p95=9.81 | notDisplayed=18 (3%) | dispChange mean=9.43 | gpuTime mean=7.35 | inPresent mean=0.16
+group=6 phase=1: n=626 betweenPresents mean=7.95 p50=7.98 p95=8.79 | notDisplayed=67 (11%) | dispChange mean=9.12 | gpuTime mean=8.68 | inPresent mean=0.14
+group=6 phase=2: n=626 betweenPresents mean=7.70 p50=8.01 p95=8.48 | notDisplayed=76 (12%) | dispChange mean=9.01 | gpuTime mean=7.59 | inPresent mean=0.15
+group=6 phase=3: n=626 betweenPresents mean=7.88 p50=8.06 p95=8.53 | notDisplayed=86 (14%) | dispChange mean=8.84 | gpuTime mean=7.67 | inPresent mean=0.14
+group=6 phase=4: n=626 betweenPresents mean=8.00 p50=8.18 p95=8.80 | notDisplayed=48 (8%) | dispChange mean=8.57 | gpuTime mean=7.71 | inPresent mean=0.16
+group=6 phase=5: n=626 betweenPresents mean=7.72 p50=7.96 p95=8.52 | notDisplayed=127 (20%) | dispChange mean=8.34 | gpuTime mean=8.11 | inPresent mean=0.15
+display-change histogram:
+     2-4   : 19
+     4-6   : 198
+     8-9   : 2756
+    10-12  : 1
+    12-14  : 154
+    16-18  : 221
+    20-25  : 8
+    25-30  : 2
+    30-40  : 1
+    40-60  : 4
