@@ -1,358 +1,506 @@
-# Vulkan + DLSS Frame Generation: Generic's NR on the finished frame — update 2026-10-05
+# DLSS 5 neural rendering with native frame generation in Arknights: Endfield (Vulkan) — release unified-20261015q
 
-## Short version
+Release date: 2026-10-19. This release replaces `vk-fgrelay-20261005` (2026-10-05). The previous README is kept at [docs/history/README-vk-fgrelay-20261005.md](https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/blob/main/docs/history/README-vk-fgrelay-20261005.md).
 
-- **What it is.** An update of the DLSS 5 bridge add-on (`dlss5-bridge.addon64`) released here on 2026-10-02 (`vk-fgrelay-20261002`). In Vulkan games with native DLSS Frame Generation, it runs RenoDX DLSS 5 Generic's neural rendering (NR) on the game's finished real frame, right before the native DLSS-G evaluate, once per real frame; frame generation then interpolates the enhanced frames.
-- **What this update does, in one line each.**
-  1. An absent or zero `Pipeline` key used to silently select the serial feed, which caused the game's frame counter to run ahead of what the display showed. `Pipeline` now defaults to 2 (GPU relay); a `Pipeline=0` configuration logs a warning.
-  2. The throttle at `slReflexSleep` now waits for the newest NR value already on the private queue, not for a completed native DLSS-G group. Each wait is bounded to 250 ms; five consecutive timeouts stand the throttle down for 5 s, then it re-arms itself automatically.
-  3. Generic builds that export `DLSS5StageProtocolVersion()` returning 1 and `DLSS5GetStagePlan()` choose NR layers per stage — Render, Upscaled and Present, 0-4 each, up to 12 total. With such a Generic the bridge serves only the Present layers; Render and Upscaled run inside Generic on the game's own Vulkan evaluate. The currently shipped Generic build, 8.5.0-rc10-stages1, uses one Upscaled and one Present layer by default.
-  4. The composition guard window is no longer excluded from screen capture by default; the NVIDIA overlay refused to take screenshots while it was. `HoldCompositionHideCapture=1` restores the exclusion.
+发布日期：2026-10-19。本次发布取代 2026-10-05 的 `vk-fgrelay-20261005`。上一版 README 保留在 [docs/history/README-vk-fgrelay-20261005.md](https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/blob/main/docs/history/README-vk-fgrelay-20261005.md)。
 
-  Also: the SR carrier hook may use a wider memory allocation range (MinHook fallback, fixes sessions that hit status 9). `Trace=1` adds a bounded observer of the FG command buffer.
+## In short / 简要说明
 
-- **What is also new: Generic 8.5.0-rc10-stages1.** The Generic source changes are published as a new branch `rc10-stages1` in PEQHUB/RenoDX-DLSS5-Generic. The compiled add-on (`renodx-dlss5.addon64`) is now included in the ready-to-use zip alongside the bridge. With a bridge that does not support the stage protocol, the new Generic behaves exactly like 8.5.0-rc10 at the Upscaled hook point.
+**What this is.** A ready-to-use package that adds NVIDIA's DLSS 5 neural rendering ("NR", an AI filter that redraws the game's picture with more detailed lighting and materials) to Arknights: Endfield running on Vulkan, together with the game's own DLSS Frame Generation. NVIDIA GeForce RTX 30, 40 and 50 series cards use the same files. You copy one folder into the game folder, change a few settings once, and restart the game.
 
-- **Graphics cards.** Supported: RTX 50 series. Maybe: RTX 40 series (DLSS-G 2x works there; the NR runtime contains only RTX 50 code; a community-modified runtime may work, untested). Needs own adaptation for now: RTX 20 and RTX 30 series (no DLSS-G).
+**这是什么。** 一个开箱即用的插件包，让运行在 Vulkan 下的《明日方舟：终末地》在使用游戏自带 DLSS 帧生成的同时，用上 NVIDIA 的 DLSS 5 神经渲染（NR，一种用 AI 重新绘制画面、让光影和材质更细致的画面滤镜）。NVIDIA GeForce RTX 30、40、50 系列显卡使用同一套文件。只需把一个文件夹复制进游戏目录，做一次设置，再重启游戏即可。
 
-- **Tested** in Arknights: Endfield on an RTX 5090 (5120x2160), Generic 8.5.0-rc10-stages1 with one Upscaled and one Present NR layer, native 6x DLSS-G. Items 1 and 4 were confirmed in the game. Item 3 (stage protocol) is confirmed by in-game logs (plan 72 = Upscaled 1 Present 1 at the FG input, Upscaled NR via the game's own SR evaluate). Items 2, 3 and 4 are covered by offline tests. Not tested in other games or on other cards.
+**How it works.** The game draws a picture and passes it to its own DLSS Frame Generation, which then creates the extra in-between frames. Our add-on runs neural rendering on that finished real picture just before frame generation takes it. Frame generation then builds its extra frames from the improved picture, so the expensive AI step runs once per real frame instead of once per displayed frame.
 
-- **Use it or merge it.** A ready-to-use build (bridge + Generic + ini), patches on top of the 2026-10-02 patches, full copies of every changed file, the offline tests, and the logs and captures behind every number are linked in "Files" below.
+**怎么做到的。** 游戏先画出一张画面，再交给它自带的 DLSS 帧生成去插出中间的画面。我们的插件在帧生成接手之前，对这张已经画好的真实画面做神经渲染；帧生成随后用这张改进过的画面去生成插帧。这样，最耗性能的 AI 步骤只需每张真实画面做一次，而不是屏幕上每显示一帧都做一次。
 
-A step-by-step install guide in English and Chinese follows. Everything after the guide is technical detail.
-# Install guide / 安装教程
+**What is new since 2026-10-05.**
 
-**DLSS 5 neural rendering for Arknights: Endfield (Vulkan), build `vk-fgrelay-20261005`**
-**《明日方舟：终末地》Vulkan 版 DLSS 5 神经渲染，版本 `vk-fgrelay-20261005`**
+1. **One package for RTX 30, 40 and 50.** The add-on detects the graphics card and loads the matching neural rendering runtime by itself.
+2. **Streamline 2.14.1 is chosen inside the game.** You pick `2.14.1 + DLSS-G 310.9.1` in the add-on panel; it is loaded from the package's own folder at the next start. No game file is replaced, and `EndfieldFGSwitch.exe` is no longer needed.
+3. **Frame generation up to 6x on every supported card**, set in the included MFG Unlock panel. RTX 50 cards keep NVIDIA's own frame generation; only the multiplier is changed.
+4. **Fixed:** stutter at 2x frame generation; Present-stage NR switching itself off after a high layer count; the frame-generation multiplier not taking effect; a crash during game start; the Streamline option becoming unselectable after the 2026-10-15 game update; and the recovery file refusing to uninstall after the game had been moved to another folder.
+5. **Protection and recovery:** a start-up health check that undoes a setting which kept the game from starting, a safe mode, a 15-second confirmation for 5 or more NR layers, automatic adjustment of NVIDIA driver frame-generation settings with a restore record, and a recovery file that removes everything from outside the game.
+6. **All logs in one folder** (`dlss5\dlss5_log`), with an optional complete anomaly log for hard-to-reproduce bugs.
 
-## What this does / 这是什么
+**相比 2026-10-05 的新内容。**
 
-"Neural rendering" (NR) is an AI filter that redraws the game's picture with more detailed lighting and materials. "RenoDX DLSS 5 Generic" (Generic for short) is a free add-on that applies it. This package lets Generic work in Arknights: Endfield when the game runs on Vulkan with the game's own "DLSS Frame Generation" turned on. It needs three other free downloads, listed below. It does not change any game file.
+1. **RTX 30、40、50 共用一个包。** 插件自动识别显卡，并自行加载对应的神经渲染运行库。
+2. **在游戏里选择 Streamline 2.14.1。** 在插件面板中点选 `2.14.1 + DLSS-G 310.9.1`，下次启动时会从插件包自己的文件夹加载。不替换任何游戏文件，也不再需要 `EndfieldFGSwitch.exe`。
+3. **所有支持的显卡都能用最高 6 倍帧生成**，在随包附带的 MFG Unlock 面板里设置。RTX 50 显卡保留 NVIDIA 自己的帧生成，只改倍率。
+4. **已修复：** 2 倍帧生成卡顿；高 NR 层数后“呈现”阶段 NR 自行停用；帧生成倍率不生效；游戏启动时崩溃；2026-10-15 游戏更新后 Streamline 选项无法选择；游戏换过安装目录后，恢复文件拒绝卸载。
+5. **保护与恢复：** 启动健康检查（某项设置导致游戏无法启动时自动撤回）、安全模式、NR 总层数达到 5 层及以上时需在 15 秒内确认、自动调整 NVIDIA 驱动中与帧生成有关的设置并保留恢复记录，以及一个能在游戏外撤除全部组件的恢复文件。
+6. **所有日志集中在一个文件夹**（`dlss5\dlss5_log`），并可选开启完整异常日志，用于难以复现的 Bug。
 
-“神经渲染”（NR）是一种 AI 画面滤镜，会用更细致的光影和材质重新绘制游戏画面。“RenoDX DLSS 5 Generic”（简称 Generic）是提供这种效果的免费插件。本插件包让 Generic 在《终末地》使用 Vulkan、并开启游戏自带的“DLSS 帧生成”时正常工作。它还需要下面列出的另外三个免费下载项，不会修改任何游戏文件。
+**Tested.** On two RTX 5090 PCs (Windows 11 with driver 616.92; Windows 10 22H2 with driver 616.56), in game. RTX 30 and RTX 40 cards: confirmed working by internal testers on this build; their logs are not part of this release. Details, measurements and known limits are in the technical part below the install guide.
 
-There is also an optional tool, `EndfieldFGSwitch.exe`. It allows 6x frame generation on RTX 50 cards and keeps frame generation and NR running when you switch to another window. It does change game files. See "Optional: EndfieldFGSwitch" below; you do not need it to use NR.
+**测试情况。** 在两台 RTX 5090 电脑上做过游戏内实测（Windows 11、驱动 616.92；Windows 10 22H2、驱动 616.56）。RTX 30、RTX 40 显卡：已由内测用户在本版本上确认可用；他们的日志不包含在本次发布中。详细说明、测试数据和已知限制见安装教程之后的技术部分。
 
-另外还有一个可选工具 `EndfieldFGSwitch.exe`。它能让 RTX 50 显卡使用 6 倍帧生成，并在你切到其他窗口时让帧生成和神经渲染继续运行。它会改动游戏文件。见下文“可选：EndfieldFGSwitch”；不用它也能使用神经渲染。
+---
 
-## Please read first / 请先阅读
+# Install guide / 使用教程
 
-- **Account risk / 账号风险:** Arknights: Endfield is an online game with anti-cheat software, and this setup loads third-party software (ReShade with add-ons) into the game. We do not know whether this can affect your account. Decide for yourself; you use it at your own risk.
-  《终末地》是带反作弊软件的联网游戏，而这套方案会把第三方软件（带插件的 ReShade）加载进游戏。我们不知道这是否会影响账号。请自行判断，风险自负。
-- **Graphics card / 显卡:** NVIDIA GeForce RTX 50 series. RTX 40 series maybe; RTX 20 and RTX 30 series not without your own adaptation. See "Which graphics cards work" below.
-  NVIDIA GeForce RTX 50 系列。RTX 40 系列可能可以；RTX 20、RTX 30 系列需要自行适配。见下文“支持哪些显卡”。
-- **Performance / 性能:** NR is heavy. In our test (RTX 5090, 5120x2160, two NR passes) the game's real frame rate, before frame generation adds frames, dropped to about half.
-  神经渲染很吃性能。我们的测试中（RTX 5090、5120×2160、两层神经渲染），游戏的真实帧率（帧生成插帧之前的帧率）降到了大约一半。
-- **System / 系统:** Windows 10 or 11, 64-bit. / Windows 10 或 11，64 位。
+This guide assumes that you have never installed ReShade or any add-on for this game. If you used the 2026-10-05 version of this add-on, read "Already using the 2026-10-05 version" first.
 
-## Which graphics cards work / 支持哪些显卡
+本教程假设你从未给这个游戏安装过 ReShade 或任何插件。如果你用过本插件 2026-10-05 的版本，请先看“已经在用 2026-10-05 版本”一节。
 
-- **Supported: NVIDIA GeForce RTX 50 series.** Tested on an RTX 5090 with NVIDIA driver 616.92. With the game's own files, frame generation goes up to 4x. With the optional tool below it goes up to 6x (this needs NVIDIA driver 595.97 or newer).
-  **确定支持：NVIDIA GeForce RTX 50 系列。** 在 RTX 5090、NVIDIA 驱动 616.92 上测试过。使用游戏自带文件时，帧生成最高 4 倍；使用下文的可选工具最高 6 倍（需要 NVIDIA 驱动 595.97 或更新版本）。
-- **Maybe: NVIDIA GeForce RTX 40 series.** RTX 40 cards have the game's DLSS Frame Generation (2x), which this add-on needs, and nothing in this add-on itself is made only for RTX 50. The problem is the NR runtime (download 3): it only contains code for RTX 50 cards and refuses to start on other cards. With the files listed below, NR therefore does not start on an RTX 40 card. It can work with a community-modified NR runtime that runs on RTX 40 cards, but nobody has tested this setup on an RTX 40 card yet. That is why it says "maybe". Expect a large drop in frame rate as well: NR is heavy even on an RTX 5090.
-  **可能支持：NVIDIA GeForce RTX 40 系列。** RTX 40 显卡有本插件所需的游戏 DLSS 帧生成（2 倍），本插件本身也没有只为 RTX 50 设计的部分。问题出在神经渲染运行库（第 3 项）：它只包含 RTX 50 显卡用的代码，在其他显卡上会拒绝启动。所以照下面列出的文件安装，RTX 40 显卡上神经渲染不会启动。换用社区修改过、能在 RTX 40 上运行的神经渲染运行库，有可能可以用，但还没有人在 RTX 40 显卡上测试过这套方案，所以写作“可能”。另外帧率也会大幅下降：即使在 RTX 5090 上，神经渲染也很吃性能。
-- **Needs your own adaptation for now: NVIDIA GeForce RTX 20 and RTX 30 series.** This add-on does its work at the moment when the game's DLSS Frame Generation makes new frames. RTX 20 and RTX 30 cards do not have DLSS Frame Generation, so the add-on has nothing to work with. The NR runtime does not run on these cards either. There are community tools that add frame generation to these cards, and NR runtimes modified for them, but they replace parts of the game's or the driver's DLSS files, and none of them has been tested with this add-on. If you try such a combination, you are on your own for now.
-  **暂需自行适配：NVIDIA GeForce RTX 20、RTX 30 系列。** 本插件是在游戏的 DLSS 帧生成制作新画面的那一刻工作的。RTX 20、RTX 30 显卡没有 DLSS 帧生成，本插件就没有可以工作的地方。神经渲染运行库也不能在这些显卡上运行。社区里有给这些显卡加上帧生成的工具，也有为它们修改过的神经渲染运行库，但它们会替换游戏或驱动的部分 DLSS 文件，而且都没有和本插件一起测试过。如果你尝试这样的组合，目前只能靠自己。
+## Personal statement from the author / 作者的个人声明
 
-### Trying it on an RTX 40 card / 在 RTX 40 显卡上尝试
+I published this file on 18 October 2026. Up to that date, every case I could find in which a player received a warning or a ban involved a first-person-view add-on called "Enhancer". I have not seen a case in which a warning or ban came only from using injected DLSS 5. That does not mean I can guarantee that this add-on is completely safe. If you value your account very much and do not want to take any risk at all, I do not recommend using this add-on.
 
-1. Install everything as described in the case below that fits you, but instead of `nvngx_dlssnr.dll` from download 3, use an `nvngx_dlssnr.dll` whose publisher says that it runs on RTX 40 cards. Such modified files are shared in the RenoDX community; its Discord server is linked at the top of https://github.com/clshortfuse/renodx. Only use a file from a source you trust: a `.dll` file runs inside the game.
-   按下文适合你的情况安装，但不要用第 3 项的 `nvngx_dlssnr.dll`，而是换成发布者说明可以在 RTX 40 显卡上运行的 `nvngx_dlssnr.dll`。这类修改过的文件在 RenoDX 社区里分享；它的 Discord 服务器链接在 https://github.com/clshortfuse/renodx 页面顶部。只使用你信任的来源提供的文件：`.dll` 文件是在游戏里运行的。
-2. In the game, set DLSS Frame Generation to 2x (RTX 40 cards only have 2x).
-   在游戏里把 DLSS 帧生成设为 2 倍（RTX 40 显卡只有 2 倍）。
-3. Check as in Case 1, step 8. If the picture changes, it works. If it does not change after about half a minute in the game, that NR runtime does not work on your card. Then close the game and move that `nvngx_dlssnr.dll` out of the game folder. The game still runs normally without it, only without NR.
-   按情况一第 8 步检查。画面有变化就是可以用。如果进入游戏约半分钟后画面仍然没有变化，说明这个神经渲染运行库在你的显卡上不能用。这时关闭游戏，把这个 `nvngx_dlssnr.dll` 移出游戏文件夹。没有它游戏照常运行，只是没有神经渲染。
-4. Please tell us the result, whether it works or not: your card model, where the NR runtime came from, and the two log files (see "Asking for help" below). Reports like this are how RTX 40 can move to "supported".
-   无论成功与否，都请告诉我们结果：显卡型号、神经渲染运行库的来源，以及两个日志文件（见下文“求助时”）。有了这样的反馈，RTX 40 才能改为“确定支持”。
+我发布这个文件的日期是 2026 年 10 月 18 日。截止目前这个时间点为止，我能够找到的、出现了警告和封号的所有案例中，都只出现在使用了一款叫做“Enhancer”的第一人称视角插件上。我目前还没有见过只开了注入式 DLSS5 导致被警告或封号的案例，但这不代表我能够保证本插件是绝对安全的。如果你非常爱惜你的账号，完全不想冒任何风险，那么我不推荐你使用本插件。
 
-## Preparation / 准备工作
+I clearly understand and support the Fair Operation Statement (《公平运营声明》) published by Hypergryph. I promise that this add-on never creates or changes any of the game's gameplay or features and never harms the game's fairness in any way; all of my development is about DLSS 5 and the graphics pipeline.
 
-- **Show file extensions.** In File Explorer, Windows 11: "View" → "Show" → "File name extensions"; Windows 10: "View" tab → tick "File name extensions". Otherwise `ReShade.ini` and `ReShade.log` both look like "ReShade", and renaming a file can go wrong.
-  **显示文件扩展名。** 在文件资源管理器中，Windows 11：“查看”→“显示”→“文件扩展名”；Windows 10：“查看”选项卡 → 勾选“文件扩展名”。否则 `ReShade.ini` 和 `ReShade.log` 看起来都叫“ReShade”，改名时也容易出错。
-- **Turn on hardware-accelerated GPU scheduling.** DLSS Frame Generation needs it; without it the option is greyed out in the game. Windows Settings → System → Display → Graphics → "Change default graphics settings" (on Windows 10: "Graphics settings") → turn on "Hardware-accelerated GPU scheduling", then restart the PC.
-  **打开“硬件加速 GPU 计划”。** DLSS 帧生成需要它，没打开时游戏里的帧生成选项是灰色的。Windows 设置 → 系统 → 屏幕 → 显示卡 →“更改默认图形设置”（Windows 10 为“图形设置”）→ 打开“硬件加速 GPU 计划”，然后重启电脑。
-- **Find the game folder.** It is the folder that contains `Endfield.exe`. The usual location is `C:\Program Files\Hypergryph Launcher\games\Endfield Game`. If you are not sure: start the game, open Task Manager (Ctrl+Shift+Esc), right-click the game, and choose "Open file location".
-  **找到游戏文件夹。** 就是 `Endfield.exe` 所在的文件夹，常见位置是 `C:\Program Files\Hypergryph Launcher\games\Endfield Game`。如果不确定：先启动游戏，打开任务管理器（Ctrl+Shift+Esc），右键游戏，选择“打开文件所在的位置”。
-- **Administrator permission.** The game folder is usually protected by Windows. When Windows asks for permission while you copy, rename or replace files there, click "Continue".
-  **管理员权限。** 游戏文件夹通常受 Windows 保护。在里面复制、改名或替换文件时，如果 Windows 要求权限，点“继续”。
-- **Only change files while the game is closed.**
-  **只在游戏关闭时改动文件。**
+我明确理解并支持鹰角网络发布的《公平运营声明》，承诺本插件绝不创造、修改任何游戏原有的玩法和功能，绝不破坏游戏的任何公平性，我的一切开发都基于 DLSS5 和图形管线。
 
-## Downloads / 需要下载的文件
+I even hope that Hypergryph sees these optimizations and that they help reduce development costs, and I hope that Hypergryph lets more people use an officially fine-tuned DLSS 5 as soon as possible.
 
-On the GitHub pages (downloads 2 to 5), scroll down to "Assets" and click the file named below. Do not download "Source code"; that is not the add-on. After downloading, right-click each `.zip` file and choose "Extract All".
+我甚至希望鹰角官方能够看到我做的这些优化，并且帮助他们降低研发成本，也希望鹰角官方能够尽早让更多的人都能用上官方精调优化过的 DLSS5。
 
-在 GitHub 页面（第 2～5 项）上，往下找到 “Assets” 一栏，点击下表写的那个文件。不要下载 “Source code”，那不是插件。下载后，右键每个 `.zip` 文件，选择“全部解压缩”。
+This statement, my "disclaimer" above, does not mean that I support or oppose any other third-party add-on. Please do not use it to start arguments, compare, or label me. I respect both the official developers and the authors of every third-party add-on at the same time; the two do not conflict.
 
-| # | What / 内容 | Where / 下载位置 | Files you need / 需要的文件 |
+我的此次声明、也就是上面叠的甲的含义，并不代表我支持或不支持任何其他的第三方插件，请不要因此拉踩引战，也不要给我扣帽子。我同时尊重官方和所有第三方插件的作者，这并不冲突。
+
+## What you need / 需要的条件
+
+**Graphics card / 显卡**
+
+- Supported: NVIDIA GeForce RTX 30, 40 and 50 series.
+  确定支持：NVIDIA 30 系、40 系、50 系。
+- Not known yet: NVIDIA RTX Spark, GTX 16 series, RTX 20 series, Turing RTX 3000–8000, Ampere RTX A500–A6000, Ada RTX 500–6000, Blackwell RTX PRO 500–6000, TITAN RTX, TITAN V.
+  尚未确定是否支持：NVIDIA RTX Spark、16 系、20 系、Turing RTX 3000～8000、Ampere RTX A500～A6000、Ada RTX 500～6000、Blackwell RTX PRO 500～6000、TITAN RTX、TITAN V。
+- Not supported: NVIDIA GTX 10 series, Pascal P400–GP100 and every GPU older than Pascal; all AMD GPUs; all Intel GPUs.
+  确定不支持：NVIDIA 10 系、Pascal P400～GP100、Pascal 架构之前的全部 GPU；AMD 全部 GPU；Intel 全部 GPU。
+
+**NVIDIA driver / NVIDIA 驱动：** version 615.00 or newer; Game Ready or Studio both work.
+最低 615.00；Game Ready 或 Studio 均可。
+
+**Windows / 系统：** Windows 10 version 2004 (build 19041) or newer, or Windows 11; 64-bit.
+最低 Win10 2004（19041），或 Win11；64 位。
+
+**The game must run with Vulkan.** If you ever switched the game's graphics mode to DirectX 11 in the launcher's game settings, switch it back to Vulkan.
+**游戏必须以 Vulkan 运行。** 如果你曾在启动器的游戏设置里把图形模式改成 DirectX 11，请改回 Vulkan。
+
+## Downloads / 下载
+
+1. **ReShade 6.8.0 with full add-on support:** https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe (this is the same file as the button "Download ReShade 6.8.0 with full add-on support" on https://reshade.me).
+   **带完整插件支持的 ReShade 6.8.0：** https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe （与 https://reshade.me 上“Download ReShade 6.8.0 with full add-on support”按钮下载的是同一个文件）。
+2. **This package:** on the release page https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/releases/tag/unified-20261015q, scroll down to "Assets" and click `unified-20261015q-candidate.zip` (about 280 MB). Do not download "Source code"; that is not the add-on. After downloading, right-click the zip file and choose "Extract All". This creates a folder named `unified-20261015q-candidate`.
+   **本插件包：** 打开发布页 https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/releases/tag/unified-20261015q ，往下找到“Assets”，点击 `unified-20261015q-candidate.zip`（约 280 MB）。不要下载“Source code”，那不是插件。下载后右键这个 zip 文件，选择“全部解压缩”，会得到一个名为 `unified-20261015q-candidate` 的文件夹。
+
+The name contains "candidate" because the add-ons are exactly the ones that were tested under that name; only the uninstall files and their description were corrected afterwards. This is the release version.
+文件名里带“candidate”，是因为插件本体与以这个名字测试过的完全相同，之后只修正了卸载用的恢复文件及其说明。这就是正式发布版。
+
+The package also contains a technical document, `DLSS5-使用与恢复 Usage and Recovery.md`. You do not need to read it to follow this guide.
+包里还有一份技术文档 `DLSS5-使用与恢复 Usage and Recovery.md`，按本教程操作不需要阅读它。
+
+## Install / 安装
+
+**1.** Run `ReShade_Setup_6.8.0_Addon.exe`.
+**1.** 打开 `ReShade_Setup_6.8.0_Addon.exe`。
+
+**2.** Click "Browse...". In the window that opens, go to the Arknights: Endfield game folder. If you kept the launcher's and the game's default install locations, it is usually `C:\Program Files\Hypergryph Launcher\games\Arknights Endfield`. If you changed it or do not know where it is: open the Hypergryph launcher, and on the Endfield page click the button with three lines to the right of the start button ("开始游戏"). In the menu, choose the game settings ("游戏设置"). The window shows the game installation path ("游戏安装路径"). Remember this folder; you will need it again later.
+**2.** 点击“Browse...”，在打开的窗口中找到终末地的安装目录。如果启动器和游戏一直按默认位置安装，这个目录通常是 `C:\Program Files\Hypergryph Launcher\games\Arknights Endfield`。如果改过、不知道目录在哪：打开启动器，点击终末地页面“开始游戏”右侧的三道横杠，在出现的菜单中选择“游戏设置”，页面会显示“游戏安装路径：……”，这就是要在“Browse...”窗口中找到的地方。记住这个目录，等会儿还要用。
+
+**3.** Select `Endfield.exe` in that folder and click "Open".
+**3.** 选中该目录下的 `Endfield.exe`，然后点“打开”。
+
+**4.** Click "Next". You may now see "Downloading compatibility information ..." with a spinning circle. It does not matter whether this succeeds or fails: it downloads something this add-on does not need, and in some regions the download can fail because of network restrictions. When it stops, click "Next".
+**4.** 点“Next”，之后可能会出现一直转圈的“Downloading compatibility information ...”。无论成功还是失败都没关系：它下载的不是本插件需要的东西，在中国大陆等地区可能因网络限制而失败。转圈结束后，点击“Next”。
+
+**5.** Tick the fourth icon from the top, the red "Vulkan", then click "Next".
+**5.** 勾选从上往下数第四个图标，红色的“Vulkan”，然后点“Next”。
+
+**6.** "Downloading compatibility information ..." may appear again. As before, success or failure does not matter. When it stops, you may see a red cross (failure): click "Next". Or you may see the page "Select effects to install" with many checkboxes: do not tick or untick anything, just click "Next".
+**6.** 一直转圈的“Downloading compatibility information ...”可能会再次出现。和上面一样，成功还是失败都没关系。转圈结束后，如果提示红叉失败，直接点“Next”；如果进入“Select effects to install”页面、下方出现大量可勾选项，什么都不要勾选、也不要取消已经勾选的项目，直接点“Next”。
+
+**7.** You may now see a spinning circle with "Downloading Standard effects from https://github.com/......". As before, success or failure does not matter. When it stops, you may see a red cross: click "Next". Or you may see the page "Select add-ons to install" with many checkboxes: do not tick or untick anything, just click "Next".
+**7.** 这时可能会出现“Downloading Standard effects from https://github.com/......”等字样的转圈。和上面一样，成功还是失败都没关系。转圈结束后，如果提示红叉失败，直接点“Next”；如果进入“Select add-ons to install”页面、下方出现大量可勾选项，什么都不要勾选、也不要取消已经勾选的项目，直接点“Next”。
+
+**8.** A green tick and "Successfully installed ReShade ......" means ReShade is installed. Click "Finish"; the installer closes. You can delete `ReShade_Setup_6.8.0_Addon.exe` now, or keep it in case you need to reinstall.
+**8.** 页面出现绿色对勾，提示“Successfully installed ReShade ......”，说明安装成功。点“Finish”，安装程序会自动关闭。之后可以删除 `ReShade_Setup_6.8.0_Addon.exe`，也可以留着以备重装。
+
+**9.** Open the `unified-20261015q-candidate` folder. Select everything inside it (all files and the `dlss5` folder; Ctrl+A works) and copy it into the game folder from step 2. Copy what is inside the folder, not the folder itself. If Windows asks for administrator permission, click "Continue". You can delete the `unified-20261015q-candidate` folder afterwards, or keep it in case you need to reinstall.
+**9.** 打开 `unified-20261015q-candidate` 文件夹，全选里面的所有文件和文件夹（包括 `dlss5` 文件夹，可以按 Ctrl+A），全部复制到第 2 步记住的游戏目录中。要复制的是文件夹里面的内容，不是这个文件夹本身。如果 Windows 要求管理员权限，点“继续”。之后可以删除 `unified-20261015q-candidate` 文件夹，也可以留着以备重装。
+
+**10.** Turn on Windows "Hardware-accelerated GPU scheduling". Frame generation does not work without it. Please note: part of this add-on works through frame generation. Even if you dislike frame generation, you need at least 2x frame generation to use this add-on normally. If you do not want frame generation at all, this add-on is not for you.
+**10.** 打开 Windows 的“硬件加速 GPU 计划”。不开启它就不能用帧生成。提前强调一下：本插件有一部分功能运行在帧生成上。即使你再不喜欢帧生成，想正常使用本插件也至少要开 2 倍帧生成。如果你坚持不想开帧生成，那么后面的内容可以不用看了。
+
+- Windows 10: Settings → System → Display → Graphics settings.
+  Win10：设置 → 系统 → 显示 → 图形设置。
+- Windows 11: Settings → System → Display → Graphics → Advanced graphics settings (called "Change default graphics settings" in older versions).
+  Win11：设置 → 系统 → 显示 → 图形 → 高级图形设置（较旧版本里叫“更改默认图形设置”）。
+- If you cannot find it: press Win+R, type `ms-settings:display-advancedgraphics`, and click OK. The page with the switch opens.
+  如果找不到：按 Win+R，在“运行”窗口中输入 `ms-settings:display-advancedgraphics`，点确定，开关所在的设置页就会打开。
+
+If you had to turn the switch on, restart the PC. If it was already on (true for most people), you do not need to restart.
+如果是你刚刚打开的，需要重启电脑；如果它本来就是打开的（大多数人如此），就不需要重启。
+
+## First start and settings / 首次启动与设置
+
+The first start is only for settings; they take effect after a restart. This is needed only once, right after installing.
+第一次启动只用来做设置，设置要重启游戏后才生效。只有刚安装后的第一次需要这样做。
+
+**11.** Start the game. When it is running, press the **Home** key. The ReShade menu opens with a tutorial. Click "Skip tutorial" ("跳过教程" in a Chinese menu); do not follow ReShade's own tutorial. ReShade was not designed for DLSS 5, and some of its settings can stop this add-on from working. In particular, do not change the game's color space (HDR): keep the game's original 8-bit sRGB format, or the Present-stage DLSS 5 cannot run.
+**11.** 启动终末地。游戏启动后，按下 **Home** 键，会出现 ReShade 的操作面板和教程指引。请点击“跳过教程”，不要按照它的教程操作。ReShade 原本不是为 DLSS5 设计的，它的部分设置反而可能让本插件无法正常运行。特别注意 HDR：请不要修改游戏的色彩空间，保持终末地原生的 8 位 sRGB 格式，否则“呈现”层的 DLSS5 将无法正常运行。
+
+**12.** At the top of the menu you see a row of tabs, including "DLSS 5 Bridge", "DLSS 5 Neural Rendering" and "MFG Unlock". Each of these tabs has a language choice at the top (English or Chinese).
+**12.** 跳过教程后，上方可以看到一行菜单，里面有“DLSS 5 Bridge”、“DLSS 5 Neural Rendering”、“MFG Unlock”这三个选项。每个选项页的顶部都可以选择语言（英文或中文）。
+
+**13.** Open "DLSS 5 Bridge". Under "Deployment" ("统一部署"), choose `2.14.1 + DLSS-G 310.9.1`. Under "NR hook mode (EnableHooks)" ("NR 钩子模式"), choose "1: NGX + Streamline (suite Present NR)" ("1：NGX + Streamline（本套件呈现 NR）").
+**13.** 点进“DLSS 5 Bridge”，把“统一部署”下方的选项改成 `2.14.1 + DLSS-G 310.9.1`，再把“NR 钩子模式”下方的选项改成“1：NGX + Streamline（本套件呈现 NR）”。
+
+**14.** Close the game and start it again. Wait about 5 to 10 seconds after closing before you start it again; otherwise a window from ACE (the game's anti-cheat) may block the start. If that window appears, close it, wait a few seconds and start the game again.
+**14.** 关闭游戏，重新启动终末地。关闭游戏后请不要立刻再启动，过 5～10 秒左右再启动，否则可能会弹出被 ACE（游戏的反作弊）拦截的窗口。如果弹了也别担心，关掉弹窗，过几秒再启动游戏就行了。
+
+**15.** In the game's own settings, set the upscaling option ("画质提升") to "DLSS". Any DLSS Super Resolution mode ("DLSS 超分辨率模式") works; we recommend "Quality" ("质量"). Turn on DLSS Frame Generation and choose a multiplier from 2x to 4x; any of them is fine, because MFG Unlock can take over the multiplier later. Do not choose "Auto" ("自动"), and do not leave frame generation off. Part of DLSS 5 (the "Present" stage) runs at the entrance of frame generation: with frame generation off it stops, and with "Auto" MFG Unlock cannot take over and frame generation behaves erratically. This is the main difference from most other DLSS 5 solutions, and the most effective optimization in this one. With the current cost of DLSS 5, playing smoothly is almost impossible without frame generation; use at least 2x.
+**15.** 进入终末地的游戏设置，把“画质提升”改成“DLSS”。“DLSS 超分辨率模式”可以选任何档位，推荐“质量”。打开 DLSS 帧生成，倍率选 2～4x 均可，因为之后 MFG Unlock 可以接管倍率。但不要选“自动”，也不要不开帧生成。DLSS5 的一部分（“呈现”层）运行在帧生成的入口上：关闭帧生成会使它失效；选择“自动”会让 MFG Unlock 的接管失效，帧生成的判定也会乱掉。这是本方案和大多数 DLSS5 方案的核心差别，也是最有效的一步优化。就现阶段 DLSS5 的负载来看，想流畅地玩，帧生成几乎不可能不开，至少也要 2x。
+
+**16.** Press Home and open "DLSS 5 Neural Rendering". Find "Hook point" ("介入点"). Below it are three rows of buttons from 0 to 4: "Render layers" ("渲染层数"), "Upscaled layers" ("超分后层数") and "Present layers" ("呈现层数"). Each number is how many times NR runs at that stage.
+**16.** 按 Home 打开 ReShade 面板，点进“DLSS 5 Neural Rendering”页面，找到“介入点”。下面有三行 0～4 的按钮：第一行“渲染层数”，第二行“超分后层数”，第三行“呈现层数”。每个数字表示 NR 在该阶段运行几次。
+
+**17.** Choose the layers according to your graphics card:
+**17.** 按显卡情况选择层数：
+
+- 12 GB of video memory or more: you can try Upscaled 1 and Present 1.
+  显存大于等于 12G：可以尝试“超分后层数”选 1，“呈现层数”选 1。
+- 8 GB or less: we recommend Upscaled 0 and Present 1. With 8 GB you can try 2 layers in total, but only at 1080p or lower; the frame rate will be low, so use it for photos rather than for normal play.
+  显存只有 8G 或更小：建议“超分后层数”选 0，“呈现层数”选 1。8G 显存也可以尝试总共 2 层，但只建议在 1080P 及以下分辨率尝试，帧数较低，不建议日常使用，仅建议用于拍照。
+- For this game, in any case, do not use more than 2 layers in total, and not more than 1 in any single row. For example, do not choose Upscaled 2 or Present 2.
+  对于终末地，无论如何不建议总层数大于 2，也不建议某一行的层数大于 1。例如不推荐“超分后层数”选 2 或“呈现层数”选 2。
+- If you use only one layer, choose Present 1. With one layer in Render or Upscaled there is still an unsolved problem: the frame counter is high, but the motion looks less smooth. With Present 1 motion looks smoother, and in most cases the picture also looks better (this is based on feedback from some users, may not be objective, and is not my personal opinion).
+  如果只开 1 层，更建议选“呈现层数”1 层。“渲染层数”或“超分后层数”只开 1 层时，还有一个尚未解决的问题：实时帧数高、但肉眼看起来帧数低。选“呈现层数”1 层不仅肉眼更流畅，大多数情况下画面也更好（该评价基于部分用户反馈，可能不够客观，并非我个人意见）。
+
+If you choose 5 or more layers in total, the add-on asks you to confirm within 15 seconds; without confirmation it goes back to your previous layers.
+如果总层数选到 5 层及以上，插件会要求你在 15 秒内确认；不确认就会自动回到之前的层数。
+
+**18.** Adjust the other settings on the "DLSS 5 Neural Rendering" page as you like. For this game we recommend "Style" ("风格") = "Cinematic" ("电影感") in most cases. In "Advanced settings" ("高级设置"), do not change anything except the hotkeys and the screenshot settings.
+**18.** “DLSS 5 Neural Rendering”页面的其他参数按自己的喜好调整。对于终末地，大多数情况下“风格”建议选“电影感”。“高级设置”中，除了快捷键和截图相关功能以外，其他设置都不建议乱改。
+
+**19.** The default hotkey that turns DLSS 5 on and off is F6. In this game F6 also opens the pass page, so it is easy to press by accident. To change it: on the "DLSS 5 Neural Rendering" page, tick "Advanced settings" at the top; the section "Hotkeys & screenshots" ("快捷键与截图") appears below, where you can change it.
+**19.** 用来开关 DLSS5 的默认快捷键是 F6，它也是终末地通行证页面的按键，容易误触。修改方法：进入“DLSS 5 Neural Rendering”页面，勾选上方的“高级设置”，下面会出现“快捷键与截图”，在里面修改即可。
+
+**20.** If the frame rate is too low, open "MFG Unlock". Its multiplier is set to "Game default" ("由游戏决定"). In the drop-down list you can choose up to "6x", which is 6x frame generation. After you choose a multiplier here, the frame generation multiplier in the game's settings no longer has any effect; the add-on controls it. To give control back to the game's settings, choose "Game default" again.
+**20.** 如果觉得帧数太低，可以进入“MFG Unlock”页面。这里默认的帧生成倍率是“由游戏决定”，点击下拉菜单最高可选“6x”，即 6 倍帧生成。在这个页面改了倍率后，游戏设置里的帧生成倍率就不再起作用，由本插件接管。想交还给游戏设置时，选回“由游戏决定”即可。
+
+**21.** Done. Play for a moment and see how smooth it is. Press Home and open ReShade's "Statistics" tab ("统计"). You should see a fairly flat frame-time curve with small, gentle bumps, and the game should feel smooth.
+**21.** 主要设置已经完成，可以进游戏感受一下流畅度。按 Home 打开 ReShade 面板，点进上面的“统计”页，你应该看到一条比较平滑、略有起伏但并不明显的帧曲线，玩的时候也应该感觉比较丝滑。
+
+If the curve looks like a saw blade or another irregular shape, the game is not as smooth as this add-on is designed to be. First check the steps above for mistakes. If you followed every step exactly, open "MFG Unlock", tick "Advanced settings", tick "Legacy software flip pacing (restart required)" ("Legacy 软件呈现节奏（需重启）"), and restart the game. This fixes the smoothness on most graphics cards.
+如果看到的是锯齿状或其他不规则形状的曲线，说明目前的体验没有达到本插件设计的流畅度。请先检查上面的步骤有没有误操作。如果确定都严格照做了，进入“MFG Unlock”页面，勾选“高级设置”，勾选出现的“Legacy 软件呈现节奏（需重启）”，然后重启游戏。这样应该能解决大部分显卡的流畅度问题。
+
+## If it still stutters or DLSS 5 does not work / 如果仍然卡顿或 DLSS5 不生效
+
+**22.** Known problems that you can fix yourself:
+**22.** 目前已知、可以自己解决的问题：
+
+1. **Turn off "Smooth Motion" in the NVIDIA App** (shown as "AI 插帧" in the Chinese NVIDIA App) for this game. With it on, the frame rate becomes very unstable. This is not a bug: this add-on deliberately does not support Smooth Motion, because its latency is too high; even if it worked, I would not recommend it.
+   **不要开启 NVIDIA App 里的“AI 插帧”**（Smooth Motion），否则游戏帧数会非常不稳定。这不是 Bug：本插件本来就没打算兼容 Smooth Motion，因为它的延迟实在太高，就算能用也不推荐。
+2. **Turn off the NVIDIA game filters and RTX HDR** for this game. They can stop the add-on from working. This is a known bug that may be fixed later, but it is difficult.
+   **不要开启 NVIDIA 的游戏滤镜效果和 RTX HDR**，否则可能使插件失效。这是已知 Bug，之后可能会修，但难度较高。
+3. **Safe mode is still on.** If an earlier mistake caused this, then even after every setting is correct DLSS 5 still does not work, the top-left corner of the game shows "NR runtime not installed" ("未安装 NR 运行时"), and the "DLSS 5 Neural Rendering" page says "NR runtime not installed" and "NVIDIA's signed nvngx_dlssnr.dll is not next to the addon or the game's executable" ("插件或游戏可执行文件旁没有 NVIDIA 签名的 nvngx_dlssnr.dll"). This means safe mode was switched on and must be switched off by hand. Open "DLSS 5 Bridge"; it shows a ticked "Safe mode next launch" ("下次启动安全模式（手动退出）"). Untick it and restart the game. DLSS 5 should then work again.
+   **安全模式仍在开启。** 如果之前的误操作导致即使现在所有设置都改对了、严格按教程做完了，DLSS5 仍不生效，游戏左上角提示“未安装 NR 运行时”，“DLSS 5 Neural Rendering”页面也提示“未安装 NR 运行时”、“插件或游戏可执行文件旁没有 NVIDIA 签名的 nvngx_dlssnr.dll……”，说明安全模式被启用了，需要手动关掉。点进“DLSS 5 Bridge”页面，下面会有一个已被勾选的“下次启动安全模式（手动退出）”，取消勾选，然后重启游戏，DLSS5 应该就会恢复正常工作。
+
+**23.** Enjoy your new DLSS 5 experience!
+**23.** 享受 DLSS5 带来的全新游戏体验吧！
+
+## Already using the 2026-10-05 version / 已经在用 2026-10-05 版本
+
+Do these three things once, with the game closed, before step 9:
+在第 9 步之前、游戏关闭的状态下，做一次下面三件事：
+
+1. If you used `EndfieldFGSwitch.exe`: in the launcher, run the game's file verification/repair, so that the game's own files are original again. This package does not need that tool and does not replace game files.
+   如果用过 `EndfieldFGSwitch.exe`：在启动器里对游戏执行文件校验/修复，让游戏自带的文件恢复原样。本插件包不需要这个工具，也不替换游戏文件。
+2. Move `vk-present-adapter.ini` out of the game folder (for example to your desktop). The package no longer uses this file, and an old copy keeps an older setting that caused stutter at 2x.
+   把游戏目录里的 `vk-present-adapter.ini` 移出游戏目录（例如移到桌面）。本插件包不再使用这个文件，旧文件里保留着一个会导致 2 倍帧生成卡顿的旧设置。
+3. Move `nvngx_dlssnr.dll` out of the game folder (not out of the `dlss5` folder). The package brings its own copies in `dlss5\nr\`.
+   把游戏目录里的 `nvngx_dlssnr.dll` 移出游戏目录（不是 `dlss5` 文件夹里的）。本插件包在 `dlss5\nr\` 里自带了运行库。
+
+Then continue with step 9 and choose "Replace" for files that already exist. Your NR settings in `ReShade.ini` stay as they are. ReShade is already installed, so you can skip steps 1 to 8, and steps 11 to 15 are still needed once.
+然后从第 9 步继续，已存在的文件选择“替换”。`ReShade.ini` 里的 NR 设置会保留。ReShade 已经装过，可以跳过第 1～8 步；第 11～15 步仍需做一次。
+
+## Updates, uninstalling, known issues and bug reports / 更新、卸载、已知问题与反馈
+
+You only need this part if something goes wrong.
+能正常玩就不用看这部分。
+
+**24. After a game update.** Some features may stop working for a while after a game update. Such updates *usually* do not prevent the game from running normally with DLSS 5 turned off, even with the old add-on version. I will release a new version as soon as possible for features that an update broke; until then you can turn off DLSS 5 or the affected feature and play without it. If an *unusually* large update changes how DLSS 5 or frame generation work at a low level, I cannot guarantee that the new game still runs with the old add-on (honestly, nobody can guarantee that for an injected add-on); in that case the game might not even start. If that happens, uninstall the add-on as in step 25 and play the original game until a new version is out.
+**24. 游戏更新后。** 游戏更新后，本插件可能会有部分功能暂时失效。这些更新*通常*不会影响“新版游戏 + 旧版插件”在不开 DLSS5 时正常运行原生画面；受更新影响的功能我会尽快更新版本，所以可以先关闭 DLSS5 或受影响的功能，暂时原生游玩。但如果游戏进行了不*通常*的大型更新，或大改了 DLSS5 和帧生成相关渲染管线的底层逻辑，我无法保证（实话说，对注入式插件也不可能有人能保证）“新版游戏 + 旧版插件”还能正常运行，甚至完全无法启动游戏都很正常。如果真的遇到这种情况，在新版出来之前，请按第 25 条卸载，暂时恢复原生游玩。
+
+**25. Uninstall.** Close the game. In the game folder, run `DLSS5-Recovery 故障恢复.cmd` and type the number **9** in the window that opens. Allow the administrator request if Windows asks. If the window lists other programs that use the same ReShade and asks whether to continue, type Y to continue (ReShade then also stops loading for those programs) or N to cancel without changing anything; Windows may ask for administrator rights once more after Y. After a few seconds, or a little over ten seconds, the window says that removal is finished; then close the window. A few files may remain in the game folder; they do not affect the game in any way and are not detected by the anti-cheat, so you can leave them. The window also reminds you to verify/repair the game files in the launcher. This package does not replace game files, so that step only matters if other tools changed game files before; doing it does no harm.
+**25. 卸载。** 关闭游戏，运行游戏根目录下的 `DLSS5-Recovery 故障恢复.cmd`，在弹出的窗口中输入数字 **9**。如果 Windows 请求管理员权限，选择允许。如果窗口列出了其他也在使用同一个 ReShade 的程序并询问是否继续，输入 Y 继续（这些程序也会不再加载 ReShade），输入 N 则取消、不做任何改动；输入 Y 后 Windows 可能会再请求一次管理员权限。约几秒或十几秒后，窗口会提示撤除完成，然后关闭窗口即可。根目录可能会残留几个文件，它们不影响游戏的任何正常运行，也不会触发反作弊或被识别到，可以不管它们。窗口最后还会提醒你在启动器里校验/修复游戏文件；本插件包不替换游戏文件，所以只有以前用其他工具改过游戏文件时这一步才有意义，做了也没有坏处。
+
+**26. Known issues that do not stop you from playing.**
+**26. 已知但不影响使用的问题。**
+
+1. The game's built-in photo camera takes its picture before the Present-stage DLSS 5, so its photos do not show Present-stage DLSS 5. I will not change how the game's camera works: that would break my promise never to change the game's features, and it would be risky with the anti-cheat. Use the add-on's own screenshot function instead; it captures DLSS 5 at every stage. To use the game camera's filters: set up the shot and filter, press X to hide the UI, then press the add-on's screenshot key.
+   游戏内置相机的拍照发生在“呈现”层 DLSS5 之前，所以拍不到“呈现”层的 DLSS5。我不会去改游戏内置相机的逻辑，这违背了“本插件绝不创造、修改任何游戏原有的玩法和功能”的承诺，对反作弊来说也是相当危险的操作。请使用本插件自带的截图功能，它可以拍到所有阶段的 DLSS5。想用游戏相机的滤镜时，可以调好位置和滤镜后按 X 隐藏 UI，再按本插件的截图键。
+2. Right after a character revives, right after a new map has loaded, and on some UI screens such as the backpack, part of a model's shadow behind may show through. It hardly affects normal play. The cause is not found yet; I will fix it if it can be done without risk.
+   角色死亡刚复活、切地图刚加载完，以及背包等部分 UI 下，有可能映出背后的一部分模型影子，基本不影响正常游戏。目前还没找到原因，能在无风险的前提下修好我就修。
+3. Switching UI screens or scenes very quickly (for example when visiting friends' bases for dailies) can make DLSS 5 turn off and on again for an instant, which looks like a flash. This is hard to fix without risking overall stability; I will try, but cannot promise.
+   高频切 UI、切场景时（比如清每日逛好友家），可能出现 DLSS5 被快速关闭又开启一瞬间的闪烁。这个不太好修，动了可能影响整体稳定性，不保证能解决，但会试试看。
+4. If you open the ReShade menu while controlling a character in first- or third-person view, the mouse is no longer locked to the game window and may leave it, and the game stutters until the window loses focus and gets it back. Switch windows once or press the Win key twice to fix it. Also, with DLSS 5 on, dragging in the ReShade menu feels a little sluggish, regardless of performance, even on top-end PCs. Both are existing ReShade problems, not caused by this add-on.
+   在控制角色的第一或第三人称视角时打开 ReShade 菜单，鼠标会脱离游戏窗口锁定、可能划到窗口外，同时游戏卡顿，直到窗口失焦再回到焦点。切一下窗口或连按两下 Win 键就能解决。另外 DLSS5 开启后，在 ReShade 面板里拖动鼠标会有些卡顿，与性能无关，顶配电脑也会出现。这两个都是 ReShade 原有的问题，不是本插件导致的。
+5. In rare cases DLSS 5 rapidly turns off and on several times in a row (flashing). It is very hard to reproduce: on my four test PCs and among several internal testers it appeared only twice in about half a month, even when we tried to trigger it. Restarting the game fixes it. Reports are very welcome.
+   在某些极端情况下，DLSS5 会快速连续关闭又开启（闪烁）。这个 Bug 非常难复现：我的 4 台测试机和几名内测群友想故意触发都很难，半个月左右只出现了 2 次。出现后重启游戏即可解决。欢迎大家多多反馈。
+
+**27. Reporting a bug.** After the bug happens, exit the game and do not start it again until you have sent the report. Send `ReShade.log` from the game folder, and put every file in the folder `dlss5\dlss5_log` (inside the game folder) into a zip file and send that too.
+**27. 反馈 Bug。** 触发 Bug 后退出游戏（在完成反馈之前不要重启游戏），把游戏根目录的 `ReShade.log` 发给我，再进入游戏根目录下的 `dlss5` 文件夹里的 `dlss5_log` 文件夹，把里面的所有文件打包成压缩包发给我。
+
+**28. Bugs that are very hard to solve** (usually after you already reported one and it is not fixed, and I suggest this step): start the game, press Home, open "DLSS 5 Bridge", tick "Advanced settings", scroll to the bottom, and in the "Anomaly log" ("异常日志") section tick "Full anomaly log (one full line per occurrence)" ("完整异常日志（每次发生都完整记录一行）"). In the window that opens, tick "I understand the disk-use risk above" and click "Turn on". Then try to trigger the bug a few times, exit the game, and send the same files as in step 27.
+**28. 非常难解决的疑难问题**（通常是你已经反馈过、但 Bug 还没修好，我建议你做这一步）：进入游戏后按 Home，进入“DLSS 5 Bridge”页面，勾选“高级设置”，滑到页面最下方，在“异常日志”区勾选“完整异常日志（每次发生都完整记录一行）”，在弹出的窗口中勾选“我已了解上述容量占用风险”并点“确认开启”。然后去尝试触发几次 Bug，退出游戏，按第 27 条发送同样的文件。
+
+This mode records every anomaly the add-on can record. Depending on the bug it can use a lot of disk space; in the worst case several GB per day. After reporting, start the game, untick the option again, and check how much space the logs use. Everything in `dlss5_log` is a log file and not needed for the add-on to run, so you can delete large files there by hand.
+请注意，该功能会完整记录本插件理论上能记录到的所有异常值。视 Bug 类型，存储空间占用可能非常大，最极端情况下一天（24 小时）生成几个 G 的日志都有可能。反馈完毕后，请重启游戏，关闭这个功能，并检查这些日志占用了多少空间。`dlss5_log` 文件夹内都是日志文件，不是插件运行所必需的，如果占用空间很多，可以手动删除其中较大的文件。
+
+---
+
+# Technical details
+
+Everything below is for developers and maintainers: what changed, why, how it was verified, what is still open, and which files to use for merging or reproducing.
+
+## 1. Components and versions
+
+The package `unified-20261015q-candidate.zip` (SHA-256 `f13a454e799ce8cee52a0cbcbe980ce5a0e923113b6dbcc2762794cd6177a18a`, 280,294,193 bytes) contains 23 files. The three add-ons, the NR runtimes and the Streamline files are byte-identical to the build that was tested on the two RTX 5090 PCs described in section 4; that is why the folder keeps its candidate name. On 2026-10-19 three non-binary files were corrected in place without changing the version: `DLSS5-Clean-Recovery.ps1` and `DLSS5-Recovery 故障恢复.cmd` (section 3.7) and two sentences of `DLSS5-使用与恢复 Usage and Recovery.md` that describe them. `SHA256SUMS.txt` and `release-manifest.json` inside the package list every file.
+
+| File | Version | SHA-256 | Source |
 | --- | --- | --- | --- |
-| 1 | ReShade 6.8.0 with full add-on support / 带完整插件支持的 ReShade 6.8.0 | https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe (the same file as the button "Download ReShade 6.8.0 with full add-on support" on https://reshade.me / 与 https://reshade.me 上 “Download ReShade 6.8.0 with full add-on support” 按钮是同一个文件) | `ReShade_Setup_6.8.0_Addon.exe` (the installer / 安装程序) |
-| 2 | Generic 8.5.0-rc10-stages1 | https://github.com/RankFTW/rhi-repo/releases/tag/renodx-dlss5-8.5.0-rc10-stages1 → `renodx-dlss5_8.5.0-rc10-stages1.zip` | `renodx-dlss5.addon64` |
-| 3 | NR runtime 310.8.0 / 神经渲染运行库 310.8.0 | https://github.com/RankFTW/rhi-repo/releases/tag/dlssnr-310.8.0 → `nvngx_dlssnr_310.8.0.zip` | `nvngx_dlssnr.dll` |
-| 4 | This add-on / 本插件 | https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/releases/tag/vk-fgrelay-20261005 → `dlss5-bridge-vk-fgrelay-20261005.zip` | `dlss5-bridge.addon64`, `renodx-dlss5.addon64`, `vk-present-adapter.ini` |
-| 5 | Optional: EndfieldFGSwitch / 可选：EndfieldFGSwitch | Same page as download 4 → `EndfieldFGSwitch.exe` / 与第 4 项同一页面 → `EndfieldFGSwitch.exe` | `EndfieldFGSwitch.exe` (one file, nothing to extract / 单个文件，无需解压) |
+| `dlss5-bridge.addon64` | `1.4.13-pre8-unified1q-20261015` | `68cedaf0a233b1c0b04baac1537b8eb434f667a7a7d8112c15ba175768d4c267` | [NIGos/dlss5-bridge](https://github.com/NIGos/dlss5-bridge) with the changes of the earlier releases of this repository and of this release |
+| `renodx-dlss5.addon64` | Generic `v8.5.0-rc10-unified1q` | `7de606225acb49075f4f03b1125e89f46109fe5013fa9a3c6e121578dc7ce80b` | RenoDX DLSS 5 Generic 8.5.0-rc10, with the `rc10-stages1` changes of the 2026-10-05 release and the changes of this release |
+| `renodx-mfgunlock.addon64` | MFG Unlock `0.11+unified1q-20261015` | `e160b7e60687374a4a5d878e17cb37edb3a9a4a55542181025d5b8ab6c77df1a` | [nefh/MFGAmpereUnlock-RenoDx](https://github.com/nefh/MFGAmpereUnlock-RenoDx) tag `0.11`, with the changes of this release |
+| `dlss5/nr/rtx50/nvngx_dlssnr.dll` | 310.8.0.0, NVIDIA-signed, `sm_120` only | `e16bcf15e16e13f527491cdf7845b2fe6521a738d8f7c9c721866a8496e1fc8e` | NVIDIA NR runtime |
+| `dlss5/nr/rtx20-40/nvngx_dlssnr.dll` | 310.8.SF.0, not signed | `6eb209e764f39872625debd6abaf45e2bb6322f6f270f781f70c059ae30b3927` | community-modified runtime, [RHI release dlssnr-310.8.SF-v2](https://github.com/RankFTW/rhi-repo/releases/tag/dlssnr-310.8.SF-v2) |
+| `dlss5/sl-2.14.1/` (11 files) | Streamline 2.14.1 plugins, DLSS-G 310.9.1, DLSS/DLSS-D/DeepDVC 310.5.2 | see `SHA256SUMS.txt` | NVIDIA Streamline / NGX |
+| `DLSS5-Recovery 故障恢复.cmd`, `DLSS5-Clean-Recovery.ps1`, `DLSS5-RestoreDriver.exe` | — | see `SHA256SUMS.txt` | this release |
+| `DLSS5-使用与恢复 Usage and Recovery.md`, `payload-manifest.json`, `release-manifest.json`, `SHA256SUMS.txt` | — | — | this release |
 
-Downloads 2 and 3 are hosted by the RHI project; you do not need to install the RHI program. This package was tested with exactly these versions; the links above always give these versions, even after newer ones come out.
+The package no longer contains `vk-present-adapter.ini` (its defaults are built into the bridge) or `EndfieldFGSwitch.exe` (replaced by the Streamline selection in the bridge).
 
-第 2、3 项由 RHI 项目托管，不需要安装 RHI 程序。本插件包只和上表这些版本一起测试过；即使以后出了新版本，上面的链接下载到的仍是这些版本。
+## 2. How the pieces fit together
 
-## Case 1: you have never installed ReShade or any mod for this game / 情况一：从未给这个游戏装过 ReShade 或任何插件
+- **Generic** runs NVIDIA's NR runtime at up to three stages per frame: Render (before the game's upscaler), Upscaled (after it) and Present (on the finished frame), 0 to 4 layers each. On Vulkan it runs Render and Upscaled itself on the game's own DLSS evaluate; the Present layers are served by the bridge.
+- **The bridge** runs the Present layers on the game's finished real frame at the input of the native DLSS Frame Generation (DLSS-G), once per real frame, and hands the result to DLSS-G through a GPU relay. This part is unchanged in principle since the 2026-10-05 release. New in this release, the bridge also owns everything that is specific to this game and this machine: which Streamline build is loaded, which NR runtime file is used for the GPU, the NVIDIA driver-profile frame-generation settings, the start-up health record, safe mode, the log folder and the anomaly log.
+- **MFG Unlock** stays a separate add-on and is the only component that changes the frame-generation multiplier. On RTX 50 it only changes the multiplier and keeps NVIDIA's native frame-generation kernels. On RTX 20/30/40 it keeps the compatibility path of MFG Unlock 0.11.
 
-1. **Switch the game to Vulkan.** Close the game. In the Hypergryph launcher, open the game's settings and choose Vulkan as the graphics mode. If you might want to go back later, write down the mode that was selected before.
-   **把游戏切换到 Vulkan。** 关闭游戏。在鹰角启动器里打开游戏设置，把图形模式选为 Vulkan。如果以后可能想改回来，先记下原来选的是哪种模式。
-2. **Install ReShade.** Run the installer from download 1. It shows a list of games; if Endfield is not in the list, click "Browse" and pick `Endfield.exe` in the game folder (not the launcher's `.exe`). When it asks which rendering API the game uses, choose **Vulkan**. If it offers effect packages, presets or add-ons, you do not need any of them for this; uncheck them all and finish.
-   **安装 ReShade。** 运行第 1 项的安装程序。它会列出一些游戏；如果列表里没有终末地，点“Browse”（浏览），选择游戏文件夹里的 `Endfield.exe`（不要选启动器的 `.exe`）。问游戏使用哪种渲染 API 时，选择 **Vulkan**。如果它提供特效包、预设或插件让你勾选，这里一个都不需要，全部取消勾选，然后完成安装。
-3. **Copy four files into the game folder** (next to `Endfield.exe`): `renodx-dlss5.addon64` (download 2), `nvngx_dlssnr.dll` (download 3), `dlss5-bridge.addon64` and `vk-present-adapter.ini` (download 4).
-   **把四个文件复制到游戏文件夹**（和 `Endfield.exe` 放在一起）：`renodx-dlss5.addon64`（第 2 项）、`nvngx_dlssnr.dll`（第 3 项）、`dlss5-bridge.addon64` 和 `vk-present-adapter.ini`（第 4 项）。
-4. **Start the game once, then close it.** At the top of the screen, a ReShade message should appear for a few seconds (if it does not, see "If something does not work" below). This first start also creates the settings file `ReShade.ini` in the game folder.
-   **启动一次游戏，然后关闭。** 屏幕顶部应该会出现几秒钟的 ReShade 提示（如果没有出现，见下文“遇到问题时”）。这次启动还会在游戏文件夹里生成设置文件 `ReShade.ini`。
-5. **Allow the add-on to work with frame generation.** Copy `ReShade.ini` from the game folder to your desktop and open the copy with Notepad. Press Ctrl+F and search for `RenoDX.DLSS5` to find the line `[RenoDX.DLSS5]`. Below it, find `EnableHooks=` and change the number after it to `1`. If that line is missing, add `EnableHooks=1` directly below `[RenoDX.DLSS5]`. If `[RenoDX.DLSS5]` is missing too, add these two lines at the end of the file:
-   **允许插件配合帧生成工作。** 把游戏文件夹里的 `ReShade.ini` 复制到桌面，用记事本打开这个副本。按 Ctrl+F 搜索 `RenoDX.DLSS5`，找到 `[RenoDX.DLSS5]` 这一行，在它下面找到 `EnableHooks=`，把后面的数字改成 `1`。如果没有这一行，就在 `[RenoDX.DLSS5]` 正下方加一行 `EnableHooks=1`。如果连 `[RenoDX.DLSS5]` 也没有，就在文件末尾加上这两行：
+The three add-ons talk only through versioned exports of the bridge (`DLSS5GetNrRuntimePathV2`, `DLSS5LogEventV1`, `DLSS5LogFullModeV1`) and of Generic (`DLSS5HookModeControlV1`, the stage protocol `DLSS5StageProtocolVersion`/`DLSS5GetStagePlan`). A missing or older partner is detected and reported; it does not lead to guessed behaviour.
 
-   ```ini
-   [RenoDX.DLSS5]
-   EnableHooks=1
-   ```
+## 3. Changes since vk-fgrelay-20261005
 
-   Save, then copy the edited file back into the game folder and choose "Replace". (Editing a copy avoids "Access denied" when saving inside the protected game folder.)
-   保存后，把改好的文件复制回游戏文件夹，选择“替换”。（先改副本，是为了避免直接在受保护的游戏文件夹里保存时提示“拒绝访问”。）
-6. **Turn on frame generation in the game.** Start the game. In the game's graphics settings, set the upscaling option to DLSS (any mode: DLAA, Quality, Balanced or Performance) and turn on DLSS Frame Generation with any multiplier your card supports.
-   **在游戏里打开帧生成。** 启动游戏，在游戏的画面设置中把超分辨率选项设为 DLSS（DLAA、质量、平衡、性能任一档位均可），并打开 DLSS 帧生成，倍数选显卡支持的任意一档。
-7. **Choose "Present".** Press the **Home** key to open the ReShade menu (on some laptops: Fn+Home; the ReShade message at game start names the key if it is different). Open the tab **DLSS 5 Neural Rendering**. Make sure the switch **Neural Rendering** is on, and set **Hook point** to **Present**. We also recommend **HDR mode: Auto (recommended)**. Press Home again to close the menu. If your ReShade menu is in Chinese, the tab and the switch keep their English names; Hook point is called 介入点, Present is 呈现, HDR mode is HDR 模式, and Auto (recommended) is 自动（推荐）.
-   **选择“呈现”。** 按 **Home** 键打开 ReShade 菜单（部分笔记本需要按 Fn+Home；如果按键不同，游戏启动时的 ReShade 提示会写出来）。打开 **DLSS 5 Neural Rendering** 选项卡，确认 **Neural Rendering** 开关已打开，把 **介入点**（Hook point）设为 **呈现**（Present）。同时建议把 **HDR 模式**（HDR mode）设为 **自动（推荐）**（Auto (recommended)）。再按一次 Home 关闭菜单。中文菜单里，这个选项卡和这个开关仍显示英文名。
-8. **Check that it works.** Stand still in the game and switch **Neural Rendering** off and on a few times. With it on, lighting, shadows and material detail look clearly different from the game's own picture. Your settings are saved automatically.
-   **确认已经生效。** 在游戏里站着不动，把 **Neural Rendering** 开关关、开几次。打开时，光影和材质细节应该和游戏原本的画面有明显不同。你的设置会自动保存。
-9. **Optional:** if you want 6x frame generation or NR that keeps running behind other windows, see "Optional: EndfieldFGSwitch" below.
-   **可选：** 如果想要 6 倍帧生成，或者想让切到其他窗口时神经渲染继续运行，见下文“可选：EndfieldFGSwitch”。
+Each item gives the problem, the cause, the change and how it was verified. "In game" means a run of Arknights: Endfield with the logs kept as evidence (section 6). Several items were developed and verified in intermediate builds (named unified1 to unified1p in the evidence); their code is unchanged in unified1q unless stated.
 
-## Case 2: you used a DirectX 11 version of these mods before / 情况二：以前装过 DirectX 11 版本的这类插件
+### 3.1 One package for RTX 30/40/50; NR runtime chosen per GPU
 
-1. **Back up.** Close the game. Make a backup folder outside the game folder, for example on your desktop. Copy these from the game folder into it, if they exist: `d3d11.dll`, `d3d12.dll`, `dxgi.dll`, `nvngx_dlssnr.dll`, every file ending in `.addon64`, `ReShade.ini`, `ReShadePreset.ini`, and the folder `reshade-shaders`. Also write down which graphics mode the launcher uses now.
-   **备份。** 关闭游戏。在游戏文件夹以外新建一个备份文件夹，例如放在桌面。把游戏文件夹里的这些东西（存在的话）复制进去：`d3d11.dll`、`d3d12.dll`、`dxgi.dll`、`nvngx_dlssnr.dll`、所有以 `.addon64` 结尾的文件、`ReShade.ini`、`ReShadePreset.ini`，以及 `reshade-shaders` 文件夹。同时记下启动器现在用的是哪种图形模式。
-2. **Turn off the old DirectX installation.** In the game folder, rename `d3d11.dll` to `d3d11.dll.bak` and `d3d12.dll` to `d3d12.dll.bak`. Both were placed there by the old installation (Arknights: Endfield does not ship them). If there is also a `dxgi.dll`, right-click it → Properties → Details: if "Product name" says ReShade, rename it to `dxgi.dll.bak` in the same way. If a file does not exist, skip it. If a `.bak` file with the same name already exists, move the old `.bak` into your backup folder first. Never touch files with these names in `C:\Windows`.
-   **停用旧的 DirectX 安装。** 在游戏文件夹里，把 `d3d11.dll` 改名为 `d3d11.dll.bak`，把 `d3d12.dll` 改名为 `d3d12.dll.bak`。这两个文件都是旧安装放进去的（《终末地》本身不带这两个文件）。如果还有 `dxgi.dll`，右键它 → 属性 → 详细信息：如果“产品名称”是 ReShade，也同样改名为 `dxgi.dll.bak`。某个文件不存在就跳过。如果已经有同名的 `.bak` 文件，先把旧的 `.bak` 移到备份文件夹。千万不要动 `C:\Windows` 里的同名文件。
-3. **Remove the old bridge.** Move every old bridge add-on (a file ending in `.addon64` with "bridge" in its name, for example an older `dlss5-bridge.addon64`) out of the game folder into your backup folder. Only the new one from download 4 may be in the game folder. If you are not sure what an `.addon64` file is, move it to the backup folder as well; the four files from Case 1 step 3 are all you need.
-   **移除旧的 bridge 插件。** 把所有旧的 bridge 插件（名字里带 bridge、以 `.addon64` 结尾的文件，例如旧版 `dlss5-bridge.addon64`）从游戏文件夹移到备份文件夹。游戏文件夹里只能有第 4 项下载的新文件。如果不确定某个 `.addon64` 文件是什么，也一起移到备份文件夹；需要的只有情况一第 3 步的那四个文件。
-4. **Continue with Case 1 from step 1.** In step 2, the installer normally no longer finds the old installation, because you renamed its file; just choose Vulkan. If it still offers to uninstall or update, choose uninstall, then run the installer again and choose Vulkan; if `ReShade.ini` is gone afterwards, copy it back from your backup folder. In step 3, choose "Replace" for files that are already there. Step 5 only changes one line of `ReShade.ini`. Effects you used before stay in the ReShade menu; you can switch them off there if you do not want them.
-   **从情况一的第 1 步继续。** 第 2 步中，由于旧文件已经改名，安装程序通常不会再发现旧安装，直接选择 Vulkan 即可。如果它仍然提供卸载或更新，选择卸载，然后重新运行安装程序并选择 Vulkan；如果之后 `ReShade.ini` 不见了，从备份文件夹复制回来。第 3 步中，遇到已经存在的文件时选择“替换”。第 5 步只改 `ReShade.ini` 中的一行。以前用过的特效仍会出现在 ReShade 菜单里，不需要的话可以在菜单里关掉。
-5. **To go back to your old DirectX 11 setup later,** close the game, remove the four files from Case 1 step 3, rename the `.bak` files back to `.dll`, put your backed-up files back, and switch the launcher back to its previous graphics mode. If you used EndfieldFGSwitch, click "Restore original 2.10.3" in it first.
-   **以后想退回旧的 DirectX 11 方案时，** 关闭游戏，移走情况一第 3 步的四个文件，把 `.bak` 文件改回 `.dll`，放回备份的文件，再在启动器里把图形模式改回原来的设置。如果用过 EndfieldFGSwitch，先在工具里点“恢复原装 2.10.3”。
+- **Problem.** The NVIDIA-signed NR runtime 310.8.0.0 contains GPU code only for RTX 50 (`sm_120`) and refuses to start on older cards, so RTX 20/30/40 users had to find and install a different runtime themselves.
+- **Change.** The package carries two runtimes: the signed 310.8.0.0 in `dlss5/nr/rtx50/` and the community-modified 310.8.SF.0 in `dlss5/nr/rtx20-40/`. The latter contains `sm_75`, `sm_86`, `sm_89` and `sm_120` code, and its host-side minimum-architecture check is lowered (static comparison with 310.8.0.0: `.rdata` identical, 25 bytes of `.text` differ: the immediate `0x1b0`→`0x160` and the per-architecture lower bounds). Generic asks the bridge for the runtime path through `DLSS5GetNrRuntimePathV2` with the LUID of the actual D3D12 device; the bridge maps the LUID to the physical NVIDIA GPU with NVAPI, picks the file by architecture (`0x1b0` → rtx50; `0x160`/`0x170`/`0x190` → rtx20-40), and checks only that file's SHA-256. An unknown device, a linked adapter that mixes architectures, a missing file or a wrong hash suspends NR for the session; no unverified file is used instead. The advanced section of the bridge panel shows the selected file and the check result.
+- **Also:** on RTX 20/30 the bridge calls `cuInit(0)` before the first Vulkan instance is created (advanced setting, default on for RTX 20/30 and off for RTX 40/50). On an RTX 3070 Ti, the driver failed the game's first `vkCreateDevice` with -3 because CUDA could not initialise after the address space below 1 TB was used up by earlier instances; the game then retried without the NGX extensions and hid DLSS. Calling `cuInit` first made DLSS appear (verified on that PC with a diagnostic Vulkan layer before this was built into the bridge). After a first `vkCreateDevice` of -3 the bridge no longer reuses the consumed layer call chain for a retry; it suspends NR and records that early CUDA initialisation is needed on the next start.
+- **Verified.** Offline: the selection fixture `test-nr-selection` passes. In game on RTX 5090: the rtx50 file is selected and NR initialises. RTX 30/40: confirmed by internal testers; no logs in this release.
 
-## Case 3: you already use a Vulkan setup, but not this build / 情况三：已经在用 Vulkan 版本，但不是这个版本
+### 3.2 Streamline 2.14.1 chosen in the panel, without replacing game files
 
-1. **Back up.** Close the game. Copy your current `dlss5-bridge.addon64`, `renodx-dlss5.addon64`, `vk-present-adapter.ini` (if you have it) and `ReShade.ini` into a backup folder outside the game folder.
-   **备份。** 关闭游戏。把现在的 `dlss5-bridge.addon64`、`renodx-dlss5.addon64`、`vk-present-adapter.ini`（如果有）和 `ReShade.ini` 复制到游戏文件夹以外的备份文件夹。
-2. **Keep ReShade** if it is the "full add-on support" version installed for Vulkan.
-   **保留 ReShade**，前提是它是为 Vulkan 安装的“完整插件支持”版本。
-3. **Replace the bridge.** Copy `dlss5-bridge.addon64` and `vk-present-adapter.ini` from download 4 into the game folder and choose "Replace". Make sure no other bridge add-on (another file ending in `.addon64` with "bridge" in its name) is left in the game folder.
-   **替换 bridge。** 把第 4 项下载里的 `dlss5-bridge.addon64` 和 `vk-present-adapter.ini` 复制到游戏文件夹，选择“替换”。确认游戏文件夹里没有留下其他 bridge 插件（名字里带 bridge、以 `.addon64` 结尾的其他文件）。
-4. **Generic version.** We recommend Generic 8.5.0-rc10-stages1 (download 2), because this build was tested together with that version. Other versions are allowed. If one does not work with this build, the tab **DLSS 5 Bridge** in the ReShade menu shows a section "NR compatibility" that names the problem.
-   **Generic 版本。** 建议使用 Generic 8.5.0-rc10-stages1（第 2 项），因为本版本是和它一起测试的。其他版本也允许使用。如果某个版本和本版本配合不正常，ReShade 菜单的 **DLSS 5 Bridge** 选项卡会出现 “NR compatibility” 一栏，写出问题所在。
-5. **Check `EnableHooks=1`** in `ReShade.ini` as in Case 1 step 5. Keep your own picture settings.
-   **检查 `EnableHooks=1`**，方法同情况一第 5 步。你自己的画面参数保持不变。
-6. **Start the game and do Case 1, steps 6 to 9.**
-   **启动游戏，完成情况一的第 6～9 步。**
+- **Problem.** RTX 30 cards need the Streamline 2.14.1 plugins with DLSS-G 310.9.1 for MFG Unlock to accept the provider, and on RTX 50 the native multiplier change needs DLSS-G 310.9.x. The earlier tool `EndfieldFGSwitch.exe` replaced eight Streamline/NGX files in the game folder and wrote a fixed multiplier into the driver profile.
+- **Change.** The bridge hooks `slInit` of the game's own `sl.interposer.dll` and, when selected, points `Preferences.pathsToPlugins` to `dlss5\sl-2.14.1\`. The game's interposer stays in place (it has the export `HGSetupCustomVulkan`). The folder must contain all 11 files with matching hashes, including the game's NGX snippets `nvngx_dlss.dll`, `nvngx_dlssd.dll` and `nvngx_deepdvc.dll`: without them the game's DLSS Super Resolution is unavailable and the Render/Upscaled NR stops (found in game during development). After a successful redirect, the bridge's own NGX sessions use the same folder as their feature search path (`NVSDK_NGX_FeatureCommonInfo`); before this fix the bridge's NGX context loaded DLSS-G 310.5.2 from the game folder next to the game's 310.9.1, and MFG Unlock's version check refused to change the multiplier. The choice is stored in an atomic state file and applies at the next start; one click saves it (no second confirmation), a pending change can be cancelled, and it is independent of the frame-generation switch and multiplier.
+- **2026-10-15 game update.** The update replaced only `sl.interposer.dll` (still Streamline 2.10.3: old build `39925bb5…`, 581,096 bytes, with `HGSetupCustomVulkan`; new build `fabb19bb6495d743182c1bc51bcbbdc4481acc3dcaf445403f0b304a31a56ccc`, 569,472 bytes, NVIDIA-signed, without that export). The previous bridge accepted only the old hash, so `2.14.1 + DLSS-G 310.9.1` could not be selected; the game then used its own DLSS-G 310.5.2, MFG Unlock logged `provider not confirmed` on RTX 50, and the focus retention could not find its call site in the 2.10.3 `sl.dlss_g.dll`. unified1q accepts both interposer builds (list generated by `make-payload.py` into `common/payload.hpp`) and the panel says separately whether the interposer is unknown or a package file is missing or changed.
+- **Verified.** In game on RTX 5090: both directions of the switch, including with frame generation off; the bridge and game NGX contexts both loading DLSS-G 310.9.1 from the subfolder; with unified1q and the updated interposer `[deployment] SL check: interposer=fabb19bb… known=1 package=verified` and `sl_valid=1 current=1`, Streamline plugins loaded from `dlss5\sl-2.14.1`, `[focus-fg] scoped focus gate ready`. Offline: 2,000 concurrent calls of the entry hooks, NGX ABI layout checks.
 
-## Optional: EndfieldFGSwitch (6x frame generation, NR behind other windows) / 可选：EndfieldFGSwitch（6 倍帧生成、切到其他窗口时神经渲染不停）
+### 3.3 MFG Unlock: one build for all generations, reliable multiplier takeover
 
-`EndfieldFGSwitch.exe` (download 5) is a small separate tool. You only need it for one or both of these two things:
+- **RTX 50 support.** MFG Unlock 0.11 identifies RTX 50 (`0x1b0`) as Unknown and passes the game's request through, so on RTX 50 it did not change the multiplier. A Blackwell profile now allows only the multiplier override; architecture gates, PTX/kernel replacement and timing patches stay disabled on Blackwell. The structural ceiling and the `slDLSSGSetOptions`/`slDLSSGGetState` entries are found from a successful `slGetFeatureFunction` query of the plugin module, because the host may cache `slGetPluginFunction` before MFG Unlock loads. On RTX 20/30/40 the 0.11 paths are kept. "Legacy software flip pacing" is kept as an option (default on for RTX 20/30/40 and off for RTX 50 when no choice is saved; restart required).
+- **Start-up crash (two causes).** (1) MFG Unlock 0.11 writes `LoadFromDllMain=renodx-mfgunlock.addon64` into `ReShade.ini`; on the next start the game crashed in `UnityPlayer.dll+0x57D123` (same address with the unmodified 0.11). Endfield no longer gets this setting. (2) ReShade on Vulkan unloads add-ons at each `vkDestroyInstance`, Endfield creates and destroys about six instances while starting, and MFG Unlock was the only add-on that was really unloaded. When the game's Direct3D 9 probe thread was inside MFG Unlock's `LoadLibraryExW` detour at that moment, it returned into unmapped memory (`DEP at MFG+0x31183`). MFG Unlock now pins itself and the ReShade module for the process lifetime before installing its first hook, and repeats its module scan in an exported `AddonInit` on later ReShade cycles.
+- **Multiplier not taking effect.** (1) The bridge's read-only hook on `slDLSSGSetOptions` (from the focus feature) conflicted with MFG Unlock's hook on the same function; it was removed, the actual focus entry is kept. (2) Hook installation enlists every other thread; a thread that exits between enumeration and `SuspendThread` made the whole transaction fail (`stage=enlist-thread error=5`; in one case the thread, started by `ACE-Base64.dll`, had exited 34.5 ms before enlistment). A thread whose exit is confirmed by its exit signal is now skipped; a live thread that cannot be suspended still aborts. (3) `UnityPlayer.dll` asks for the `slDLSSGSetOptions` pointer once and caches it, so one failed install lasted the whole session. The entry is now installed as soon as any DLSS-G entry is resolved from the plugin module, and the present path retries a failed install up to 6 times with growing intervals (60 to 480 frames), checking that the target module is still the same one.
+- **Verified.** Offline: 271 policy checks and 10 start-up checks; the hook fixture (41 checks: exited thread skipped, live unsuspendable thread still aborts, exit code 259 treated as unknown, bounded retry); the unload race fixture: the build before the fix crashed 5 of 5 times at `+0x31183`, the fixed build returned normally 5 of 5 times; in six load/unload cycles the hooks were installed once and rescanned five times. In game on RTX 5090 with intermediate builds: 6x accepted with five generated frames per real frame (`idx=1/5..5/5`); switching between 2x, 3x, 4x, 5x and 6x, frame generation off/on and back to "Game default" worked; after a full reinstall the multiplier took over on first start once the NGX folder fix (3.2) was in. On PC B (intermediate build 1p) the first present-path retry installed the entry after an `error=5` failure. With unified1q: section 5.1.
 
-`EndfieldFGSwitch.exe`（第 5 项）是一个单独的小工具。只有需要下面两点中的一点或两点时才需要它：
+### 3.4 Stutter at 2x: CPU throttle default changed to 2
 
-1. **6x frame generation on RTX 50 cards.** With the game's own files, frame generation stops at 4x (one real frame plus three generated frames). With the tool you can choose 2x to 6x. This works with or without NR.
-   **在 RTX 50 显卡上使用 6 倍帧生成。** 使用游戏自带文件时，帧生成最高 4 倍（一帧真实画面加三帧生成画面）。用这个工具可以选择 2～6 倍。这一点有没有神经渲染都可以用。
-2. **Frame generation and NR keep running when you switch to another window** (except while the game is minimised). With the game's own files, both stop as soon as another window is in front, and the game shows its plain picture until you click back into it. With the tool's files and this add-on (Hook point Present and Neural Rendering on, as in Case 1 step 7), both keep running while the game window is not minimised, and the picture does not briefly flash without NR when you switch windows. This works on RTX 40 cards too, as long as NR works there.
-   **切到其他窗口时，帧生成和神经渲染继续运行**（游戏最小化时除外）。使用游戏自带文件时，只要其他窗口到了前台，两者都会停下，游戏显示原本的画面，直到你点回游戏。使用工具的文件并配合本插件（按情况一第 7 步设置介入点为呈现、打开 Neural Rendering）时，只要游戏窗口没有最小化，两者都会继续运行，切换窗口时画面也不会短暂闪一下没有神经渲染的画面。只要神经渲染能在 RTX 40 显卡上运行，这一点在 RTX 40 上同样有效。
+- **Problem.** At 3840×2160, real 2x and NR Render 0 / Upscaled 1 / Present 1 on an RTX 5090, the game stuttered visibly although the average frame rate was about 65.
+- **Cause.** The throttle (`Throttle=1`, introduced with the GPU relay to stop frames from queueing in front of the private NR queue) holds the game after `slReflexSleep` until the NR of the newest queued frame has completed. At 2x this alternated the simulation interval between about 14–17 ms and 57–60 ms. With `Throttle=0` the alternation disappeared (table in section 5.2).
+- **Change.** The built-in default is now `Throttle=2` (wait for the NR of the frame before the newest queued one). This keeps a bounded wait for a real backlog. An explicit `Throttle` value in an existing `vk-present-adapter.ini` still wins; that is why users of the 2026-10-05 version should remove that file.
+- **Verified.** Throttle 2 against 0 at 6x and 2x (section 5.2): no stable advantage of 0, and no difference the user could notice. The throttle did not actually wait in those runs (`waits=0`), so the benefit of keeping the bounded wait under backlog is not measured.
 
-If you need neither, you do not need this tool; NR works without it.
+### 3.5 Present-stage NR switching itself off after a high layer count
 
-如果两点都不需要，就不需要这个工具；不用它也能使用神经渲染。
+- **Problem.** After about 7–8 NR layers in total and the automatic return to Upscaled 1 / Present 1, the Present stage either flickered continuously or switched itself off for the rest of the session (`feature creation did not complete within 4 s`, printed only 40 ms after the creation started).
+- **Cause.** `ID3D12Fence::SetEventOnCompletion` cannot be cancelled. A wait that timed out left its registration on the fence; when the GPU later reached that value it signalled the auto-reset event while nobody waited. The next wait on the same event woke at once, found the fence not yet at its own target, and returned failure. In the PQ wait this produced failed output frames, a reset of the private upscaler history and a restarting stabiliser (the flicker); in the session rebuild it produced the false "4 s" failure and the refusal state. The pattern dates from the Vulkan integration of September; no device removal or TDR was logged.
+- **Change.** `FenceDeadlineWait()` (`bridge/src/fence-deadline-wait.h`) uses one deadline for the whole call, treats every event wake only as a reason to read `GetCompletedValue()` again, and fails only when the deadline passes. It replaces the bodies of `Synth12WaitFence` and `FgCompositeWait`; `PqPassWait` follows the same rule. The return value of `FgIdentityCopy` is now checked and logged. No timeout, guard threshold, refusal policy or GPU-completion proof was changed.
+- **Verified.** In game on RTX 5090 with the layer stack replayed 1→4→2→3→1: 11 waits really ran their full 900 ms and all recovered, 0 "4 s" failures, the refusal state was never entered, NR kept presenting; the flicker did not appear. Real D3D12 fence on WARP: the old logic gave 8 of 8 false failures at 0 ms after three timeouts, the new one 0; a fence that really does not complete still fails at the deadline (100 ms budget, 110 ms measured).
+- **Packaging note.** This fix was verified in the intermediate builds 1m/1n, but the bridge of 1o/1p was built from a source tree that did not contain it. unified1q merges it into the production tree; its binary contains the fix's log strings.
 
-**What it changes.** The game ships with an older version of NVIDIA's frame generation files (Streamline 2.10.3). The tool contains NVIDIA's newer official versions (Streamline 2.14.1 and frame generation 310.9.1) and also the game's original files. It swaps 8 of these files in the game folder and, on RTX 50 cards, tells the NVIDIA driver which multiplier to use for this game only. It does not change other files, other games or the driver's global settings. Before it replaces a file it keeps a copy in `%LOCALAPPDATA%\EndfieldFGSwitch` and writes a log there (`fg-switch.log`); to open that folder, type `%LOCALAPPDATA%\EndfieldFGSwitch` into the address bar of File Explorer and press Enter. Because it changes game files, the account risk described at the top applies to it as well.
+### 3.6 Start-up protection, safe mode and layer confirmation
 
-**它会改动什么。** 游戏自带的是旧版的 NVIDIA 帧生成文件（Streamline 2.10.3）。工具里装着 NVIDIA 官方的新版本（Streamline 2.14.1 和帧生成 310.9.1），也装着游戏的原装文件。它会替换游戏文件夹里的 8 个这类文件；在 RTX 50 显卡上，还会告诉 NVIDIA 驱动这个游戏使用哪个倍率（只对这个游戏生效）。它不改其他文件、其他游戏或驱动的全局设置。替换文件之前，它会把原文件复制一份到 `%LOCALAPPDATA%\EndfieldFGSwitch`，并在那里写日志（`fg-switch.log`）；要打开这个文件夹，在文件资源管理器的地址栏输入 `%LOCALAPPDATA%\EndfieldFGSwitch` 后按回车。因为它会改动游戏文件，开头所说的账号风险同样适用于它。
+- **State and health.** Deployment state lives in `dlss5/state` (atomic write, generation number, checksum; fallback `%LOCALAPPDATA%/dlss5-bridge/<id>`). A start counts as healthy after 60 s of continuous presents, and with the Streamline subfolder selected also a successful redirect, the required modules from that folder and a successful game DLSS Super Resolution evaluate. A trial setting is undone after 1 recorded crash or 2 unexplained interrupted starts; a confirmed configuration enters safe mode after 2 crashes or 3 unexplained interrupted starts. Safe mode skips all NR/Streamline interventions without clearing settings and is left only by hand.
+- **Layer confirmation.** A combination with 5 or more layers in total is saved as a pending trial before it is applied; the DLSS 5 Neural Rendering page then shows a warning and a 15-second confirmation, with "Keep" disabled for the first 2 s. The deadline keeps running with the menu closed, and every NR plan read rejects an expired combination; a restart restores the combination before an unconfirmed trial.
+- **Verified in game (RTX 5090).** Timeout measured at 15.040 s and 14.785 s (0.25 s sampling) with the menu closed; "Keep" held the combination; safe mode entered (NR evaluations 0, Streamline from the game folder) and left by hand with all 125 Generic and 5 MFG Unlock settings unchanged. Offline: 474 state/plan checks including 125 stage combinations, storage failures and failure thresholds.
 
-**How to use it / 使用方法**
+### 3.7 NVIDIA driver profile and recovery outside the game
 
-The tool shows every label in Chinese and English, for example "切换到 2.14.1 并应用倍率 / Switch to 2.14.1".
+- **Driver profile.** At start and when the Streamline selection changes, the bridge reads 8 public DLSS-G related driver settings (fixed and dynamic multiplier, target frame rate, FG model overrides) for `Endfield.exe`, no matter which tool wrote them, and where a local or inherited global override would interfere it writes a default into the Endfield profile only. The previous local value or its absence goes into two journals with generation numbers; restore only resets values that still equal what the bridge wrote. If the process lacks rights, a maintenance process started through the system `rundll32` asks for UAC for the same Windows account. Read or write errors never block the game. Undocumented private settings are not touched.
+- **External removal.** `DLSS5-Recovery 故障恢复.cmd` option 9 runs `DLSS5-Clean-Recovery.ps1` and `DLSS5-RestoreDriver.exe` without loading ReShade or any add-on: it disables the ReShade Vulkan layer registration (if other existing programs are registered with the same ReShade, it lists them and continues only after the user answers Y), restores the journalled driver values, and moves the three add-ons, the `dlss5` folder and the related settings into `DLSS5-Recovery-Backups/<time-id>/` next to the game folder with SHA-256 checks. The result is reported as `render-components-removed; launcher-repair-required`. Other options: disable/enable the add-ons by renaming, enter/leave safe mode, restore driver changes, export diagnostics, reset the layer confirmation.
+- **Verified.** In game on RTX 5090: the first start synchronised two settings (FG override and FG render preset selection got Endfield-local defaults; no local values existed before); the journal did not change on later starts. Option 9 was run by the user with intermediate build 1f1 (the recovery script was changed afterwards, in build 1o, for the new NR runtime folders; that change is covered by the offline checks only): the game then started without ReShade, the tool returned 0, no enabled ReShade registration or component remained, and the 82-file backup passed its hash check; after launcher repair and a new install (intermediate build 1h), NR and the multiplier worked again. Offline: 43 + 80 driver transaction checks, 15 maintenance-entry checks, 82 recovery checks each in PowerShell 7 and Windows PowerShell 5.1. A real UAC prompt and concurrent edits by another driver tool were not tested.
+- **Fix of 2026-10-19: option 9 refused after the game was moved.** ReShade lists the programs it was installed for in `C:\ProgramData\ReShade\ReShadeApps.ini`. After the game had been reinstalled from `...\games\Endfield Game` to `...\games\Arknights Endfield`, that list still held the old path. The script counted every listed program other than the current game as another game sharing ReShade and stopped. The menu did not show which entry blocked it, offered no way to continue, and still printed the reminder to repair the game in the launcher. Now a listed program whose file no longer exists is reported as ignored (`stale_apps` in the plan) and does not block. Programs that exist are listed, and the script exits with code 3 before it backs up or changes anything. The menu then asks Y/N; Y runs the removal again with `-AllowSharedReShade`. The completion message appears only after success, and a failure says that files are retained. A missing or empty list still counts as unknown and needs the confirmation.
+- **Verified (fix of 2026-10-19).** Offline: the recovery fixture passes 89 checks, including a nonexistent listed program, the current game written with `/` and different letter case, and a missing list. In an elevated shell with `DLSS5_TEST_ELEVATED_ENTRY=1` it passes 96: the real `-File -Action Restore` entry point listed the other program and exited with 3 before any change, and the HKLM ReShade registrations were unchanged. The menu flow, with a stub in place of the PowerShell script, passed 8 checks: Y reruns with `-AllowSharedReShade`, N cancels after one call, and a failure shows the failure message. The fixed script's read-only plan on PC Z's real game folder gave an empty `shared_apps` and the old `Endfield Game\Endfield.exe` path in `stale_apps`. Option 9 itself was not run with the fixed script.
 
-工具里的每个文字都同时用中文和英文显示，例如“切换到 2.14.1 并应用倍率 / Switch to 2.14.1”。
+### 3.8 Panels and defaults
 
-1. Close the game.
-   关闭游戏。
-2. Double-click `EndfieldFGSwitch.exe`. Windows asks "Do you want to allow this app to make changes to your device?": click "Yes". If a blue window "Windows protected your PC" appears, click "More info" and then "Run anyway". Windows shows this window because the tool has no digital signature.
-   双击 `EndfieldFGSwitch.exe`。Windows 会问“你要允许此应用对你的设备进行更改吗？”，点“是”。如果出现蓝色的“Windows 已保护你的电脑”窗口，点“更多信息”，再点“仍要运行”。出现这个窗口是因为工具没有数字签名。
-3. Check that "Game folder" shows the folder that contains `Endfield.exe`. If it does not, click "Browse…" and choose that folder.
-   确认“游戏文件夹”一栏显示的是 `Endfield.exe` 所在的文件夹。如果不是，点“浏览…”选择这个文件夹。
-4. Below the folder, the tool shows your graphics card, your driver version and the multipliers you can use. On an RTX 50 card, choose the multiplier; 6x is recommended. (On an RTX 40 card there is no choice: the tool only swaps the files, and frame generation stays 2x, set in the game.)
-   文件夹下方会显示你的显卡、驱动版本和可用的倍率。RTX 50 显卡选择倍率，推荐 6 倍。（RTX 40 显卡没有这个选项：工具只替换文件，帧生成保持 2 倍，在游戏里设置。）
-5. Click "Switch to 2.14.1". When the box below shows "Done", close the tool.
-   点“切换到 2.14.1 并应用倍率”。下方框里显示“完成”后，关闭工具。
-6. Start the game and keep DLSS Frame Generation on in the game's settings. The game's menu still offers only its own choices (up to 4x); any of them is fine, because the multiplier you chose in the tool is used anyway.
-   启动游戏，在游戏设置里保持 DLSS 帧生成开启。游戏菜单里仍只有它自己的选项（最高 4 倍），选哪一档都可以，因为实际使用的是你在工具里选的倍率。
+- Each of the three panels has its language choice in the first row and shows one language at a time. Secondary settings are hidden behind "Advanced settings"; hiding them does not reset them.
+- The bridge's Deployment section has the Streamline choice and the NR hook mode (`EnableHooks` 0/1/2). The value is written through Generic's own ReShade configuration interface (`DLSS5HookModeControlV1`), and the panel shows the current and the next-start value. The Present stage and the focus retention need mode 1; mode 2 (Generic's default, NGX only) was not accepted for the Present path.
+- Generic's layer controls are grouped by stage and show the global layer number, because per-layer settings are stored by global number.
+- New configurations enable the character mask and set Character / skin to 0 on every layer (independent skin stays on). On PC Z these two values largely removed dark patches on faces. Explicit saved values, including mask off and skin -1, are kept.
+- Without `vk-present-adapter.ini` the bridge uses `Pipeline=2`, `Import=1`, `Throttle=2`.
 
-**To change the multiplier**, close the game, open the tool, choose another multiplier and click "Switch to 2.14.1" again. **To undo everything the tool did**, close the game, open the tool and click "Restore original 2.10.3". The original files come back and the game's menu decides the multiplier again.
+### 3.9 Logs
 
-**想换倍率时，** 关闭游戏，打开工具，选另一个倍率，再点一次“切换到 2.14.1 并应用倍率”。**想撤销工具做的全部改动时，** 关闭游戏，打开工具，点“恢复原装 2.10.3，倍率交还游戏”。原装文件会放回去，倍率重新由游戏菜单决定。
+- All logs of the suite are in `dlss5\dlss5_log\`: `dlss5-bridge.log` (first 8 MB of a session, then two rotating 4 MB overflow files; previous session kept as `.prev`), `dlss5-observe.log`, `dlss5-sl.log` (Streamline), `RenoDX-DLSS5-crash.log`, diagnostics exports, NR trace CSVs and the anomaly log. Logs left in the game root by older versions are moved there on first start. `ReShade.log` stays next to `ReShade.ini`, where ReShade writes it.
+- The anomaly log collects bridge errors and failure-signature lines, all warnings and errors of Generic and MFG Unlock, every MFG Unlock decision that leaves the panel multiplier unapplied, the previous session's crash record, presents 100 ms or more apart, and 2 s without a present while the game is in the foreground. Bounded mode (default): first occurrence in full, repeats merged per 10 s, 16 MB per session, 64 MB and 30 files kept. Full mode (opt-in with a disk-use warning and confirmation): one line per occurrence, 64 MB parts, never deleted automatically, paused below 4 GB free disk space and resumed above 6 GB; stored in `dlss5\state\event-log-mode.txt`.
+- Fixed: lines with non-ASCII paths were written empty (`%ls` is now formatted with a UTF-8 locale).
+- Verified offline: 67 event-log checks; a fixture that loads the real bridge DLL in a temporary game folder (log migration, crash-record transfer, merged repeats, `GetLastError` preserved). In game on RTX 5090: full mode over 26 minutes wrote 301 KB.
 
-**Good to know about the tool / 关于工具的注意事项**
+## 4. Test machines
 
-- It refuses to do anything while the game is running.
-  游戏运行时，它不会做任何改动。
-- It only works with the two file versions it knows. If it shows "unknown version", the game has different files (for example after a game update), and its buttons stay greyed out so that nothing is overwritten. In that case wait for an updated tool. The multiplier you chose earlier stays set for this game in the NVIDIA driver until you click "Restore original 2.10.3" in a tool version that knows the new files.
-  它只认识两套文件版本。如果显示“未知版本”，说明游戏里的文件不同（例如游戏更新之后），这时按钮保持灰色，不会覆盖任何文件。这种情况下请等待工具更新。你之前选的倍率会继续保存在 NVIDIA 驱动里、只对这个游戏生效，直到你在认识新文件的工具版本里点“恢复原装 2.10.3，倍率交还游戏”。
-- If it shows "mixed", an earlier switch did not finish. Click the button you want again.
-  如果显示“两种版本混合”，说明上次切换没有完成。再点一次你想要的按钮即可。
-- When the launcher repairs or updates the game, it may put the original files back. Then run the tool again.
-  启动器修复或更新游戏时，可能会把原装文件放回去。这时再运行一次工具即可。
-- On cards older than RTX 40, only "Restore original 2.10.3" is available.
-  比 RTX 40 更早的显卡只能使用“恢复原装 2.10.3，倍率交还游戏”。
+| Name | GPU | System | Driver | Build tested | Result |
+| --- | --- | --- | --- | --- | --- |
+| Z (development PC) | RTX 5090 | Windows 11 25H2 (build 26200), Ryzen 9 9950X3D, 5120×2160 | 616.92 | unified1q and all intermediate builds | section 3 and 5 |
+| B (another user's PC) | RTX 5090 | Windows 10 22H2 (build 19045.6456), Ryzen 9 9950X3D, 3840×2160 at 240 Hz | 616.56 | unified1q; earlier 1p | section 5.4 |
+| A | RTX 4080 | Windows 10 22H2 (19045), Core i7-13700K, 3840×2160 at 60 Hz | 616.92 | only the 2026-10-05 bridge and Generic with MFGAda 1.4.1/1.4.2 | historical, section 7 |
+| C | RTX 3070 Ti | Windows 10, Ryzen 5 9600X | — | only the 2026-10-05 bridge and Generic with MFGAmpere 0.11 | historical, section 3.1 and 7 |
+| internal testers | RTX 30 and RTX 40 | — | — | unified1q | confirmed working; logs not included |
 
-## If something does not work / 遇到问题时
+## 5. Measurements and test results
 
-- **No ReShade message at game start, and Home does nothing:** ReShade is not loaded. Check that the launcher is set to Vulkan, and run the ReShade installer again for `Endfield.exe` with Vulkan.
-  **游戏启动时没有 ReShade 提示、按 Home 也没反应：** 说明 ReShade 没有加载。检查启动器是否设为 Vulkan，再对 `Endfield.exe` 重新运行一次 ReShade 安装程序并选择 Vulkan。
-- **The tab DLSS 5 Neural Rendering or DLSS 5 Bridge is missing:** the file `renodx-dlss5.addon64` or `dlss5-bridge.addon64` is not in the game folder, or you installed ReShade without "full add-on support".
-  **没有 DLSS 5 Neural Rendering 或 DLSS 5 Bridge 选项卡：** 说明游戏文件夹里缺少 `renodx-dlss5.addon64` 或 `dlss5-bridge.addon64`，或者装的 ReShade 不是“完整插件支持”版本。
-- **The picture does not change when you switch Neural Rendering:** check that frame generation is on in the game, that Hook point is Present, and that `EnableHooks=1` is saved in `ReShade.ini` in the game folder. Then look at the tab **DLSS 5 Bridge** for a section "NR compatibility". If all of this is in order and the picture still does not change after you have been in the game for about half a minute, restart the game once. If that does not help, see "Asking for help" below. On an RTX 40 card, see "Which graphics cards work" above first.
-  **切换 Neural Rendering 时画面没有变化：** 检查游戏里帧生成是否打开、介入点是否为呈现、游戏文件夹里的 `ReShade.ini` 是否已保存 `EnableHooks=1`。然后查看 **DLSS 5 Bridge** 选项卡里有没有 “NR compatibility” 一栏。如果以上都没问题，进入游戏约半分钟后画面仍然没有变化，就重新启动一次游戏。如果还是不行，见下文“求助时”。RTX 40 显卡请先看上文“支持哪些显卡”。
-- **NR and frame generation stop when you click another window:** this is normal with the game's own files. If you want them to keep running, use EndfieldFGSwitch (see above).
-  **点到其他窗口时，神经渲染和帧生成停了：** 使用游戏自带文件时这是正常的。如果想让它们继续运行，使用 EndfieldFGSwitch（见上文）。
-- **The game does not start, crashes, or shows an anti-cheat message:** move the four files from Case 1 step 3 out of the game folder and start the game again. If you used EndfieldFGSwitch, also click "Restore original 2.10.3" in it. If it still fails, uninstall ReShade (see "To remove everything" below).
-  **游戏无法启动、闪退或出现反作弊提示：** 把情况一第 3 步的四个文件移出游戏文件夹，再启动游戏。如果用过 EndfieldFGSwitch，也在工具里点“恢复原装 2.10.3，倍率交还游戏”。如果仍然不行，卸载 ReShade（见下文“想全部卸载时”）。
-- **Asking for help:** close the game and open an issue at https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/issues. Attach `dlss5-bridge.log` and `ReShade.log` from the game folder. If the problem is about EndfieldFGSwitch, also attach `fg-switch.log` from `%LOCALAPPDATA%\EndfieldFGSwitch`.
-  **求助时：** 关闭游戏，到 https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/issues 提交 issue，附上游戏文件夹里的 `dlss5-bridge.log` 和 `ReShade.log`。如果问题与 EndfieldFGSwitch 有关，再附上 `%LOCALAPPDATA%\EndfieldFGSwitch` 里的 `fg-switch.log`。
+All measurements are from PC Z (RTX 5090) unless stated. Frame data were taken with PresentMon 2.5.1 while the game was in the foreground and the user turned the camera at the same spot; the first second after gaining focus and the last 0.25 s were excluded. "Simulation interval" is `MsBetweenSimulationStart`, "display interval" `MsBetweenDisplayChange`, "software PC latency" `MsPCLatency` (not a photon-latency measurement).
 
-## Good to know / 注意事项
+### 5.1 unified1q in game
 
-- **Frame generation must stay on.** With the game's frame generation off, this add-on does nothing and the picture has no NR.
-  **帧生成必须保持开启。** 游戏帧生成关闭时，本插件不工作，画面没有神经渲染。
-- **Leave "Source interpretation" on Auto.** In the tab DLSS 5 Neural Rendering, keep Encoding, Primaries and Linear unit (nits) under "Source interpretation" on Auto (Chinese menu: 来源解读 → 编码, 原色, 线性单位). Other values pause NR until they are set back to Auto.
-  **“来源解读”保持“自动”。** 在 DLSS 5 Neural Rendering 选项卡中，“来源解读”下的“编码”“原色”“线性单位”都保持“自动”。改成其他值会暂停神经渲染，改回“自动”后恢复。
-- **Switching windows.** With the game's own files, NR and frame generation stop while another window is in front and start again when you click back into the game. With EndfieldFGSwitch's files, they keep running while the game window is not minimised. In both cases they pause while the game is minimised and start again when you bring the game back.
-  **切换窗口。** 使用游戏自带文件时，其他窗口在前台期间，神经渲染和帧生成会停下，点回游戏后重新开始。使用 EndfieldFGSwitch 的文件时，只要游戏窗口没有最小化，它们就会继续运行。两种情况下，游戏最小化时它们都会暂停，恢复游戏窗口后自动继续。
-- **Two text files appear in the game folder:** `dlss5-bridge.cfg` (the add-on's settings) and `dlss5-bridge.log` (its log). This is normal.
-  **游戏文件夹里会多出两个文本文件：** `dlss5-bridge.cfg`（插件设置）和 `dlss5-bridge.log`（日志）。这是正常的。
-- **To turn this add-on off,** close the game, open `vk-present-adapter.ini` with Notepad (edit a copy on the desktop as in Case 1 step 5), change the line `Enabled=1` to `Enabled=0`, and start the game again. Generic then keeps working on its own, but not at the "Present" hook point. Change it back to `Enabled=1` to use this add-on again.
-  **想关闭本插件时，** 关闭游戏，用记事本打开 `vk-present-adapter.ini`（和情况一第 5 步一样先改桌面上的副本），把 `Enabled=1` 这一行改成 `Enabled=0`，再启动游戏。之后 Generic 仍会单独工作，但不再使用“呈现”介入点。改回 `Enabled=1` 即可重新使用本插件。
-- **To remove everything,** close the game. If you used EndfieldFGSwitch, click "Restore original 2.10.3" in it first. Then move the four files from Case 1 step 3 out of the game folder, together with `dlss5-bridge.cfg` and `dlss5-bridge.log`. To remove ReShade too, run the ReShade installer again, choose `Endfield.exe` and choose uninstall.
-  **想全部卸载时，** 关闭游戏。如果用过 EndfieldFGSwitch，先在工具里点“恢复原装 2.10.3，倍率交还游戏”。然后把情况一第 3 步的四个文件，连同 `dlss5-bridge.cfg` 和 `dlss5-bridge.log` 一起移出游戏文件夹。如果还想卸载 ReShade，再次运行 ReShade 安装程序，选择 `Endfield.exe`，然后选择卸载。
-- **After a game update,** first check that the game still starts normally. If the add-on stops working, keep the two log files and report the problem.
-  **游戏更新后，** 先确认游戏能正常启动。如果插件不再生效，保留那两个日志文件并反馈问题。
-- This is an unofficial community project. It is not made or supported by NVIDIA or Hypergryph.
-  这是非官方的社区项目，与 NVIDIA 和鹰角网络无关，也不受其官方支持。
-## Files
+| Item | PC Z, 2026-10-16 (session of 26 min) | PC B, 2026-10-16 |
+| --- | --- | --- |
+| Streamline check | `interposer=fabb19bb… known=1 package=verified`, `sl_valid=1 current=1` | same |
+| Streamline plugins | from `dlss5\sl-2.14.1` | same |
+| NR runtime | 310.8.0.0, declared minimum driver 615.00, driver 616.92, initialised on the game's Vulkan device | 310.8.0.0, driver 616.56, initialised |
+| MFG Unlock | `Blackwell native multiplier 6x accepted`; 0 lines `provider not confirmed` or `multiplier not applied` | `6x accepted` |
+| DLSS-G per real frame | 5.00 generated frames (6x), also while the window was in the background with Present NR on | 5.00 |
+| Frame rate | about 122–125 presents/s at 6x, p99 about 9 ms (Generic telemetry), about 21.3 real frames/s, NR Upscaled 1 / Present 1 | see 5.4 |
+| Start-up | `startup health confirmed`; no crash marker | — |
+| Anomaly log (full mode) | 301 KB in 26 min (about 0.7 MB/h); 1,950 of 2,014 lines were recovered `fg-composite` waits | — |
 
-All paths below are inside https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay. The source changes to Generic are published as branch `rc10-stages1` in PEQHUB/RenoDX-DLSS5-Generic; the bridge changes will also be proposed there as new commits on top of PR [PEQHUB/RenoDX-DLSS5-Generic#1](https://github.com/PEQHUB/RenoDX-DLSS5-Generic/pull/1). Files of the 2026-10-02 release stay where they were.
+### 5.2 Throttle 2 against Throttle 0 (5120×2160, NR 0/1/1 at 67 %, one run each)
 
-| What | Where |
+| Measure | 6x, Throttle 2 | 6x, Throttle 0 | 2x, Throttle 2 | 2x, Throttle 0 |
+| --- | ---: | ---: | ---: | ---: |
+| Foreground present records | 3974 | 3946 | 1531 | 1533 |
+| Presents per second | 139.26 | 138.41 | 53.69 | 53.85 |
+| Displayed frames per second | 116.84 | 109.58 | 53.65 | 53.61 |
+| Simulation rate (per second) | 23.22 | 23.05 | 26.87 | 26.94 |
+| Simulation interval P95 / P99 (ms) | 46.69 / 48.31 | 46.96 / 49.96 | 40.80 / 43.44 | 40.55 / 42.55 |
+| Simulation intervals over 50 ms | 1/662 | 7/657 | 0/766 | 1/767 |
+| Display interval P95 / P99 (ms) | 8.40 / 16.67 | 16.67 / 16.70 | 25.02 / 33.32 | 25.03 / 31.84 |
+| Software PC latency median / P95 (ms) | 152.20 / 176.47 | 155.48 / 180.90 | 98.33 / 115.05 | 98.51 / 116.51 |
+
+The user reported no noticeable difference between 2 and 0. Throttle 2 did not wait in these runs (`waits=0`).
+
+The 2x stutter that led to this change (3840×2160, real 2x, NR 0/1/1):
+
+| Measure | Throttle 1 (old default) | Throttle 0 |
+| --- | ---: | ---: |
+| Present interval mean / P95 (ms) | 15.654 / 23.418 | 14.265 / 15.645 |
+| Simulation interval mean / P95 / max (ms) | 31.309 / 58.935 / 62.743 | 28.528 / 31.494 / 37.317 |
+| Simulation intervals over 50 ms | 209/911 (22.94 %) | 0/1000 |
+| Display interval P95 / max (ms) | 25.016 / 41.671 | 24.991 / 41.644 |
+| Software PC latency median / P95 (ms) | 98.594 / 114.427 | 81.716 / 96.348 |
+
+The user confirmed that the stutter almost disappeared with 0. A later run with Throttle 2 at 5120×2160, 6x, NR 0/1/1 had a simulation interval of 45.785 / 48.475 / 54.946 ms (mean / P95 / max), 9 of 625 intervals over 50 ms, and a software PC latency median of 164.673 ms; the throttle did not wait in that run either.
+
+### 5.3 Offline fixtures, re-run on 2026-10-19 against the production source and the shipped bridge
+
+| Fixture | Covers | Result |
+| --- | --- | --- |
+| `test.cmd` (state and loader) | failure thresholds, safe mode, atomic saves, layer trial and timeout, 125 stage plans, NGX init path, panel callbacks; concurrent resolver and Streamline entry calls | 474 checks; 2,000 concurrent calls, 0 errors |
+| `test-nr-selection` | NR runtime choice per GPU architecture | all checks passed |
+| `test-event-log`, `test-bridge-logdir` | anomaly log; the shipped bridge DLL loaded in a temporary game folder | 67 checks; log-folder fixture completed |
+| MFG Unlock `native-policy` | Blackwell multiplier ABI, fallback, no-patch limits, legacy profiles; start-up policy | 271 + 10 assertions |
+| `test-drs` | driver-profile transactions, FG settings, maintenance entry | 43 + 80 + 15 checks |
+| `test-fence-deadline-wait` | real D3D12 fence on WARP | old logic 8 of 8 false failures after three timeouts, new logic 0; a fence that never completes fails at 109 ms for a 100 ms budget |
+| `test-deploy.ps1` (Windows PowerShell 5.1) | deployment and bridge-free disable/enable | 30 checks |
+| `test-clean-recovery.ps1` (Windows PowerShell 5.1) | external removal, including the fix of 2026-10-19 | 89 checks; 96 with the opt-in elevated entry-point check |
+
+Every fixture exited with 0 (`offline-rerun/summary.json` in the evidence archive). PowerShell 7 is not installed on PC Z, so the PowerShell 7 runs of the two PowerShell fixtures were not repeated. The fixtures work in temporary folders with mocked registry, driver and process interfaces and do not touch the game folder, the driver profile or ReShade's registration; the only exception is the opt-in elevated recovery check, which writes one temporary HKCU value and removes it.
+
+### 5.4 Frame-time curve case on PC B
+
+On PC B the ReShade frame-time curve was saw-toothed with every build. The bridge and Generic counters showed about 11.7–11.8 presents per real frame at 6x (PC Z: 5.85), while DLSS-G still generated 5 frames per real frame. The cause was NVIDIA App "Smooth Motion" enabled for `Endfield.exe`, which adds driver-level frame generation on top of DLSS-G; after the owner turned it off the curve became flat at once (reported by the owner; the logs of that run were not collected). Smooth Motion was not found in the driver profile (setting `0xB0D384C0` was absent on both PCs), so the add-on cannot detect it yet. A ratio of presents to real frames clearly above the DLSS-G multiplier indicates extra frame generation.
+
+## 6. Limitations and open issues
+
+- **Hardware coverage.** In-game logs exist only for RTX 5090. RTX 30 and RTX 40 are confirmed by internal testers without logs in this release, and no measurement in this document comes from those cards. RTX 20 was not tested. Only Arknights: Endfield on Vulkan was tested.
+- **NR runtime for RTX 20/30/40** is a community-modified, unsigned file; Generic logs it as a named non-reference build. NVIDIA may block or change this path in future drivers.
+- **Driver minimum.** 615.00 is the minimum the NR runtime declares. Generic calls the runtime directly and does not enforce it; the real lower limit is unknown. Tested: 616.56 and 616.92.
+- **Windows minimum.** Windows 10 2004 (19041) is Streamline 2.14.1's requirement for frame generation (with hardware-accelerated GPU scheduling). Tested: Windows 10 build 19045 and Windows 11 build 26200.
+- **Future game updates.** Only the two known `sl.interposer.dll` builds are accepted. With another build the bridge keeps the game's Streamline 2.10.3; then MFG Unlock cannot change the multiplier on RTX 50 and frame generation stops while the window is unfocused, until a new release adds the build. A redirect that fails at start is undone at the next start by the health policy.
+- **MFG Unlock multiplier.** On PC B with intermediate build 1p (2026-10-14) the multiplier fell back to 2x three times without any MFG Unlock log line; the path is not identified. Build 1q writes every unapplied decision to the anomaly log; in the logged 1q sessions on PC Z and PC B the multiplier stayed at 6x. Calls that bypass MFG Unlock's hooks are not recorded. The thread-exit and retry fixes are verified by fixtures and by one in-game retry on PC B. Historical rate before those fixes: 3 failed sessions out of 21 on PC Z.
+- **Wait chain.** The same single-wake wait pattern on the Vulkan side (`SynthOfaVkFrame`, `FgRelayRecoverNrWaits`, two calls in `synth.inc`) was not reviewed one by one. The cause of the first real 900 ms PQ timeouts at high layer counts (memory or queue) is not found. Higher VRAM use after high layer counts and a lost NR hotkey after the earlier failure were reported and are not resolved.
+- **EnableHooks 2** is not accepted for the Present path; mode 1 is required.
+- **Full anomaly log** can grow to several GB per day if an anomaly repeats every frame.
+- **Not tested:** a real UAC prompt for the driver maintenance, another driver tool writing at the same time, external removal on a PC other than Z, a real removal with the recovery script of 2026-10-19 (section 3.7), removal after an update that breaks ReShade itself, multi-GPU PCs.
+- **Starting the game again within a few seconds after closing it** can be blocked by the anti-cheat; waiting 5–10 s avoids it. Its exact cause is not identified.
+- **Known visual issues** from the install guide: the game's photo camera does not include Present-stage NR; model shadows can show through after reviving, after map loads and in some UI screens; NR can turn off and on briefly when UI screens change quickly; rare repeated flashing that a restart fixes.
+- **Other add-ons and overlays.** NVIDIA game filters and RTX HDR can stop the add-on; Smooth Motion breaks pacing (5.4).
+- **Rebuilding** needs Visual Studio 2022 Build Tools at the path in the build script and, for Generic, a RenoDX `external` folder whose exact commit was not recorded; rebuilt DLLs differ in hash because of time stamps (see `BUILDING.md` in the source archive).
+
+## 7. Historical results from other PCs (2026-10-05 bridge and Generic)
+
+These results come from the 2026-10-05 bridge and Generic with older MFG Unlock builds. They explain several defaults of this release but are not tests of unified1q.
+
+- **RTX 4080 (PC A), MFG 3–6x.** Generated frames bunched at the start of each group, then about 30 ms gaps. With MFG Unlock's software pacing (`ForceFlipMeteringOff=1`, the "Legacy" option) the share of GPU-ready frames within ±25 % of the ideal interval went from 28 % to 87 % at 6x and gaps went from 17 % to 0 %; first and last present were about 45 ms and 35 ms later. It works only when set before DLSS-G creates its context (restart). It should not be combined with the NVIDIA control panel frame-rate limit. This is why Legacy defaults to on for RTX 20/30/40.
+- **Periodic stutter on Windows 10 with Intel hybrid CPUs (PC A).** Every 1–2 minutes, 15–20 s of stutter, also with ReShade disabled. Cause: all three Windows 10 power plans park the performance cores (`CPMINCORES1`=0 %) while the game pins its main and render threads to them. `powercfg /setacvalueindex SCHEME_CURRENT SUB_PROCESSOR CPMINCORES1 100` followed by `powercfg /setactive SCHEME_CURRENT` removed it. Not related to this add-on.
+- **RTX 3070 Ti (PC C).** The `vkCreateDevice` -3 and early `cuInit` finding of section 3.1; the Present stage needs `vk_mirror=1` and `ngx_loader=0` (both defaults); the bridge's former `slDLSSGSetOptions` observer hook conflicted with MFG Unlock (removed in this release).
+
+## 8. Files
+
+### 8.1 Release assets
+
+| Asset | Content |
 | --- | --- |
-| Ready-to-use build: bridge DLL, Generic DLL, `vk-present-adapter.ini`, install guide, licenses, SHA-256 sums | Release [`vk-fgrelay-20261005`](https://github.com/Yukikaze20170315/dlss5-vulkan-fg-relay/releases/tag/vk-fgrelay-20261005), file `dlss5-bridge-vk-fgrelay-20261005.zip`. Both DLLs are also attached individually. |
-| Full source of the bridge build | Same release, `dlss5-bridge-vk-fgrelay-source-835c5bf.zip`. The commits: `merge/dlss5-bridge.bundle` (git bundle; `git clone merge/dlss5-bridge.bundle` gives branch `feature/vulkan-fg-relay`). |
-| Patches for merging | `merge/patches/`: `0001`-`0007` on top of `0a4af91` (the 2026-10-02 release head). The same update as one diff: `merge/update-since-20261002.diff`. `merge/CHANGED-FILES.txt` lists what it touches. |
-| Full copies of every file changed since `0a4af91` | `merge/changed-files/` (source, tests, docs), now at `835c5bf`. |
-| Design document | `docs/VULKAN-FG-INPUT-NR.md` ("Update 2026-10-05" at the top) |
-| Install guide | `docs/INSTALL.md` (same file as in the zip and as the guide above) |
-| Offline test results of this build | `evidence/2026-10-05/summary/offline/` |
-| Game logs and PresentMon captures | `evidence/2026-10-05/raw/` |
-| Root-cause PresentMon captures (serial vs relay, throttle variants) | `evidence/rootcause-20261004-2305/` |
-| Scripts | `tools/compare-presentmon.py`, `tools/fg-transition-gaps.py` |
+| `unified-20261015q-candidate.zip` | the ready-to-use package (section 1) |
+| `unified-20261015q-source.zip` | the complete production source tree of the three add-ons and the shared headers, the build/test/packaging scripts, the recovery script and driver-restore tool sources, and the NVAPI SDK; `BUILDING.md` inside explains the build |
+| `unified-20261015q-evidence.zip` | the logs, captures and analyses behind every number in sections 3 and 5, and the logs of the 2026-10-19 offline re-run; `README.md` inside lists each folder |
+| `SHA256SUMS.txt` | SHA-256 of the three archives |
 
-## What changed since 2026-10-02
+| Asset | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `unified-20261015q-candidate.zip` | 280,294,193 | `f13a454e799ce8cee52a0cbcbe980ce5a0e923113b6dbcc2762794cd6177a18a` |
+| `unified-20261015q-source.zip` | 20,351,303 | `b2b31d024adc5336dd9061e1e7f0eac7f6956a214a92261ab4ac05703a867f0e` |
+| `unified-20261015q-evidence.zip` | 4,793,015 | `9fdbbc615fc51c368badd1c9011b9bfad61523d807204887e6860f51f8f8e11e` |
 
-Bridge commits `56b0616`, `a699d5e`, `fe40337`, `9557013`, `a97e707`, `8045ebd`, `835c5bf` on top of `0a4af91`. File version 1.4.13.29, version string `1.4.13-pre8-vk-fgrelay-20261005`.
+### 8.2 Repository content added in this release
 
-1. **GPU relay by default; no silent serial fallback** (`src/fg-relay.inc`, `src/fg-input.inc`, `src/present-adapter-config.h`). An absent `Pipeline` key previously selected the serial feed (Pipeline=0). With serial, each real frame held the FG command buffer for the duration of NR — about 27 ms at two passes — while generated frames queued. Streamline then released the queue all at once, DWM displayed only the last frame in each batch, and the frame counter ran about 37 % ahead of what the display showed (121 counted / 88 displayed). `Pipeline` now defaults to 2. `Pipeline=0` still works for diagnosis and is logged as a warning. When the relay stands down, NR at the FG input pauses (frame generation still uses the game's own frames), the private session is rebuilt and the relay is retried, up to 3 times per process; `SerialFallback=1` restores the old fallback.
-
-2. **Throttle** (`src/fg-relay.inc`). The 2026-10-04 test build waited for a completed DLSS-G group. With the GPU relay, Streamline issues the next group's index right before its start, so that gate almost never held the game. The throttle now waits for the newest NR value already signed onto the private queue. The bound rises from 100 ms to 250 ms (two NR layers at 5120x2160 have been measured up to 99 ms). Five timeouts in a row stand the throttle down for 5 s, then it re-arms automatically; before, it stayed off for the process. The diagnostic log records the DLSS-G group index from the relay, so the old measurement is still auditable from the rate log.
-
-3. **Stage protocol v1** (`src/present-adapter-config.h`, `src/present-adapter.inc`, `src/vkmirror.inc`, `src/focus-fg.inc`, `src/composition-guard.inc`, `src/dlss5-bridge.cpp`). A Generic that exports `DLSS5StageProtocolVersion()` returning 1 and `DLSS5GetStagePlan()` carries a plan: 0-4 NR layers for each of Render, Upscaled and Present, packed into 9 bits. The bridge reads the plan once and pins the module. For each carrier evaluate it freezes the plan, exports `DLSS5BridgeActiveStagePlan()`, and sets bit 31 to tell Generic this is the carrier call. Generic then runs only the Present layers. An invalid plan (reserved bits, a count above 4) pauses the carrier with a log line. The bridge never hooks `nvngx_dlssnr.dll` so Generic's NR calls keep their own caller identity. The focus gate and composition guard follow the Present count. The bridge no longer mirrors the game's SR evaluate when the protocol is active; NGX calls within the carrier evaluate are forwarded unchanged, and only a leftover mirror or a pending FG-input release is retired. A Generic without these exports keeps the existing `NRHookPoint` behaviour.
-
-4. **Composition guard: visible to screen capture by default** (`src/composition-guard.inc`). `WDA_EXCLUDEFROMCAPTURE` was set on the guard window. While it was, the NVIDIA overlay refused to take screenshots of the game and reported a protected application blocking desktop recording. `HoldCompositionHideCapture` now defaults to 0; set it to 1 to restore the exclusion. Everything else about the guard is unchanged.
-
-5. **Wider SR carrier hook range** (`src/minhook/src/buffer.c`). One session saw MinHook status 9 (no free 4 KiB block within ±1 GiB of the SR entry). `MH_CreateHookPrologueExtended`, used for the SR carrier only, tries ±1 GiB first and then ±2 GiB, and only for the exact five-byte `mov [rsp+8], rbx` prologue verified under thread freeze at enable. RIP-relative displacements that do not fit are refused rather than truncated.
-
-6. **Trace=1 FG command buffer observer** (`src/fg-submit-observation.h`). A bounded pass-through observer of the FG command buffer's submits, for debugging and validation only. Off by default.
-
-## Measurements
-
-All in Arknights: Endfield on the RTX 5090 test PC. PresentMon 2.5.1 with `--track_pc_latency --track_app_timing --track_frame_type`, 40 s per run except the first (17 s), first 3 s dropped. Captures in `evidence/rootcause-20261004-2305/raw/`.
-
-The test builds equal the published builds except for a read-only DLSS-G `OutputDisableInterpolation` counter (meaningless: the bridge read a resource pointer as a flag) removed from the relay, and an unused Generic encode variant. The live measurements used Generic 8.5.0-rc10-stages1 with one Upscaled and one Present NR layer.
-
-| | A: deployed serial | B: fix1 GPU relay, old throttle | C: fix3 relay, improved throttle | F: **fix5 relay, this throttle** |
-| --- | --- | --- | --- | --- |
-| presents / s | 121.2 | 126.9 | 114.1 | **120.7** |
-| displayed / s | 88.3 | 112.4 | 105.5 | **108.4** |
-| real frames / s | 20.2 | 21.2 | 20.7 | **20.1** |
-| present interval p95 / max (ms) | 17.9 / 19.1 | 8.8 / **59.7** | 10.3 / **55.2** | 8.9 / **11.1** |
-| display intervals ≥ 25 ms | 8 (0.53 %) | 7 (0.23 %) | 77 (1.98 %) | **0** |
-| PC latency p50 / p95 (ms) | 119.5 / 147.5 | 218.6 / 246.2 | 158.2 / 181.3 | **161.9 / 184.6** |
-
-Column A is the configuration of the 2026-10-04 deployment: old bridge code with `Pipeline=0` forced by a script. Column B added the GPU relay but used the old throttle gate (DLSS-G group completion), which almost never fired; max present gap 59.7 ms shows the queue draining. Column C fixed the gate to target queued NR but a 100 ms bound was too tight for two passes; display gaps ≥ 25 ms jumped to 77. Column F uses a 250 ms bound.
-
-The GPU relay removes the stutter: column F has no display gaps above 25 ms, compared to 0.53 % in the serial feed and 1.98 % in column C.
-
-The serial feed's lower median latency comes from the game waiting on the parked frame; the price was the 0.53 % gap rate. Column F gives 42 ms more latency than column A (serial) but 0 % display gaps; in motion the relay looks perceptibly smoother.
-
-## Tests
-
-Offline, on the source of `835c5bf` (the add-on code is that of `bcc7908`, the version bump being documentation only) and, where a DLL is loaded, on the published DLL. All passed; outputs in `evidence/2026-10-05/summary/offline/`.
-
-| Test | Result |
+| Path | Content |
 | --- | --- |
-| `tests/vulkan-fg-quality/run.cmd registry` | 188780 checks, 0 failures |
-| `run.cmd guides` | 57 checks, 0 failures |
-| `run.cmd hooks` | 545 checks, 0 failures |
-| `run.cmd colour` | 39 checks, 0 failures |
-| `run.cmd recovery` | 34 checks, 0 failures |
-| `run.cmd compatibility` | 26 checks, 0 failures |
-| `run.cmd carrier` | 49 checks, 0 failures |
-| `run.cmd carrier-range` (crowded MinHook range) | 19 checks, 0 failures |
-| `run.cmd minhook-range` (global range safety) | 34 checks, 0 failures |
-| `run.cmd guard` | 30 checks, 0 failures |
-| `run.cmd gpu` | 402 checks, 0 failures |
-| `run.cmd focus` with Streamline 2.14.1 `sl.dlss_g.dll` | 512 guard combinations; contract found |
-| `focus` with Streamline 2.10.3 `sl.dlss_g.dll`, `--report-only` | `matches=0` (expected) |
-| `tests/vulkan-fg-relay/test-fg-trace.cmd` | 7382 checks, 0 failures |
-| `tests/vulkan-fg-relay/scan/` | 20705 assertions |
-| `tests/vulkan-fg-relay/lifetime/` stable + control (rc10) | exit 0 |
-| `tests/vulkan-fg-relay/lifetime/` stable (stages1, pinned path) | exit 0; log shows `PINNED Generic stays loaded and registered` |
-| `tests/vulkan-fg-relay/lifetime/` late-ref (stages1) | exit 15 (not applicable: stages1 Generic is pinned, never re-registers) |
-| `tests/vulkan-fg-relay/inject/` | export present; both shared-fence directions pass |
-| `tests/vulkan-fg-input/run-roundtrip.py` SDR+RR, HDR (rc10 Generic) | 22 / 22 each |
-| `tests/vulkan-fg-input/run-roundtrip.py` SDR+RR, HDR (stages1 Generic, plan Present=2) | 22 / 22 each; log shows `stage=present plan=128` |
-| `tests/stage-protocol/run.cmd` (bridge scope, 125 legal + 391 invalid plans) | 4 / 4 PASS lines |
-| Generic stage-plan-same-frame test (stage_plan.hpp, 125 plans, nested scopes, concurrent writer) | PASS |
-| Generic Vulkan stage CPU tests (49 behavioral + 30 static checks; 6 negative controls fail against original draft) | PASS |
+| `README.md` | this document |
+| `docs/history/README-vk-fgrelay-20261005.md` | the previous README |
+| `docs/unified-20261015q/USAGE-AND-RECOVERY.md` | a copy of the bilingual technical document from the package |
+| `merge/unified-20261015q/` | patches and full copies of every changed file, for merging into existing trees (see its `README.md`) |
+| `docs/unified-20261015q/EVIDENCE.md` | the index of the evidence archive |
+| `tools/release-unified-20261015q/` | the scripts that staged this release, checked the patches and re-ran the offline fixtures |
 
-In the game (Arknights: Endfield, RTX 5090, 5120x2160, Generic 8.5.0-rc10-stages1, 6x):
+Files of the earlier releases stay where they were. `docs/INSTALL.md` and `docs/VULKAN-FG-INPUT-NR.md` describe the 2026-10-05 release; for this release, use the install guide above.
 
-- Item 1 (serial vs relay): confirmed. With the serial config, the frame counter ran ahead and only about 88 of 121 counted presents were displayed. With Pipeline=2 the display gap rate dropped to 0 %.
-- Item 3 (stage protocol): confirmed in game logs. Plan 72 (Upscaled 1 / Present 1) was active; `stage=upscaled` evaluations at count up to 130800 logged from the game's own SR hook, and `stage=present` evaluations at count up to 128400 logged from the bridge carrier.
-- Item 4 (composition guard, NVIDIA overlay screenshot): the NVIDIA overlay was unable to take screenshots when `HoldCompositionHideCapture=1` was active and took them normally after it was set to 0.
+### 8.3 Merging
 
-## Limitations
+`merge/unified-20261015q/` has one patch per component for each of two bases, so that it can be applied either to the state of the 2026-10-05 release or to the upstream projects directly:
 
-- One game, one GPU (Arknights: Endfield, RTX 5090, driver 616.92). Other Vulkan DLSS-G games are not covered.
-- RTX 40 is untested. The NR runtime contains only Blackwell (`sm_120`) GPU code and refuses other architectures. Nothing in the bridge itself is Blackwell-specific, but the whole chain has not run on an RTX 40 card.
-- Stage protocol: Generic's per-layer knobs (intensity, transfer strength, etc.) are shared across stages, so Render, Upscaled and Present layers cannot have independent per-layer tuning. The total layer count is up to 12.
-- `Pipeline=0` (serial feed) still works but is warned. `Pipeline=3` (older CPU-gated relay) is untested with the new throttle.
-- The focus gate and composition guard depend on Streamline 2.14.1; with the game's own 2.10.3 files both are inactive (the focus contract is not found in 2.10.3).
-- The stage protocol Generic build (8.5.0-rc10-stages1) has not been tested in a D3D12 game. Its D3D12 Render stage runs before the game's upscaler on a full-size copy of the Color surface, and it changes the automatic frame-generation fallback behaviour: while a game pauses DLSS and FG continues, NR pauses instead of moving to Present.
+| Component | Patch | Base |
+| --- | --- | --- |
+| bridge | `bridge/bridge-since-vk-fgrelay-20261005.patch` | Yukikaze20170315/dlss5-bridge `835c5bf` (the 2026-10-05 release) |
+| bridge | `bridge/bridge-since-NIGos-main-d1cc508.patch` | NIGos/dlss5-bridge `main` at `d1cc508` |
+| Generic | `generic/generic-since-rc10-stages1-c3dc63c.patch` | Generic `rc10-stages1` at `c3dc63c` (the 2026-10-05 release) |
+| Generic | `generic/generic-since-v8.5.0-rc10-9bb6c0f.patch` | Generic v8.5.0-rc10 at `9bb6c0f` |
+| MFG Unlock | `mfg/mfg-since-MFGAmpereUnlock-0.11.patch` | nefh/MFGAmpereUnlock-RenoDx tag `0.11` (`53b3770e`), folder `src/addons/mfgunlock` mapped to `addon/` |
+| shared | `common/*.hpp` | new files |
 
-## Merging
+Every patch was applied to a fresh copy of its base and the result compared byte for byte (line endings normalised to LF) with the production tree; all five matched. The bridge and Generic include the shared headers by relative path (`../../common/` from `bridge/src/`, `../../../../common/` from `generic/src/addons/dlss5/`), so place `common/` accordingly or adjust those include lines. `merge/unified-20261015q/README.md` lists every changed file and the order of application.
 
-From the 2026-10-02 release head (`0a4af91`): `git am merge/patches/0001-*.patch ... 0007-*.patch`, or apply `merge/update-since-20261002.diff`. From NIGos/dlss5-bridge `0a4af91`: same patches. Or fetch the exact commits from `merge/dlss5-bridge.bundle`.
+## 9. Licenses and third-party components
 
-Build: `src\build.cmd` (MSVC, `/W4 /WX`). Published DLL: SHA-256 `2F5BBC44C9001FD31F65D4A298861C769EEB27211CEA9A5028D0904F5D32FE45`.
+The bridge (NIGos/dlss5-bridge), Generic (RenoDX), and MFG Unlock (nefh/MFGAmpereUnlock-RenoDx, which builds on mavismmg/MFGAdaUnlock-RenoDx) are MIT licensed; their license files are in the source archive. The source archive also contains MinHook, Detours, the ReShade add-on headers with ImGui, the NVIDIA Streamline headers and the NVAPI SDK, each with the license notice it came with. It does not contain the NVIDIA NGX SDK headers, which carry a proprietary notice (`BUILDING.md` says where to get them). The NR runtimes, the Streamline plugins and the NGX snippets in the package are NVIDIA binaries and remain subject to NVIDIA's terms; the RTX 20–40 NR runtime is a community modification of an NVIDIA binary.
 
-The Generic source: branch `rc10-stages1` in PEQHUB/RenoDX-DLSS5-Generic (3 commits on top of `v8.5dev`). Build at `src/addons/dlss5` inside a compatible RenoDX checkout. Published DLL: SHA-256 `CCAECB3559CC4BA3B42C2FFEBEDF5C655914945A9C2488237E9C3D5DD1A95F7C`. The two builds differ only in their PE timestamp and the version resource HHMM (CMake TIMESTAMP fallback); no code byte changes.
+## Acknowledgements
 
-## Reproducing
-
-- Bridge offline: `tests/vulkan-fg-quality/README.md` and `tests/vulkan-fg-relay/README.md`.
-- Stage protocol: `tests/stage-protocol/README.md`.
-- Generic stage-plan test: `tests/stage-plan/run.cmd <src/addons/dlss5> <new-directory>`.
-- Generic CPU tests: `tests/vulkan-stage-cpu/run-cpu-tests.py --source <src/addons/dlss5> --out <new-directory> --negative-control <tests/vulkan-stage-cpu/negative-control>`.
-- Root-cause PresentMon analysis: `python tools/compare-presentmon.py` on the captures in `evidence/rootcause-20261004-2305/raw/`.
+RenoDX and the RenoDX DLSS 5 Generic authors; NIGos for dlss5-bridge; nefh and mavismmg for MFG Unlock; the RHI project for hosting the NR runtimes; the internal testers, and the owners of the test PCs.

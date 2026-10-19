@@ -1,0 +1,147 @@
+{
+  "bridge-vk-fgrelay-20261005": {
+    "patch": "bridge/bridge-since-vk-fgrelay-20261005.patch",
+    "modified": [
+      "src/bridge.inc",
+      "src/build.cmd",
+      "src/dlss5-bridge.cpp",
+      "src/fg-input.inc",
+      "src/fg-relay.inc",
+      "src/fg-trace.inc",
+      "src/focus-fg.inc",
+      "src/present-adapter-config.h",
+      "src/present-adapter.inc",
+      "src/synth.inc",
+      "src/version.rc",
+      "src/vk-present-adapter.ini.example",
+      "src/vkmirror.inc",
+      "tests/vulkan-fg-quality/test-focus.cpp"
+    ],
+    "added": [
+      "src/deploy-observer.inc",
+      "src/deployment-panel.inc",
+      "src/deployment.inc",
+      "src/event-sink.h",
+      "src/fence-deadline-wait.h",
+      "src/generic-hook-mode.h",
+      "src/ngx-runtime-info.h"
+    ],
+    "deleted": []
+  },
+  "bridge-NIGos-main-d1cc508": {
+    "patch": "bridge/bridge-since-NIGos-main-d1cc508.patch",
+    "modified": [
+      "src/bridge.h",
+      "src/bridge.inc",
+      "src/build.cmd",
+      "src/dlss5-bridge.cpp",
+      "src/minhook/PROVENANCE.md",
+      "src/minhook/include/MinHook.h",
+      "src/minhook/src/buffer.c",
+      "src/minhook/src/buffer.h",
+      "src/minhook/src/hook.c",
+      "src/minhook/src/trampoline.c",
+      "src/synth.inc",
+      "src/version.rc",
+      "src/vkmirror.inc"
+    ],
+    "added": [
+      "src/AdapterEvents.fx",
+      "src/bounded-report.h",
+      "src/composition-guard.inc",
+      "src/deploy-observer.inc",
+      "src/deployment-panel.inc",
+      "src/deployment.inc",
+      "src/event-sink.h",
+      "src/fence-deadline-wait.h",
+      "src/fg-composite-shader.h",
+      "src/fg-guide-compute.inc",
+      "src/fg-guide-math.h",
+      "src/fg-guide-nearest-spv.h",
+      "src/fg-guide-nearest.comp",
+      "src/fg-guides.inc",
+      "src/fg-handle-registry.h",
+      "src/fg-history-policy.h",
+      "src/fg-input.inc",
+      "src/fg-relay.inc",
+      "src/fg-submit-observation.h",
+      "src/fg-trace.inc",
+      "src/focus-fg-contract.h",
+      "src/focus-fg.inc",
+      "src/generic-hook-mode.h",
+      "src/ngx-module-scan.h",
+      "src/ngx-runtime-info.h",
+      "src/present-adapter-config.h",
+      "src/present-adapter.inc",
+      "src/present-carrier-retry.h",
+      "src/present-compatibility.h",
+      "src/present-config-gate.h",
+      "src/present-nr-witness.asm",
+      "src/vk-present-adapter.ini.example",
+      "tests/vulkan-fg-input/vcvars.cmd",
+      "tests/vulkan-fg-quality/run.cmd",
+      "tests/vulkan-fg-quality/test-focus.cpp",
+      "tests/vulkan-fg-quality/test-guard.cpp"
+    ],
+    "deleted": []
+  },
+  "generic-rc10-stages1-c3dc63c": {
+    "patch": "generic/generic-since-rc10-stages1-c3dc63c.patch",
+    "modified": [
+      "addon.cpp",
+      "dlssnr.hpp",
+      "edit_trace.hpp",
+      "gpu_timers.hpp",
+      "lastgasp.hpp",
+      "norm_trace.hpp",
+      "screenshot.hpp",
+      "stage_plan.hpp",
+      "ui/lang/zh-Hans.hpp"
+    ],
+    "added": [
+      "layer_trial.hpp"
+    ],
+    "deleted": []
+  },
+  "generic-v8.5.0-rc10-9bb6c0f": {
+    "patch": "generic/generic-since-v8.5.0-rc10-9bb6c0f.patch",
+    "modified": [
+      "addon.cpp",
+      "d3d11_bridge.hpp",
+      "dlssnr.hpp",
+      "edit_trace.hpp",
+      "evaluate_chain.hpp",
+      "gpu_timers.hpp",
+      "lastgasp.hpp",
+      "norm_trace.hpp",
+      "present_path.hpp",
+      "screenshot.hpp",
+      "ui/lang/zh-Hans.hpp",
+      "ui/widgets.hpp",
+      "vulkan_path.hpp"
+    ],
+    "added": [
+      "layer_trial.hpp",
+      "stage_plan.hpp"
+    ],
+    "deleted": []
+  },
+  "mfg-0.11": {
+    "patch": "mfg/mfg-since-MFGAmpereUnlock-0.11.patch",
+    "modified": [
+      "addon/addon.cpp",
+      "addon/architecture.hpp",
+      "addon/framecount.hpp",
+      "addon/ngx_hook.hpp",
+      "addon/provider.hpp",
+      "addon/reshade_compat.hpp",
+      "addon/streamline_bridge.hpp"
+    ],
+    "added": [
+      "addon/panel-locale.hpp",
+      "tests/native-policy.cpp",
+      "version.rc"
+    ],
+    "deleted": []
+  }
+}

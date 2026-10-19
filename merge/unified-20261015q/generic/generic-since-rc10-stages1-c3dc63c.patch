@@ -1,0 +1,735 @@
+diff --git a/addon.cpp b/addon.cpp
+index 6a3d4ecae2ff278a9a32afd959190966bfdc9522..f1a7f94e9be53c5a890c38698b9b9042387b64c2 100644
+--- a/addon.cpp
++++ b/addon.cpp
+@@ -24,6 +24,22 @@ extern "C" __declspec(dllexport) uint32_t __cdecl DLSS5GetStagePlan() {
+   return renodx::addons::dlss5::stages::Snapshot().packed;
+ }
+ 
++// Query/Select are called from the overlay thread. Current is an atomic-only
++// query for the bridge worker; a pending choice must not affect a live session.
++extern "C" __declspec(dllexport) bool __cdecl DLSS5HookModeControlV1(
++    uint32_t operation, uint32_t value, dlss5::hook_mode::Snapshot* result) {
++  namespace nr = renodx::addons::dlss5::internal;
++  if (!nr::hook_mode_config_ready.load(std::memory_order_acquire)) return false;
++  const uint32_t current = dlss5::hook_mode::Effective(nr::hooks_enabled.load(), nr::streamline_hooks_enabled.load());
++  return dlss5::hook_mode::Control(operation, value, current, result, [result] {
++    uint32_t mode = dlss5::hook_mode::kDefault;
++    result->stored = reshade::get_config_value(nullptr, nr::kConfigSection, "EnableHooks", mode) ? 1u : 0u;
++    return mode;
++  }, [](uint32_t mode) {
++    reshade::set_config_value(nullptr, nr::kConfigSection, "EnableHooks", mode);
++  });
++}
++
+ #if defined(RENODX_DLSS5_DEBUG)
+ extern "C" __declspec(dllexport) constexpr const char* NAME =
+     "DLSS 5 Neural Rendering (Debug)";
+diff --git a/dlssnr.hpp b/dlssnr.hpp
+index d10cfd6501ebc1efe0acee5c81a1e7854f95eda4..5bf6b334570cf743d83b8e3ccc417aa60fb67870 100644
+--- a/dlssnr.hpp
++++ b/dlssnr.hpp
+@@ -1,3 +1,6 @@
++#include "../../../../common/panel-locale.hpp"
++#include "../../../../common/hook-mode.hpp"
++#include "../../../../common/event-log.hpp"
+ /*
+  * Copyright (C) 2026
+  * SPDX-License-Identifier: MIT
+@@ -141,10 +144,10 @@ constexpr char kConfigSection[] = "RenoDX.DLSS5";
+ // instead of the nullptr generic callback keeps the NR UI in its own window,
+ // separate from every other add-on's section.
+ constexpr char kOverlayTitle[] = "DLSS 5 Neural Rendering";
+-// Config schema marker stamped into [RenoDX.DLSS5].  Bump it whenever a
+-// default changes or a key changes meaning: LoadConfiguration treats a stored
+-// marker below this as a stale config, applies the defaults namespace instead
+-// of the stored values, and re-persists.  1 = pre-v5.0 schema (classic codec
++// Config schema marker stamped into [RenoDX.DLSS5]. Bump it when stored values
++// need migration; absent-key default changes alone preserve explicit choices.
++// Versions 1-3 reset stale configurations; version 4 onward migrates only the
++// designated keys described below. 1 = pre-v5.0 schema (classic codec
+ // default, no marker).  2 = v5.0 schema (anchored codec default).  3 = v5.2.2
+ // schema (classic codec default again - bumps 2 because the stored
+ // NRCodecMode=1 that v5.0 persisted must not outlive the default change).
+@@ -165,7 +168,7 @@ constexpr char kOverlayTitle[] = "DLSS 5 Neural Rendering";
+ // default into every file, so a stored 1 at schema 6 is inherited, not
+ // chosen.
+ constexpr uint32_t kConfigVersion = 7;
+-constexpr char kAddonVersion[] = "v8.5.0-rc10-stages1";
++constexpr char kAddonVersion[] = "v8.5.0-rc10-unified1q";
+ // SHA-256 of the reference signed NR runtime build.  Identification only: a
+ // mismatch is reported in the log/overlay but never blocks loading, because
+ // swapping in a custom runtime build is a supported diagnostics workflow.
+@@ -1075,6 +1078,7 @@ inline bool hooks_installed = false;
+ // injected mods, so skipping it removes the most contested patch site.
+ inline std::atomic_bool hooks_enabled = true;
+ inline std::atomic_bool streamline_hooks_enabled = true;
++inline std::atomic_bool hook_mode_config_ready = false;
+ // Row 23 (item 21 reopened): set by OnInitDevice when the session's first
+ // D3D12 device arrives. This - not hooks_enabled, which defaults on - is what
+ // distinguishes a process that can ever use the NR runtime from a DX11-only
+@@ -1521,22 +1525,23 @@ inline constexpr float kLocalStructure = 1.f;
+ //  - with the mask, the regions it finds get Skin and the rest
+ //    LocalStructureStrength;
+ //  - any NEGATIVE Skin means "skin follows Structure" (the runtime's value
+-//    for an absent key), so at this default a Structure change moved faces
+-//    as a Skin change would - the rc10 report;
++//    for an absent runtime key), so a stored negative value makes Structure
++//    changes affect faces as a Skin change would;
+ //  - above Structure 1 the model reads Skin less and less: the Skin 0-vs-1
+ //    difference on faces, 0.17-0.40 stops at Structure 1, was 0.03-0.06 at
+ //    1.2 on three frames (0.12 on the fourth) and 0.02-0.03 at 1.5 on all
+ //    four.  Skin above 1 adds little (0.01-0.10 stops).
+-// The stored default stays -1, "stock": at the default Structure 1 the
+-// runtime uses 1 for it.  0 is the least the model does to skin, not a
+-// neutral midpoint.  NRSkinIndependent decides what is sent for it.
+-inline constexpr float kSkinStructure = -1.f;
++// Fresh configurations enable the character mask and use minimal skin steering
++// to reduce facial artifacts. Explicit saved values, including -1, still load.
++// 0 is the least the model does to skin, not a neutral midpoint.
++// NRSkinIndependent decides what is sent for it.
++inline constexpr float kSkinStructure = 0.f;
+ // Skin independent of Structure (NRSkinIndependent), SentSkinSteering.  On
+ // by default; it acts only on a pass whose Character mask is on, the one
+ // state in which the runtime reads Skin.  Off sends the stored values as
+ // they are, as through rc10.
+ inline constexpr bool kSkinIndependent = true;
+-inline constexpr bool kAutoMask = false;
++inline constexpr bool kAutoMask = true;
+ inline constexpr bool kUiCorrection = false;
+ // NR codec mode default.  2 = Auto (the v6 default and the one mode that
+ // "just works"): interpret the source encoding, run the linear
+@@ -2602,7 +2607,10 @@ inline decltype(&slFreeResources) real_streamline_free[2] = {};
+ inline detour_guard::Record streamline_records[5];
+ 
+ inline void Log(reshade::log::level level, const std::string& message) {
+-  reshade::log::message(level, ("DLSS5 Generic: " + message).c_str());
++  const std::string line = "DLSS5 Generic: " + message;
++  reshade::log::message(level, line.c_str());
++  // Also into the suite's anomaly log (dlss5/dlss5_log); a no-op without the Bridge.
++  ::dlss5::eventlog::Forward(::dlss5::eventlog::kGeneric, static_cast<int>(level), line.c_str());
+ }
+ 
+ // ---- NR's cost, as the player sees it (rc11, NRCostMeter) -------------------
+@@ -3215,12 +3223,43 @@ inline const std::filesystem::path& ReShadeBaseDirectory() {
+   return base;
+ }
+ 
++// The suite keeps its log files in <base>\dlss5\dlss5_log; the base folder is
++// the fallback when that folder cannot be created.
++inline std::filesystem::path TraceLogDirectory() {
++  wchar_t folder[MAX_PATH] = L"";
++  if (::dlss5::eventlog::EnsureLogDirectory(ReShadeBaseDirectory().c_str(), folder, MAX_PATH)) {
++    return std::filesystem::path(folder);
++  }
++  return ReShadeBaseDirectory();
++}
++
+ // Search order for the signed NR runtime: the addon's own folder first (an
+ // explicit user placement always wins), then the game executable's folder -
+ // ReShade setups with a central AddonPath load the addon far from the game
+ // while the runtime sits beside the exe.  Field logs showed exactly that
+ // class failing with "dll was not found beside the addon".
+-inline std::filesystem::path FindNrRuntimePath() {
++inline std::filesystem::path FindNrRuntimePath(ID3D12Device* device) {
++  // The bridge owns the game-specific GPU/runtime mapping; Generic consumes
++  // a versioned export so a full-path LoadLibrary cannot bypass that choice.
++  const HMODULE bridge = GetModuleHandleW(L"dlss5-bridge.addon64");
++  using RuntimePathV2 = int (__cdecl*)(uint32_t,int32_t,wchar_t*,uint32_t);
++  auto selected_device = bridge ? reinterpret_cast<RuntimePathV2>(GetProcAddress(bridge,"DLSS5GetNrRuntimePathV2")):nullptr;
++  if(selected_device) {
++    wchar_t path[32768]={};
++    if(device) {
++      const LUID luid=device->GetAdapterLuid();
++      if(selected_device(luid.LowPart,luid.HighPart,path,32768)>0) return std::filesystem::path(path);
++    }
++    return AddonDirectory()/L"dlss5-runtime-unavailable"/L"nvngx_dlssnr.dll";
++  }
++  using RuntimePath = int (__cdecl*)(wchar_t*, uint32_t);
++  auto selected = bridge ? reinterpret_cast<RuntimePath>(GetProcAddress(bridge, "DLSS5GetNrRuntimePathV1")) : nullptr;
++  if (selected) {
++    wchar_t path[32768] = {};
++    const int result = selected(path, 32768);
++    if (result > 0) return std::filesystem::path(path);
++    if (result < 0) return AddonDirectory() / L"dlss5-runtime-unavailable" / L"nvngx_dlssnr.dll";
++  }
+   const std::filesystem::path primary = AddonDirectory() / L"nvngx_dlssnr.dll";
+   std::error_code ignored;
+   if (std::filesystem::exists(primary, ignored)) return primary;
+@@ -3751,7 +3790,7 @@ inline void PrimeNgxLoaderSymbols(ID3D12Device* device) {
+     // stored pointers reference them.  The runtime's internal log cannot be
+     // enabled; behavioral probing and our own captures are the only ground
+     // truth available.
+-    symbols.nr_path = FindNrRuntimePath();
++    symbols.nr_path = FindNrRuntimePath(device);
+     // The process-wide marker names this addon's own earlier load: ReShade
+     // unloads and reloads add-ons with the devices that hold them (a game's
+     // start-up probe device is enough), and DetachLite leaves the runtime
+@@ -18624,6 +18663,8 @@ inline void ServiceDisabledNr() {
+   ngx_serial::retirement_armed.store(false, std::memory_order_release);
+ }
+ 
++inline void PollLayerTrial();
++
+ inline void OnPresent(
+     reshade::api::command_queue* queue,
+     reshade::api::swapchain* swapchain,
+@@ -18632,6 +18673,7 @@ inline void OnPresent(
+     uint32_t,
+     const reshade::api::rect*) {
+   if (shutting_down.load(std::memory_order_acquire)) return;
++  PollLayerTrial();
+   // Counted before ANY early return below it: the question this answers is
+   // "did the addon get ticked", not "did it get far".
+   presents_observed.fetch_add(1, std::memory_order_relaxed);
+@@ -19058,10 +19100,7 @@ struct Setting {
+     if (stage >= 0) {
+       const uint32_t count = static_cast<uint32_t>(std::clamp(
+           std::lround(value), 0l, static_cast<long>(stages::kPerStage)));
+-      uint32_t previous = stages::configuration.load(std::memory_order_acquire);
+-      while (!stages::configuration.compare_exchange_weak(
+-          previous, stages::Plan{previous}.With(static_cast<stages::Point>(stage), count).packed,
+-          std::memory_order_acq_rel, std::memory_order_acquire)) {}
++      stages::trial::Request(stages::Snapshot().With(static_cast<stages::Point>(stage), count));
+     } else if (f != nullptr) {
+       f->store(value);
+     } else if (u != nullptr) {
+@@ -19075,7 +19114,7 @@ struct Setting {
+     if (stage >= 0) {
+       // Write a complete plan even for a single-row edit, so missing keys
+       // cannot reintroduce a default stage on the next launch.
+-      const stages::Plan plan = stages::Snapshot();
++      const stages::Plan plan{stages::configuration.load(std::memory_order_acquire)};
+       reshade::set_config_value(nullptr, kConfigSection, "NRRenderPasses", plan.Count(stages::Point::Render));
+       reshade::set_config_value(nullptr, kConfigSection, "NRUpscaledPasses", plan.Count(stages::Point::Upscaled));
+       reshade::set_config_value(nullptr, kConfigSection, "NRPresentPasses", plan.Count(stages::Point::Present));
+@@ -20279,6 +20318,8 @@ inline const char* TransferStrengthTip(const ui::PanelText& text) {
+ // The hook point decides where every other control's effect lands, so it
+ // draws at the top of both layouts (rc3), not inside Performance where the
+ // owner could not find it.  Both layout roots call it directly.
++inline bool ui_advanced_settings = false;
++
+ inline void DrawSectionHookPoint(const ui::PanelText& text) {
+   if (text.modern) ui::SubCaption(text.hook_point);
+   else ImGui::TextUnformatted(text.hook_point);
+@@ -20307,7 +20348,7 @@ inline void DrawSectionHookPoint(const ui::PanelText& text) {
+   else ImGui::TextUnformatted(text.Tr("Total layers"));
+   ImGui::Text("%u / 12", stages::Snapshot().Total());
+   if (text.modern) ui::RowLabel("");
+-  {
++  if (ui_advanced_settings) {
+     constexpr const char* kPresentGuideModes[] = {"Optional", "Required", "Never"};
+     ChoiceSetting(
+         text, kSetPresentGuides, text.Pick("Present Guides", "Depth and motion"),
+@@ -20322,6 +20363,8 @@ inline void DrawSectionHookPoint(const ui::PanelText& text) {
+         kPresentEncodings,
+         "What the presented frame holds.  Auto reads the swapchain's colour"
+         " space; override it only for a game that declares it wrongly.");
++  }
++  {
+     SliderSetting(
+         text, kSetPresentWhite, text.Pick("Present White (nits)", "HDR paper white"),
+         0.f, 1000.f, "%.0f",
+@@ -20341,6 +20384,8 @@ inline void DrawSectionHookPoint(const ui::PanelText& text) {
+         " only on the first one of each game frame (less GPU time, but the"
+         " generated frames are shown without it, which can read as a"
+         " flicker).");
++  }
++  if (ui_advanced_settings) {
+     constexpr const char* kPresentFgSources[] = {"Auto", "Stable timing", "Legacy timing"};
+     ChoiceSetting(
+         text, kSetPresentFgSource, "Frame generation detection", kPresentFgSources,
+@@ -20351,20 +20396,53 @@ inline void DrawSectionHookPoint(const ui::PanelText& text) {
+   }
+ }
+ 
++inline void PollLayerTrial() {
++  if (stages::trial::Poll()) {
++    kSetRenderPasses.Persist();
++    RecreateFeatures();
++  }
++}
++// Draw only within the DLSS5 overlay. The global reshade_overlay event does
++// not establish ownership by this add-on's page. OnPresent keeps the timeout
++// active while this page or the entire ReShade overlay is closed.
++inline void DrawLayerTrial() {
++  PollLayerTrial();
++  const uint64_t due = stages::trial::deadline.load();
++  if (!due) return;
++  const uint64_t now = GetTickCount64();
++  ImGui::PushID("DLSS5LayerTrial");
++  ImGui::SeparatorText(ui::Tr("Confirm DLSS5 layer count"));
++  {
++    ImGui::TextWrapped("%s", ui::Tr("5+ layers increase VRAM use, GPU load and latency; rendering may stall or the device may be lost."));
++    ImGui::Text(ui::Tr("Restore previous layers in %u seconds"), static_cast<unsigned>((due > now ? due-now : 0) + 999) / 1000);
++    ImGui::BeginDisabled(now + 13000 < due || now >= due);
++    // Mouse-only activation prevents Enter/Space and the initiating click from confirming.
++    if (ImGui::Button(ui::Tr("Keep###layer_keep")) && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) stages::trial::Resolve(true);
++    ImGui::EndDisabled();
++    ImGui::SameLine();
++    if (ImGui::Button(ui::Tr("Restore now###layer_restore"))) stages::trial::Resolve(false);
++  }
++  ImGui::Separator();
++  ImGui::PopID();
++}
++inline void LayerCaption(uint32_t channel, char* text, size_t size) {
++  const auto plan = stages::Snapshot();
++  const auto point = channel < plan.Count(stages::Point::Render) ? stages::Point::Render :
++      channel < plan.Offset(stages::Point::Present) ? stages::Point::Upscaled : stages::Point::Present;
++  const char* stage = ui::Tr(point == stages::Point::Render ? "Render" : point == stages::Point::Upscaled ? "Upscaled" : "Present");
++  std::snprintf(text, size, ui::Tr("%s layer %u (global %u)"), stage, channel - plan.Offset(point) + 1, channel + 1);
++}
++
+ inline void DrawSectionStackingResolution(const ui::PanelText& text) {
+   // Global channels are ordered by stage; channel 1 is always shown above.
+   ImGui::BeginDisabled(ui_defaults_view);
+   const uint32_t channels = stages::Snapshot().Total();
+   for (uint32_t pass = 1; pass < channels && pass < kMaxNrChannels; ++pass) {
+     ImGui::PushID(static_cast<int>(pass));
+-    char caption[64];
+-    std::snprintf(caption, sizeof(caption), text.Tr(text.Pick("Stack pass %u", "Pass %u")),
+-                  pass + 1);
+-    if (text.modern) {
+-      ui::SubCaption(caption);
+-    } else {
+-      ImGui::TextUnformatted(caption);
+-    }
++    char caption[160];
++    LayerCaption(pass, caption, sizeof(caption));
++    ImGui::SeparatorText(caption);
++    if (ImGui::IsItemHovered()) ImGui::SetTooltip(ui::Tr("Settings: NRPass%u*"), pass + 1);
+     SliderSetting(text, kSetPassIntensity[pass - 1], text.Pick("Intensity", "Strength"),
+                   0.f, 2.f, "%.2f", ui::text::kIntensityTip);
+     // Greyed out like pass 1's (DrawSectionHdrDetails), the value still shown.
+@@ -21593,7 +21671,6 @@ inline void DrawClassicLayout(reshade::api::effect_runtime* runtime) {
+     DrawSectionHotkeys(text);
+   }
+   ImGui::Separator();
+-  DrawSectionLanguage(text);
+   DrawSectionIssueNotice(text);
+   DrawSectionLayoutToggle();
+ }
+@@ -21675,9 +21752,10 @@ inline void DrawModernLayout(reshade::api::effect_runtime* runtime,
+     ResetSettings({kStrengthSettings, kLookSettings, kStackingSettings, kLookResultSettings});
+   }
+   ImGui::BeginDisabled(ui_defaults_view);
+-  char first_channel[64];
+-  std::snprintf(first_channel, sizeof(first_channel), text.Tr("Pass %u"), 1u);
+-  ui::SubCaption(first_channel);
++  char first_channel[160];
++  LayerCaption(0, first_channel, sizeof(first_channel));
++  ImGui::SeparatorText(first_channel);
++  if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", ui::Tr("Settings: NR*"));
+   SliderSetting(text, kSetIntensity, text.intensity, 0.f, 2.f, "%.2f", ui::text::kIntensityTip);
+   ImGui::BeginDisabled(transfer_strength_inert.load(std::memory_order_relaxed) != 0u);
+   SliderSetting(text, kSetTransferStrength, "HDR transfer", 0.f, 1.f, "%.2f", TransferStrengthTip(text));
+@@ -21691,6 +21769,8 @@ inline void DrawModernLayout(reshade::api::effect_runtime* runtime,
+   ImGui::EndDisabled();
+   ui::SectionGap();
+ 
++  if (!ui_advanced_settings) return;
++
+   bool reset = false;
+   char hotkeys[128];
+   std::snprintf(hotkeys, sizeof(hotkeys), ui::Tr(ui::text::kHotkeysHint),
+@@ -21726,7 +21806,6 @@ inline void DrawModernLayout(reshade::api::effect_runtime* runtime,
+   if (reset) ResetSettings({kFixesSettings});
+ 
+   ui::SectionGap();
+-  DrawSectionLanguage(text);
+   DrawSectionIssueNotice(text);
+   ImGui::Separator();
+   {
+@@ -21784,7 +21863,7 @@ inline void DrawPanelBody(reshade::api::effect_runtime* runtime) {
+   // said ACTIVE while every evaluate declined.  ComputeStatusCard is the
+   // same function the NR-CARD line states, and test/dlss5 pins every row.
+   const NrVerdict verdict = ComputeNrVerdict(CollectFunnelInputs());
+-  const bool classic = ui_classic_layout.load();
++  const bool classic = ui_advanced_settings && ui_classic_layout.load();
+   {
+     const ui::StatusCard card =
+         ui::ComputeStatusCard(CollectCardInputs(verdict, SteadyNowNs()));
+@@ -21796,7 +21875,7 @@ inline void DrawPanelBody(reshade::api::effect_runtime* runtime) {
+     }
+     if (ui::DrawStatusCard(card)) {
+       if (card.action == ui::CardAction::kTurnOn) SetNrEnabledFromUi(true);
+-      if (card.action == ui::CardAction::kOpenDiagnostics) ui_open_diagnostics = true;
++      if (card.action == ui::CardAction::kOpenDiagnostics) { ui_advanced_settings = true; ui_open_diagnostics = true; }
+     }
+     DrawHealthIssues();
+     DrawIssueReport();
+@@ -21836,6 +21915,11 @@ inline void DrawPanelBody(reshade::api::effect_runtime* runtime) {
+ inline void OnOverlay(reshade::api::effect_runtime* runtime) {
+   const int64_t started = ui_capture_dir.empty() ? 0 : SteadyNowNs();
+   RefreshUiLanguage();
++  DrawSectionLanguage(ui::kModernText);
++  RefreshUiLanguage();
++  ImGui::Checkbox(ui::Tr("Advanced settings###nr_advanced"), &ui_advanced_settings);
++  DrawLayerTrial();
++  if (!stages::trial::status.empty()) ImGui::TextWrapped("%s", dlss5_panel::SelectText(stages::trial::status, ui::CurrentLanguage() == 13 || ui::CurrentLanguage() == 14).c_str());
+   ui::reset_buttons_drawn = 0;
+   overlay_window_stranded.store(
+       !ImGui::IsWindowDocked()
+@@ -21857,7 +21941,7 @@ inline void OnOverlay(reshade::api::effect_runtime* runtime) {
+       // after a row label, a translated hint and most Developer-view lines
+       // were cut off mid-word there.
+       ImGui::PushTextWrapPos(0.f);
+-      if (ui_classic_layout.load()) {
++      if (ui_advanced_settings && ui_classic_layout.load()) {
+         DrawPanelBody(runtime);
+       } else {
+         const float column = (std::min)(ImGui::GetContentRegionAvail().x,
+@@ -22206,8 +22290,8 @@ inline void LoadConfiguration() {
+   const bool future_config = version_present && stored_config_version > kConfigVersion;
+   const bool migrate_config = !future_config && stored_config_version != kConfigVersion;
+ 
+-  // Saved values start AT the defaults, so a stale config simply loads
+-  // nothing and the apply section below persists a fresh default state.
++  // Start with defaults; the unconditional reads below replace each value
++  // only when its key is present. Explicit saved choices survive default changes.
+   bool saved_enabled = defaults::kEnabled;
+   bool saved_pre_upscale = defaults::kPreSr;
+   uint32_t saved_present_guides = defaults::kPresentGuides;
+@@ -22528,10 +22612,11 @@ inline void LoadConfiguration() {
+   reshade::get_config_value(
+       nullptr, kConfigSection, "NRNormTrace", saved_norm_trace);
+   norm_trace_enabled = saved_norm_trace;
+-  // Both trace CSVs go beside this game's ReShade.ini, never into a shared
+-  // AddonPath folder where another game's run would truncate them (ENV-12).
++  // Both trace CSVs go under this game's ReShade base folder (in
++  // dlss5\dlss5_log), never into a shared AddonPath folder where another
++  // game's run would truncate them (ENV-12).
+   if (saved_norm_trace) {
+-    norm_trace::Configure(ReShadeBaseDirectory() / "RenoDX-DLSS5-normtrace.csv");
++    norm_trace::Configure(TraceLogDirectory() / "RenoDX-DLSS5-normtrace.csv");
+   }
+   bool saved_screenshot_planes = false;
+   reshade::get_config_value(
+@@ -22565,7 +22650,7 @@ inline void LoadConfiguration() {
+       SanitizeEnumKey(saved_max_megabytes, 10u, 0u, 500u, "NRScreenshotMaxMB");
+   // NREditTrace can be switched on in the Developer view at any time, so its
+   // CSV path is set whether or not it starts on.
+-  edit_trace::Configure(ReShadeBaseDirectory() / "RenoDX-DLSS5-edittrace.csv");
++  edit_trace::Configure(TraceLogDirectory() / "RenoDX-DLSS5-edittrace.csv");
+   // Read unconditionally: hook policy is a per-game support knob (see the
+   // comment at the flag definitions) and must survive a config reset.
+   // 0 = inert, 1 = NGX + Streamline, 2 = NGX only (default).  NGX-only keeps
+@@ -22574,7 +22659,7 @@ inline void LoadConfiguration() {
+   // Streamline-heavy games (FH6, Cyberpunk 2077).  Set EnableHooks=1 only for
+   // games whose DLSS/DLSSD is reached solely through a private Streamline
+   // bridge that never touches the NGX exports.
+-  uint32_t saved_hook_mode = 2;
++  uint32_t saved_hook_mode = ::dlss5::hook_mode::kDefault;
+   const bool hook_mode_stored = reshade::get_config_value(
+       nullptr, kConfigSection, "EnableHooks", saved_hook_mode);
+ 
+@@ -22831,7 +22916,7 @@ inline void LoadConfiguration() {
+         .With(stages::Point::Present, SanitizeEnumKey(
+             saved_present_passes, 0u, 0u, stages::kPerStage, "NRPresentPasses"));
+   }
+-  stages::configuration.store(saved_plan.packed, std::memory_order_release);
++  stages::trial::Initialize(saved_plan);
+   // Persist the complete plan even when the schema version did not change.
+   if (!future_config) kSetRenderPasses.Persist();
+   // Each pass's own key, so a clamp names the line the player wrote.
+@@ -23744,6 +23829,7 @@ inline void Use(DWORD reason, HMODULE module, LPVOID reserved) {
+       debug::Mark("attach:begin");
+       lastgasp::Mark("attach:begin");
+       internal::LoadConfiguration();
++      internal::hook_mode_config_ready.store(true, std::memory_order_release);
+       debug::Mark("attach:config-loaded");
+       internal::Log(
+           reshade::log::level::info,
+diff --git a/edit_trace.hpp b/edit_trace.hpp
+index 4939290b66e9e6f4cc73c7d0f7e763a565ba9e38..9f085c5c82453e4c66662862c6da17ec82e64de4 100644
+--- a/edit_trace.hpp
++++ b/edit_trace.hpp
+@@ -71,6 +71,7 @@
+ #include "gpu_lease.hpp"
+ #include "look_stage.hpp"
+ #include "submission_tracker.hpp"
++#include "../../../../common/event-log.hpp"
+ 
+ namespace renodx::addons::dlss5::edit_trace {
+ 
+@@ -183,7 +184,9 @@ inline int64_t last_sweep_ns = 0;
+ inline std::map<std::pair<uint32_t, uint32_t>, Track> tracks;
+ 
+ inline void Log(reshade::log::level level, const std::string& message) {
+-  reshade::log::message(level, ("DLSS5 Generic: " + message).c_str());
++  const std::string line = "DLSS5 Generic: " + message;
++  reshade::log::message(level, line.c_str());
++  ::dlss5::eventlog::Forward(::dlss5::eventlog::kGeneric, static_cast<int>(level), line.c_str());
+ }
+ 
+ inline void Release() {
+diff --git a/gpu_timers.hpp b/gpu_timers.hpp
+index ac83fa02c595442f90028e97f37ecb38b4e4d805..5b27e7412e4aa5c49d86f6caaddb8d9c74391865 100644
+--- a/gpu_timers.hpp
++++ b/gpu_timers.hpp
+@@ -39,6 +39,7 @@
+ #include "../../utils/directx.hpp"
+ #include "gpu_lease.hpp"
+ #include "submission_tracker.hpp"
++#include "../../../../common/event-log.hpp"
+ 
+ namespace renodx::addons::dlss5::gpu_timers {
+ 
+@@ -91,8 +92,9 @@ constexpr uint32_t PassLookEnd(uint32_t pass) { return PassEncodeStart(pass) + 5
+ static_assert(kSlotCount <= kSlotsPerEval);
+ 
+ inline void SafeLog(reshade::log::level level, const std::string& message) {
+-  reshade::log::message(
+-      level, (std::string(kLogPrefix) + ": " + message).c_str());
++  const std::string line = std::string(kLogPrefix) + ": " + message;
++  reshade::log::message(level, line.c_str());
++  ::dlss5::eventlog::Forward(::dlss5::eventlog::kGeneric, static_cast<int>(level), line.c_str());
+ }
+ 
+ struct Segment {
+diff --git a/lastgasp.hpp b/lastgasp.hpp
+index 9952873b3073ecd820dad7e4115fe9b5c5fa1724..1237a333a83d187290acccf47e7633070b40f190 100644
+--- a/lastgasp.hpp
++++ b/lastgasp.hpp
+@@ -6,7 +6,7 @@
+ // The release-build "last gasp" crash reporter.  Every build includes this
+ // header; debug.hpp's crash facility (minidumps, symbols, watchdog) stays
+ // DEBUG-only and is NOT enabled here - only the pieces a field report needs:
+-// one line in RenoDX-DLSS5-crash.log next to the game exe naming the
++// one line in RenoDX-DLSS5-crash.log (in <game>\dlss5\dlss5_log) naming the
+ // faulting module, and the last release marks (the release stage the addon
+ // died in).
+ //
+@@ -83,6 +83,7 @@
+ #include <string>
+ 
+ #include <include/reshade.hpp>
++#include "../../../../common/event-log.hpp"
+ 
+ namespace renodx::addons::dlss5 {
+ namespace lastgasp {
+@@ -850,6 +851,13 @@ inline void Install(HMODULE module, const char* version) {
+   std::wstring dir(exe);
+   const size_t slash = dir.find_last_of(L"\\/");
+   if (slash != std::wstring::npos) dir.resize(slash);
++  // The suite keeps every log in <game>\dlss5\dlss5_log; the game folder
++  // itself remains the fallback when that folder cannot be created.
++  wchar_t log_dir[MAX_PATH] = L"";
++  if (slash != std::wstring::npos &&
++      ::dlss5::eventlog::EnsureLogDirectory(dir.c_str(), log_dir, MAX_PATH)) {
++    dir = log_dir;
++  }
+   crash_log_path = (slash != std::wstring::npos ? dir + L"\\" : L"")
+                    + std::wstring(L"RenoDX-DLSS5-crash.log");
+   crash_file = CreateFileW(
+diff --git b/layer_trial.hpp b/layer_trial.hpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..5714f3346adcd3a73ce7191661434c569bb5b8cb
+--- /dev/null
++++ b/layer_trial.hpp
+@@ -0,0 +1,120 @@
++#pragma once
++#include "../../../../common/durable.hpp"
++#include <mutex>
++
++namespace renodx::addons::dlss5::stages {
++namespace trial {
++constexpr uint32_t kMagic = 0x3552594c;
++struct Record {
++  uint32_t magic = kMagic, version = 1;
++  uint64_t checksum = 0, generation = 0;
++  uint32_t confirmed = 8, requested = 8, pending = 0, reserved = 0;
++};
++inline Record record;
++inline std::filesystem::path file;
++inline std::mutex mutex;
++inline std::atomic_uint64_t deadline{0};
++inline std::atomic_uint32_t fallback{8};
++inline std::atomic_bool changed{false}, safe{false};
++inline bool writable = false;
++using SafeQuery = uint32_t (__cdecl*)();
++inline SafeQuery bridge_safe_query=nullptr;
++inline std::string status;
++inline bool Persist(Record next) {
++  next.generation = record.generation + 1;
++  if (!writable || !::dlss5::durable::Save(file, next)) {
++    status = "状态无法保存，拒绝高层数试用 / Cannot save trial state.";
++    return false;
++  }
++  record = next;
++  return true;
++}
++inline void Initialize(Plan requested, std::filesystem::path directory = {}) {
++  std::lock_guard<std::mutex> lock(mutex);
++  deadline=0; safe=false; changed=false; record={};
++  auto dir = directory.empty() ? ::dlss5::durable::StateDirectory(::dlss5::durable::GameDirectory()) : directory;
++  file = dir / L"generic-layers.state";
++  writable = !dir.empty();
++  auto result = writable ? ::dlss5::durable::Read(file, record, kMagic) : ::dlss5::durable::ReadResult::Invalid;
++  if (result == ::dlss5::durable::ReadResult::Invalid || !Plan{record.confirmed}.Valid() ||
++      !Plan{record.requested}.Valid() || record.pending > 1) {
++    if(writable && std::filesystem::exists(file)) {
++      std::error_code ec;
++      std::filesystem::copy_file(file,std::filesystem::path(file.wstring()+L".bad-"+std::to_wstring(GetTickCount64())),std::filesystem::copy_options::none,ec);
++      if(ec) writable=false;
++    }
++    record = {}; safe = true;
++    status = "层数状态损坏或不可写，本次暂停 NR。请运行故障恢复。 / Invalid state; NR paused.";
++  }
++  const auto bridge = GetModuleHandleW(L"dlss5-bridge.addon64");
++  using Safe = uint32_t (__cdecl*)();
++  auto get_safe = bridge ? reinterpret_cast<Safe>(GetProcAddress(bridge, "DLSS5DeploymentSafeMode")) : nullptr;
++  bridge_safe_query=get_safe;
++  if (get_safe && get_safe()) safe = true;
++  if (record.pending) {
++    requested = Plan{record.confirmed};
++    Record next = record; next.pending = 0; next.requested = next.confirmed;
++    Persist(next);
++    status = "上次层数未确认，已回退 / Unconfirmed layer plan restored.";
++  } else if (requested.Total() < 5) {
++    Record next = record; next.confirmed = next.requested = requested.packed;
++    Persist(next);
++  } else if (requested.packed != record.confirmed || result != ::dlss5::durable::ReadResult::Valid) {
++    Record next = record; next.pending = 1; next.requested = requested.packed;
++    if (Persist(next)) deadline = GetTickCount64() + 15000;
++    else requested = Plan{record.confirmed};
++  }
++  fallback = record.confirmed;
++  configuration.store(requested.packed, std::memory_order_release);
++}
++inline bool Request(Plan plan) {
++  std::lock_guard<std::mutex> lock(mutex);
++  if (!plan.Valid() || safe.load() || (bridge_safe_query && bridge_safe_query())) return false;
++  Record next = record;
++  next.requested = plan.packed;
++  next.pending = plan.Total() >= 5 && plan.packed != record.confirmed;
++  if (!next.pending) next.confirmed = plan.packed;
++  // No GPU consumer can see a high-layer plan before its rollback record is durable.
++  if (!Persist(next)) return false;
++  fallback.store(record.confirmed, std::memory_order_release);
++  deadline.store(next.pending ? GetTickCount64() + 15000 : 0, std::memory_order_release);
++  configuration.store(plan.packed, std::memory_order_release);
++  return true;
++}
++inline Plan Snapshot() {
++  if (safe.load(std::memory_order_acquire) || (bridge_safe_query && bridge_safe_query())) return {0};
++  const uint64_t due = deadline.load(std::memory_order_acquire);
++  if (due && GetTickCount64() >= due) {
++    // Every NR dispatch takes a snapshot, including with the overlay closed.
++    // A stalled rendering thread cannot dispatch the expired plan on resumption.
++    return {fallback.load(std::memory_order_acquire)};
++  }
++  return {configuration.load(std::memory_order_acquire)};
++}
++inline bool Resolve(bool keep, uint64_t now = GetTickCount64()) {
++  std::lock_guard<std::mutex> lock(mutex);
++  const auto due = deadline.load();
++  if (!due) return false;
++  if (keep && (now >= due || now + 13000 < due)) return false;
++  Record next = record;
++  if (keep) next.confirmed = next.requested;
++  else next.requested = next.confirmed;
++  next.pending = 0;
++  if (!Persist(next)) {
++    if (keep) return false;
++    // Keep the pending disk record for recovery on the next launch.
++  }
++  configuration.store(next.requested, std::memory_order_release);
++  fallback = next.confirmed;
++  deadline = 0;
++  changed = true;
++  status = keep ? "已保留层数 / Layer plan confirmed." : "已自动回退层数 / Layer plan restored.";
++  return true;
++}
++inline bool Poll() {
++  const auto due = deadline.load();
++  if (due && GetTickCount64() >= due) Resolve(false);
++  return changed.exchange(false);
++}
++} // namespace trial
++} // namespace renodx::addons::dlss5::stages
+diff --git a/norm_trace.hpp b/norm_trace.hpp
+index 2a9ef950dcf13d06679d4962507e1201d69be51f..18e9426052dd97fcdf4e58718bf3d293737271dd 100644
+--- a/norm_trace.hpp
++++ b/norm_trace.hpp
+@@ -57,6 +57,7 @@
+ #include "../../utils/directx.hpp"
+ #include "gpu_lease.hpp"
+ #include "submission_tracker.hpp"
++#include "../../../../common/event-log.hpp"
+ 
+ namespace renodx::addons::dlss5::norm_trace {
+ 
+@@ -172,7 +173,9 @@ inline int64_t last_sweep_ns = 0;
+ inline std::map<uint32_t, Window> windows;
+ 
+ inline void Log(reshade::log::level level, const std::string& message) {
+-  reshade::log::message(level, ("DLSS5 Generic: " + message).c_str());
++  const std::string line = "DLSS5 Generic: " + message;
++  reshade::log::message(level, line.c_str());
++  ::dlss5::eventlog::Forward(::dlss5::eventlog::kGeneric, static_cast<int>(level), line.c_str());
+ }
+ 
+ inline void Release() {
+diff --git a/screenshot.hpp b/screenshot.hpp
+index 00801c2800ba30dfdde5ba27db3548acbb959553..9aa6c3c2458a2acefabdc7fe13fb69b4221463d4 100644
+--- a/screenshot.hpp
++++ b/screenshot.hpp
+@@ -78,6 +78,7 @@
+ #include "../../utils/png.hpp"
+ #include "gpu_lease.hpp"
+ #include "submission_tracker.hpp"
++#include "../../../../common/event-log.hpp"
+ 
+ namespace renodx::addons::dlss5::screenshot {
+ 
+@@ -308,7 +309,9 @@ inline std::atomic_bool worker_started = false;
+ 
+ inline void SafeLog(reshade::log::level level, const std::string& message) {
+   if (shutdown_requested.load(std::memory_order_acquire)) return;
+-  reshade::log::message(level, (std::string(kLogPrefix) + ": " + message).c_str());
++  const std::string line = std::string(kLogPrefix) + ": " + message;
++  reshade::log::message(level, line.c_str());
++  ::dlss5::eventlog::Forward(::dlss5::eventlog::kGeneric, static_cast<int>(level), line.c_str());
+ }
+ 
+ // std::filesystem::path::string() throws for characters the ANSI code page
+diff --git a/stage_plan.hpp b/stage_plan.hpp
+index 9d23152e5ceac3c5a9d3274d4cbbd632ddeddf44..795c8293bab1668d5bafa40fca391332fd79398f 100644
+--- a/stage_plan.hpp
++++ b/stage_plan.hpp
+@@ -28,7 +28,10 @@ struct Plan {
+   }
+ };
+ inline std::atomic_uint32_t configuration{Plan{}.packed};
+-inline Plan Snapshot() { return {configuration.load(std::memory_order_acquire)}; }
++}
++#include "layer_trial.hpp"
++namespace renodx::addons::dlss5::stages {
++inline Plan Snapshot() { return trial::Snapshot(); }
+ inline thread_local Plan active_plan;
+ inline thread_local Point active_point = Point::Upscaled;
+ inline thread_local uint32_t scope_depth = 0;
+diff --git a/ui/lang/zh-Hans.hpp b/ui/lang/zh-Hans.hpp
+index da75b0b8c0233e150ddbb692a37eb43ea9d61b13..b6d4ba728cb6e06c237f1ff6aa87440bbe9e7829 100644
+--- a/ui/lang/zh-Hans.hpp
++++ b/ui/lang/zh-Hans.hpp
+@@ -12,6 +12,18 @@
+ namespace renodx::addons::dlss5::ui::lang {
+ 
+ inline constexpr Translation kZhHans[] = {
++    {"Advanced settings###nr_advanced", "高级设置###nr_advanced"},
++    {"Confirm DLSS5 layer count", "确认 DLSS5 层数"},
++    {"5+ layers increase VRAM use, GPU load and latency; rendering may stall or the device may be lost.", "5 层及以上会增加显存占用、GPU 负载和延迟，可能导致卡顿或设备丢失。"},
++    {"Restore previous layers in %u seconds", "%u 秒后恢复之前的层数"},
++    {"Keep###layer_keep", "保留###layer_keep"},
++    {"Restore now###layer_restore", "立即回退###layer_restore"},
++    {"Render", "渲染"},
++    {"Upscaled", "超分后"},
++    {"Present", "呈现"},
++    {"%s layer %u (global %u)", "%s第 %u 层（全局第 %u 层）"},
++    {"Settings: NRPass%u*", "配置键：NRPass%u*"},
++    {"Settings: NR*", "配置键：NR*"},
+     {"Neural Rendering",
+      "Neural Rendering"},
+     {"Strength",
